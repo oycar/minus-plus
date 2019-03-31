@@ -33,8 +33,8 @@ current_directory=`pwd`
 MPXDIR=~/Cloudstation/Projects/Minus-Plus-Times/Code
 
 # Usage
-USAGE="Usage: $(basename $0) [-0 Start_Date] [-1 Exit_Date] [-a account name] [-C journal-currency] [-d output-date-format] [-f financial-year] [-F financial-statements-file] [-h]\
- [-l log-function] [-P price-file] [-q qualify_window] [-s] [-t show_snapshot_transactions] [-T journal-type] [-v] [-x show_extra_detail]\
+USAGE="Usage: $(basename $0) [-a account name] [-C journal-currency] [-d output-date-format] [-f financial-year] [-F financial-statements-file] [-h]\
+ [-l log-function] [-P price-file] [-q qualify_window] [-s] [-T journal-type] [-v] [-x show_extra_detail]\
  [-w write-variable,...] [-W write-state-file] [-E export-format] [-Z preprocess_only] <journal-file>"
 
 # This is a simple front end for mpx
@@ -42,7 +42,6 @@ USAGE="Usage: $(basename $0) [-0 Start_Date] [-1 Exit_Date] [-a account name] [-
 # default arguments
 account_name=""
 date_format=""
-force_date=false
 Export_Format=0
 financial_year=0
 log_function=0
@@ -53,9 +52,6 @@ qualify_window=0
 report_file=""
 Show_All=0
 Show_Extra=0
-Show_Transactions=0
-Start_Time=""
-Stop_Time=""
 
 # Default journal currency and type
 journal_currency="AUD"
@@ -67,15 +63,8 @@ shopt -s expand_aliases
 alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
 
 # logging is an array
-while getopts ":0:1:a:C:d:Ef:F:hl:P:q:stT:vw:W:xZ" opt; do
+while getopts ":a:C:d:Ef:F:hl:P:q:sT:vw:W:xZ" opt; do
     case $opt in
-    0) # Start Time
-      Start_Time="${OPTARG}"
-      ;;
-
-    1) # Stop Time
-      Stop_Time="${OPTARG}"
-      ;;
 
     a)
       account_name=$OPTARG
@@ -126,13 +115,8 @@ while getopts ":0:1:a:C:d:Ef:F:hl:P:q:stT:vw:W:xZ" opt; do
       Show_All=true
       ;;
 
-    t)
-      # Show transactions deduced from snapshot file
-      Show_Transactions=true
-      ;;
-
     T) # PTY is the default
-      journal_type="${OPTARG}"
+      journal_type=${OPTARG}
       ;;
 
     v)
@@ -207,7 +191,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   if [ "$preprocess_only" == "false" ]; then
     # Go back to original directory
     cd "${current_directory}"
-    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v Start_Time="${Start_Time}" -v Stop_Time="${Stop_Time}" -v FY=${financial_year} -v Show_Account=${account_name} -v Show_All=${Show_All} -v Reports="${report_file}" -v Show_Extra=${Show_Extra} -v Show_Transactions=${Show_Transactions} -v Qualification_Window=${qualify_window} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
+    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v FY=${financial_year} -v Show_Account=${account_name} -v Show_All=${Show_All} -v Reports="${report_file}" -v Show_Extra=${Show_Extra} -v Qualification_Window=${qualify_window} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
   fi
 
 exit 0;
