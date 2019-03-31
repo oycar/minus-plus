@@ -1,0 +1,213 @@
+#!/bin/bash
+# A shell script to wrap the awk aware preprocessor and awk and run the mpx command with simple arguments
+# mpx.sh
+# Copyright (C) 2018  Robert Whitehurst
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http:#www.gnu.org/licenses/>.
+
+# A simple function to write a file
+# We can write provided that it either doesn't exist or is writable
+function wfile () {
+  file=$1
+  if [ -e ${file} ] && [ ! -w ${file} ]; then
+    echo "Cannot write to file => ${file}" >&2
+    exit 1
+  fi
+}
+
+# Save current directory
+current_directory=`pwd`
+
+# set directory
+MPXDIR=~/Cloudstation/Projects/Minus-Plus-Times/Code
+
+# Usage
+USAGE="Usage: $(basename $0) [-0 Start_Date] [-1 Exit_Date] [-a account name] [-C journal-currency] [-d output-date-format] [-f financial-year] [-F financial-statements-file] [-h]\
+ [-l log-function] [-P price-file] [-q qualify_window] [-s] [-t show_snapshot_transactions] [-T journal-type] [-v] [-x show_extra_detail]\
+ [-w write-variable,...] [-W write-state-file] [-E export-format] [-Z preprocess_only] <journal-file>"
+
+# This is a simple front end for mpx
+# it handles arguments and runs the preprocessor
+# default arguments
+account_name=""
+date_format=""
+force_date=false
+Export_Format=0
+financial_year=0
+log_function=0
+write_file=0
+write_variables=""
+preprocess_only=false
+qualify_window=0
+report_file=""
+Show_All=0
+Show_Extra=0
+Show_Transactions=0
+Start_Time=""
+Stop_Time=""
+
+# Default journal currency and type
+journal_currency="AUD"
+journal_type="PTY"
+
+# A useful alias for an awk aware preprocessor
+# This uses gpp
+shopt -s expand_aliases
+alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
+
+# logging is an array
+while getopts ":0:1:a:C:d:Ef:F:hl:P:q:stT:vw:W:xZ" opt; do
+    case $opt in
+    0) # Start Time
+      Start_Time="${OPTARG}"
+      ;;
+
+    1) # Stop Time
+      Stop_Time="${OPTARG}"
+      ;;
+
+    a)
+      account_name=$OPTARG
+      ;;
+
+    C) # AUD is the default
+      journal_currency=${OPTARG}
+      ;;
+
+    d)
+      date_format="${OPTARG}" # Protect this with double quotes because it may contain spaces
+      ;;
+
+    E)
+      # Export format transactions
+      date_format="%d/%m/%Y"
+      Export_Format=1
+      ;;
+
+    f)
+      financial_year=$OPTARG
+      ;;
+    F) # Financial statements
+      wfile $OPTARG
+      report_file=$OPTARG
+      ;;
+
+    h) # Hide
+      Show_All=0
+      ;;
+    l)
+      log_function=$OPTARG
+    ;;
+
+    P)
+      # This is a price file
+      write_variables="Price"
+      wfile $OPTARG
+      write_file=$OPTARG
+      ;;
+
+    q) # Dividend Qualification
+      qualify_window=$OPTARG
+      ;;
+
+    s)
+      # show all transactions
+      Show_All=true
+      ;;
+
+    t)
+      # Show transactions deduced from snapshot file
+      Show_Transactions=true
+      ;;
+
+    T) # PTY is the default
+      journal_type="${OPTARG}"
+      ;;
+
+    v)
+   printf "mpx - Minus-Plus-Times command line accounting and financial reporting\n\
+Copyright (C) 2019  Robert Whitehurst\n\
+\n\
+This program is free software: you can redistribute it and/or modify\n\
+it under the terms of the GNU General Public License as published by\n\
+the Free Software Foundation, either version 3 of the License, or\n\
+(at your option) any later version.\n\
+\n\
+This program is distributed in the hope that it will be useful,\n\
+but WITHOUT ANY WARRANTY; without even the implied warranty of\n\
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n\
+GNU General Public License for more details.\n\
+\n\
+You should have received a copy of the GNU General Public License\n\
+along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+
+    w)
+      write_variables="${OPTARG}"
+    ;;
+
+    W)
+      #   Write state to this file
+      wfile $OPTARG
+      write_file=$OPTARG
+      ;;
+
+    x)
+      Show_Extra=1
+      ;;
+
+    Z)
+      preprocess_only=true
+      ;;
+
+    \?)
+      echo "Invalid option => $OPTARG" >&2
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+    :)
+      echo "$OPTARG requires an argument." >&2
+      echo "$USAGE" >&2
+      exit 1
+      ;;
+    esac
+  done
+
+  # Remove used arguments
+  shift $((OPTIND-1))
+
+  # Move to code directory
+  cd "${MPXDIR}"
+
+  # Need to check for arguments?
+  # Two possible actions
+  #   1) only run the preprocessor
+  #   2) run the preprocessor and mpx.awk itself
+  #
+  # Preprocess (if its available...)
+  if command -v app >/dev/null 2>&1 ; then
+    app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" -D JOURNAL_TYPE=\"${journal_type}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+  else
+    echo >&2 "mpx warning: No preprocessor gpp found - using prebuilt mpx script."
+  fi
+
+  if [ "$preprocess_only" == "false" ]; then
+    # Go back to original directory
+    cd "${current_directory}"
+    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v Start_Time="${Start_Time}" -v Stop_Time="${Stop_Time}" -v FY=${financial_year} -v Show_Account=${account_name} -v Show_All=${Show_All} -v Reports="${report_file}" -v Show_Extra=${Show_Extra} -v Show_Transactions=${Show_Transactions} -v Qualification_Window=${qualify_window} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
+  fi
+
+exit 0;
