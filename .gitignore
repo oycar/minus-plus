@@ -1,0 +1,6 @@
+.DS_Store
+mpx.awk
+*log
+Icon*
+*.txt
+.gawk*
