@@ -2284,7 +2284,7 @@ function match_parcel(a, p, parcel_tag, parcel_timestamp,
 
 # This checks all is ok
 function check_balance(now,        sum_assets, sum_liabilities, sum_equities, sum_expenses, sum_income, sum_adjustments, balance, show_balance) {
-  # The following should always be true (Equity is treated a special case of liability)
+  # The following should always be true 
   # Assets - Liabilities = Income + Expenses
   # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
   sum_assets =  get_cost("*ASSET", now) - get_cost("*INCOME.GAINS.REALIZED", now) - get_cost("*EXPENSE.LOSSES.REALIZED", now) - get_cost("*EXPENSE.UNREALIZED", now)

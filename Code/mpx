@@ -30,7 +30,7 @@ function wfile () {
 current_directory=`pwd`
 
 # set directory
-MPXDIR=~/Cloudstation/Projects/Minus-Plus-Times/Code
+MPXDIR=~/Cloudstation/Projects/Minus-Plus/Code
 
 # Usage
 USAGE="Usage: $(basename $0) [-a account name] [-C journal-currency] [-d output-date-format] [-f financial-year] [-F financial-statements-file] [-h]\

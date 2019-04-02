@@ -50,7 +50,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define ONE_HOUR           (3600)
 @define ONE_WEEK    @eval (7 * ONE_DAY)
 @define ONE_YEAR    @eval (366 * ONE_DAY)
-
+@define CGT_PERIOD    @eval (366 * ONE_DAY)
 # // Day Number For Feb 29
 @define FEB29                (60)
 @define FY_DATE        ("Jul-01")

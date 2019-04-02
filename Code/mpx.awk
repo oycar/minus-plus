@@ -640,6 +640,7 @@ function first_entry(array,   key) {
 
 # delete duplicated values
 function delete_duplicate_entries(array,      k, j, v, w) {
+
   for (j in array) {
     v = array[j]
     k = find_key(array, j - 1)
@@ -2393,7 +2394,7 @@ function print_realized_gains(now, past, is_detailed,       cgt_schedule, gains_
           if (gains < parcel_adjustments - Epsilon) {
             parcel_gains = gains - parcel_adjustments
             # Sold - capital gain
-            if (held_time >= CGT_PERIOD) {
+            if (held_time >= 31622400) {
               description = "Long Gain    "
               disc_gains += parcel_gains
             } else {
@@ -2437,7 +2438,6 @@ function print_realized_gains(now, past, is_detailed,       cgt_schedule, gains_
         if (is_detailed)
           print_underline(167, 0, cgt_schedule)
         print_gains_summary(units_sold, sum_cost, sum_proceeds, adjusted_cost, reduced_cost, 35 * is_detailed, disc_gains, short_gains, tax_losses, cgt_schedule)
-        #print_gains_summary(units_sold, sum_cost, sum_proceeds, adjusted_cost, reduced_cost, 35 * is_detailed, disc_gains, disc_gains - tax_gains, tax_losses, cgt_schedule)
       }
     } # End of print current holdings
 } # End of print realized gains
@@ -2641,8 +2641,10 @@ function print_balance_sheet(now, past, is_detailed,
   label = print_account_class(label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
 
   # Here we need to adjust for accounting gains & losses
-  assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.GAINS.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
+  assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
   assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
+  #assets[now]  =  get_cost("*ASSET", now)  #- get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.GAINS.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
+  #assets[past] =  get_cost("*ASSET", past) #- get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
 
   # Print a nice line
   print_underline(72, 0, EOFY)
@@ -3035,7 +3037,9 @@ function print_parcel_gain(a, p, now, current_price, cgt_schedule,
   # We want taxable gains
   if (gains < parcel_adjustments - Epsilon) { # This is a capital gain cash_in < cash_out
     tax_gains = gains - parcel_adjustments
-    if (held_time  >= CGT_PERIOD)
+
+#    if (held_time  >= CGT_PERIOD)
+    if (held_time  >= 31622400)
       description = "Long Gain    "
     else
       description = "Short Gain   "
@@ -3339,8 +3343,6 @@ function get_capital_gains(now, past,       cgt_schedule,
       printf "\t%27s => %14s\n", "Carried Capital Losses", print_cash(cgt_losses) > cgt_schedule
 
     # Finally the losses
-    #cgt_losses += cgt_total_losses
-
     printf "\t%27s => %14s\n", "New Capital Losses", print_cash(cgt_total_losses) > cgt_schedule
     printf "\t%27s => %14s\n", "Total Capital Losses", print_cash(cgt_losses + cgt_short_losses + cgt_long_losses) > cgt_schedule
     printf "\t%27s => %14s\n", "Long Capital Losses", print_cash(cgt_long_losses) > cgt_schedule
@@ -3424,7 +3426,7 @@ function get_capital_gains(now, past,       cgt_schedule,
 
     # Save losses and taxable gains
     set_cost(CAPITAL_LOSSES, cgt_losses, now)
-    set_cost(TAXABLE_GAINS, cgt_taxable_gains, now)
+    #set_cost(TAXABLE_GAINS, cgt_taxable_gains, now)
 
     # Also save taxable short & long gains
     set_cost(TAXABLE_LONG, cgt_long_gains, now)
@@ -4199,7 +4201,7 @@ function income_tax_aud(now, past, benefits,
 
   } # End of if any attempt to apply non-refundable assets
 
-  # Now apply refundable offsets
+  # Now apply refundable offsets - but note if used these will not generate a tax loss
   if (((refundable_offsets) >  Epsilon)) {
     tax_owed -= refundable_offsets
     printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > EOFY
@@ -4261,8 +4263,12 @@ function income_tax_aud(now, past, benefits,
 
       tax_losses = 0
     }
-  } else { # Increase losses - franking offsets may not be zero
-    tax_losses = get_taxable_income(now, franking_offsets - tax_owed)
+
+  # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
+#  } else if (above_zero(franking_offsets)) { # Increase losses
+  } else if (((tax_owed + refundable_offsets) < -Epsilon)) { # Increase losses
+
+    tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
 
   }
 
@@ -6158,22 +6164,6 @@ function get_value(a, now) {
   return get_cost(a, now)
 }
 
-# # The number of units held at time 'now'
-# function get_units(a, now,   p, sum_units) {
-#   # No units found yet
-#   sum_units = 0
-#
-#   # Units held at time t are those in unsold parcels
-#   for (p = 0; p < Number_Parcels[a]; p++) {
-#     if (Held_From[a][p] > now) # All further transactions occured after (now)
-#       break # All done
-#     if (is_unsold(a, p, now)) # This is an unsold parcel at time (now)
-#       sum_units += Units_Held[a][p]
-#   }
-#
-#   return sum_units
-# }
-
 # Sell qualified units
 # This is trickier than ordinary units
 # because the qualification is provisional until the
@@ -6241,7 +6231,7 @@ function get_held_time(now, from,     held_time) {
   held_time = now - from
 
   # Fix the held time to allow for the case of leap years
-  if (CGT_PERIOD == held_time && CGT_PERIOD == one_year(now)) # A leap year
+  if (31622400 == held_time && 31622400 == one_year(now)) # A leap year
      held_time -= (86400) # Fake the held time to get the correct tax treatment
   return held_time
 }
@@ -6541,7 +6531,7 @@ function save_parcel_gain(a, p, now,    x, held_time) {
     adjust_cost(REALIZED_LOSSES, x, now)
 
     # Taxable losses are based on the reduced cost
-    if (held_time >= CGT_PERIOD)
+    if (held_time >= 31622400)
       adjust_cost(LONG_LOSSES, x, now)
     else
       adjust_cost(SHORT_LOSSES, x, now)
@@ -6556,7 +6546,7 @@ function save_parcel_gain(a, p, now,    x, held_time) {
   # Taxable Gains are based on the adjusted cost
   if (((x) < -Epsilon)) {
     # Taxable losses are based on the reduced cost
-    if (held_time >= CGT_PERIOD)
+    if (held_time >= 31622400)
       adjust_cost(LONG_GAINS, x, now)
     else
       adjust_cost(SHORT_GAINS, x, now)
@@ -6643,7 +6633,7 @@ function match_parcel(a, p, parcel_tag, parcel_timestamp,
 
 # This checks all is ok
 function check_balance(now,        sum_assets, sum_liabilities, sum_equities, sum_expenses, sum_income, sum_adjustments, balance, show_balance) {
-  # The following should always be true (Equity is treated a special case of liability)
+  # The following should always be true 
   # Assets - Liabilities = Income + Expenses
   # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
   sum_assets =  get_cost("*ASSET", now) - get_cost("*INCOME.GAINS.REALIZED", now) - get_cost("*EXPENSE.LOSSES.REALIZED", now) - get_cost("*EXPENSE.UNREALIZED", now)
@@ -6740,174 +6730,3 @@ function allocate_costs(a, now,       p, second_element) {
 
 
 }
-
-
-## Echo transactions
-function list_transactions(     a, p, e, transaction_list, key,
-                                old_s) {
-  Start_Time = 0
-  Show_All = 1
-  ((SUBSEP in transaction_list)?(TRUE):(FALSE))
-
-  ## Get each account
-  ## This is clunky in the extreme
-  ## It suggests that the parcel structure should be reworked to match the
-  ## logic in the rest of the code
-  ## Stop having cost[a][p][e][t] + a list of parcels
-  ## and have instead cost[a][t][e] and units[a][t][p]??
-
-  for (a in Leaf)
-    if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
-      # Assets and Equities are more complex
-      # Organized by parcels
-      # Each parcel has several components
-      #   Bought => Held_From[a][p]
-      #   Sold   => Held_Until[a][p]
-      #   Accounting_Cost => Sums in and out [a][p][e][t]
-      #   Tax_Adjustments => Adjustments to handle tax matters (eg depreciation) [a][p][e][t]
-      #   Units_Held      => Units held [a][p][t]
-      #   Parcel_Tag      => Named parcel  [a][p]
-      #
-      #   Other elements may include
-      #   Lifetime [a][p]
-      #   Method_Name [a][p]
-
-      # get each parcel
-      for (p in Accounting_Cost[a]) {
-        for (e in Accounting_Cost[a][p])
-          get_element_transactions(Accounting_Cost[a][p][e], a, p, e, transaction_list)
-      }
-
-      # Repeat for tax adjustments
-      for (p in Tax_Adjustments[a])
-        for (e in Tax_Adjustments[a][p])
-          get_element_transactions(Tax_Adjustments[a][p][e], a, p, ("(" e ")"), transaction_list)
-    } else {
-      # The default cost element
-      get_element_transactions(Cost_Basis[a], a, -1, COST_ELEMENT, transaction_list)
-    } # Finished account a s
-
-  # Sort in ascending order
-  old_s = sort_arrays_on("@ind_num_asc")
-
-  # Print out all the transactions
-  for (key in transaction_list)
-    printf "%s\n", transaction_list[key]
-
-  # Tidy up
-  delete transaction_list
-  sort_arrays_off(old_s)
-}
-
-# Get the transactions for each parcel
-function get_element_transactions(cost_array, a, parcel_id, element, transaction_list,
-                                       parcel_units, parcel_tag,
-                                       field_6, field_7, matched,
-                                       k, dk, key, next_key, sum, next_sum,
-                                       label) {
-
-  # First key
-  key = first_key(cost_array)
-
-  # First cost
-  sum = cost_array[key]
-
-  # Is this the last key?
-  while ((key - Epoch) > 0) {
-    # No
-    next_key = find_key(cost_array, key - 1)
-
-    # Next sum
-    next_sum = cost_array[next_key]
-
-    # Start by clearing optional fields
-    parcel_tag = field_6 = field_7 = ""
-
-    # Not matched yet
-    matched = ""
-
-    # Allow a transaction label
-    label = ""
-
-    # Is this a parcel based asset?
-    # The complications below are due to a few modifying optional fields on BUY, SELL and some CASH transactions
-    if (-1 != parcel_id) {
-      # Get the dates this parcel was
-      #  bought, sold and the number of units that were sold
-      parcel_units = Units_Held[a][parcel_id]
-      if (parcel_units) {
-        # Is this a BUY transaction?
-        if ((I == element) && (Held_From[a][parcel_id] == key)) {
-          # BUY
-          label = "BUY, "
-
-          # Check for depreciating assets
-          if (a in Method_Name) {
-            # Is this is not the low value POOL use the Lifetime
-            if (Method_Name[a] !~ /POOL/)
-              field_6 = Lifetime[a]
-            else if ((( a in Parcel_Tag) && ( parcel_id in Parcel_Tag[ a])))
-              # Use the parcel tag - unless it is
-              field_6 = Parcel_Tag[a][parcel_id]
-
-            # Another field is present for depreciating assets
-            field_7 = Method_Name[a]
-          } else if ((( a in Parcel_Tag) && ( parcel_id in Parcel_Tag[ a])))
-            # Use the parcel tag
-            field_6 = Parcel_Tag[a][parcel_id]
-
-          # Cost element is units bought
-          element = sprintf("%10.3f", parcel_units)
-        } else if ((0 == element) && (Held_Until[a][parcel_id] == key)) {
-          # SELL
-          label = "SELL,"
-
-          # Use parcel tag if one is available
-          if ((( a in Parcel_Tag) && ( parcel_id in Parcel_Tag[ a])))
-            field_6 = Parcel_Tag[a][parcel_id]
-          else # Use the purchase date
-            field_6 = get_date(Held_From[a][parcel_id])
-
-          # Cost element is units sold
-          element = sprintf("%10.3f", - parcel_units)
-        } else if (EXPORT_FORMAT)
-          element = ""
-      }
-    } else if (a in Account_Term) {
-      # Modifers for term based accounts - can ignore this if export format set
-      # Is  this the initial transaction?
-      if (find_key(cost_array, ((key) - 1)) == Epoch)
-        field_6 = ((__MPX_H_TEMP__ = find_key(Account_Term[a],  ((key) + 1)))?( Account_Term[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Account_Term[a][0]):( 0)))) # just_after might not be needed here
-      else
-        field_6 = get_date(((__MPX_H_TEMP__ = find_key(Maturity_Date[a],  ((key) + 1)))?( Maturity_Date[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Maturity_Date[a][0]):( 0)))))
-    }
-
-    # Are we matching particular accounts?
-    # mmmm - this seems ramshackle
-    ((matched= Show_Account)?(((matched=match_account( a,  Show_Account))?( matched):( matched=match_account( "",  Show_Account)))):(matched=""))
-    if (!Show_Account || matched) {
-      # Prevent key conflicts
-      # If the closest keys are DELTA_T apart
-      # and we multiply by MAX_TRANSACTIONS then if k < DELTA_T * MAX_TRANSACTIONS this should work
-      k = (1000) * (key - Epoch)
-      for (dk = 0; dk < (2) * (1000); dk ++) {
-        if (!(k in transaction_list))
-          # An empty slot
-          break
-
-        # Increment k too
-        k ++
-      }
-
-      # Is this ok?
-      assert(dk < (2) * (1000), "Too many transactions too create a unique list - increase DELTA_T * MAX_TRANSACTIONS <" dk ">")
-
-      # Save the transaction
-      transaction_list[k] = transaction_string(key, label, a, "", element, sum - next_sum, field_6, field_7, matched)
-    }
-
-    # The next key
-    key = next_key
-    sum = next_sum
-  } # Finished transactions
-} # End of get_element_transactions

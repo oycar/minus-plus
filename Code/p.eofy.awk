@@ -156,7 +156,7 @@ function print_realized_gains(now, past, is_detailed,       cgt_schedule, gains_
           if (gains < parcel_adjustments - Epsilon) {
             parcel_gains = gains - parcel_adjustments
             # Sold - capital gain
-            if (held_time >= CGT_PERIOD) {
+            if (held_time >= ONE_YEAR) {
               description = "Long Gain    "
               disc_gains += parcel_gains
             } else {
@@ -200,7 +200,6 @@ function print_realized_gains(now, past, is_detailed,       cgt_schedule, gains_
         if (is_detailed)
           print_underline(167, 0, cgt_schedule)
         print_gains_summary(units_sold, sum_cost, sum_proceeds, adjusted_cost, reduced_cost, 35 * is_detailed, disc_gains, short_gains, tax_losses, cgt_schedule)
-        #print_gains_summary(units_sold, sum_cost, sum_proceeds, adjusted_cost, reduced_cost, 35 * is_detailed, disc_gains, disc_gains - tax_gains, tax_losses, cgt_schedule)
       }
     } # End of print current holdings
 } # End of print realized gains
@@ -404,8 +403,10 @@ function print_balance_sheet(now, past, is_detailed,
   label = print_account_class(label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
 
   # Here we need to adjust for accounting gains & losses
-  assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.GAINS.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
+  assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
   assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
+  #assets[now]  =  get_cost("*ASSET", now)  #- get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.GAINS.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
+  #assets[past] =  get_cost("*ASSET", past) #- get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
 
   # Print a nice line
   print_underline(72, 0, EOFY)
@@ -1102,8 +1103,6 @@ function get_capital_gains(now, past,       cgt_schedule,
       printf "\t%27s => %14s\n", "Carried Capital Losses", print_cash(cgt_losses) > cgt_schedule
 
     # Finally the losses
-    #cgt_losses += cgt_total_losses
-
     printf "\t%27s => %14s\n", "New Capital Losses", print_cash(cgt_total_losses) > cgt_schedule
     printf "\t%27s => %14s\n", "Total Capital Losses", print_cash(cgt_losses + cgt_short_losses + cgt_long_losses) > cgt_schedule
     printf "\t%27s => %14s\n", "Long Capital Losses", print_cash(cgt_long_losses) > cgt_schedule
@@ -1187,7 +1186,7 @@ function get_capital_gains(now, past,       cgt_schedule,
 
     # Save losses and taxable gains
     set_cost(CAPITAL_LOSSES, cgt_losses, now)
-    set_cost(TAXABLE_GAINS, cgt_taxable_gains, now)
+    #set_cost(TAXABLE_GAINS, cgt_taxable_gains, now)
 
     # Also save taxable short & long gains
     set_cost(TAXABLE_LONG, cgt_long_gains, now)

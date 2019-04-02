@@ -1,53 +1,171 @@
 ## Example Accounts
+## These accounts are an example of the kind of things that mpx is designed for
 ##
-##
-<<, Document_Root, https://example.com/Documents/Example/,>>
-<<, Journal_Title, Example Company Ltd,>>
-<<, Journal_Type, PTY, >>
-##
-##
-##
-## The journal entries
-##
+
 ## This is not a real set of accounts
 ## It is simply a set of example transactions
+## So don't expense the transactions to be that coherent from a strategic investment viewpoint
 ##
 ##
-START_JOURNAL, 2008 Jan 21
-## Control Records
-SET_ENTRY, GST_Rate, 0.10
-SET_ENTRY, Foreign_Offset_Limit, 1000.00
-SET_BANDS, Tax_Bands, 0.30
+## As you can see comments can be intermingled like this
+
+## Blank lines are ignored too
+
+## It is possible to set variables within the journal file; a sort of limited configuration
+## Useful variables are
+## Document_Root which is a URL pointing to a folder where supporting documents (eg bank statments, dividend notices, tax returns etc.) can be found
+<<, Document_Root, https://example.com/Documents/Example/,>>
+
+## The syntax for this is
+## <<, Variable_Name, Variable_Value, >>
+## Note the commas! Minus-Pus uses comma-separated records (or lines) for reasons lost to history; s
+## Another useful variable is title for the journal - Journal_Title
+<<, Journal_Title, Example Company Ltd,>>
+
+## And how it should be treated for tax purposes - Journal_Type
+<<, Journal_Type, PTY, >>
+
+## The <<,...,>> construct is quite useful for recording the state of the journal after processing with mpx - as we will see later
+
+## If Journal_Type is set to PTY, LTD or CORP this means it is a private company or corporation
+## Other options are IND (for an individual)
+## or TRUST (for a closely held trust)
+## or SMSF (for an Australian Self Managed Superannuation Fund)
+##
 
 ##
+## The journal entries can begin now
+## To start processing we need
+START_JOURNAL, 2008 Jan 21
+
+##
+## The date syntax is somewhat flexible; other legal formats for the start date above include
+## 2008 January 21
+## 2008 jan 21
+## 2008-01-21
+## 21/Jan/2008
+## Jan 21 2008
+##
+## Or even 08-02-21 and 21-01-2008
+## But 21-01-08 won't work; that would be 2021 Jan 08
+## And (if you are in the US) note that 02-04-1960 would mean 1960 Apr 02
+## In short to avoid confusion it's probably best to just use the month name styles
+
+
+## The first entries are not in fact transactions, they are quantities useful in tax processing
+## which are time variable; these control records can set a simple scalar variable (like the GST rate)
+##
+SET_ENTRY, GST_Rate, 0.10
+SET_ENTRY, Foreign_Offset_Limit, 1000.00
+
+## Or the (as in 2008) company tax bands (a flat rate of 30%)
+##
+SET_BANDS, Tax_Bands, 0.30
+
+## We can (finally) start the transactions now!
+##
 2008 Jan 21, LIABILITY.TERM.LOAN:BOB.LOAN, ASSET.CURRENT.BANK:CASH,          0,       10.00, # loan
+
+## Ok each transaction has a date - if no date is given the previous date would be used
+## Then a CREDIT account (from which money flows) - Here LIABILITY.TERM.LOAN:BOB.LOAN
+## Specifying the name of the account will define it on the fly... this is a LIABILITY account
+## It is also a non-current liability, this is shown by the TERM component of the name;
+## Further components could be anything, here for readability it is identified as a LOAN
+## The full name of the account is LIABILITY.TERM.LOAN:BOB.LOAN
+## The part BEFORE the colon determines the type of the account, the part after the colon is a unique label which can
+## (in future references) be used to identify the account.
+
+## The next field is the DEBIT account (to  which the money flows). This is an ASSET, and in fact
+## a cash or cash-like CURRENT asset, in fact a bank account ASSET.CURRENT.BANK:CASH
+## There are five types of account classes; they are
+##
+## 1 ASSET
+## 2 LIABILITY
+## 3 EQUITY
+## 4 INCOME
+## 5 EXPENSE
+##
+## And the amounts credited and debited to these will always balance to zero through the relationship
+##
+## Sum (ASSET) = Sum (LIABILITY + EQUITY + INCOME + EXPENSE)
+##
+## Well actually Minus-Plus recognizes another class SPECIAL for tax accounts too...
+
+
+## The next field is here just zero, it is the cost element or units transacted field; well here in a simple
+## cash transaction it has no use and the default value of zero (0) is used
+
+## The fifth field is the amount of the transaction; here just $10.00.
+## Finally there is a comment field, signified by the # character. It could be just about anything.
+
+
 2008 Feb 08,          CASH, EXPENSE.GENERAL:BANK.FEES,          0,       10.00, # Bank Fees
-2008 Feb 20,       BOB.LOAN, ASSET.CURRENT.BANK:ANZ,          0,       55.50, # loan
+2008 Feb 20, EQUITY.SHARES:ALICE.EXCO, ASSET.CURRENT.BANK:ANZ,          5.55,       55.50, # Five odd shares for alice
 2008 Feb 20, LIABILITY.TERM.LOAN:ALICE.LOAN,           ANZ,          0,    80320.44, # loan
+
+## The above three transactions create an EXPENSE account, a new bank account and opened up the company equity with a rather peculiar
+## number of shares going to Alice. The units don;t have to be an integer! Also we can see how the shorthand label
+## defined earlier can be used to start making the accounts less verbose.
+
 2008 Feb 20,           ANZ, ASSET.CAPITAL.SHARES:BHP.ASX,   2076.000,    80370.44, 50.00, # BHP Shares Initial Investment
+
+## Ah something new! We've bought some shares. These are subject to capital gains tax so they are of type ASSET.CAPITAL
+## We have purchased 2076 shares (as shown in the cost element field) for $80370.44. Furthermore there is an extra field - 50.00
+## This signifies in the context of purchased shares or units that $50 of the cost was paid for brokerage.
+
 2008 Feb 29,       BOB.LOAN,          CASH,          0,      500.00, # loan
 2008 Mar 03,          CASH, EXPENSE.GENERAL:ADMIN,          0,      374.00, #  Subscription
 2008 Mar 04,          CASH, ASSET.CURRENT.BANK:ESAVER,          0,      125.00, # Transfer to Savings
 2008 Mar 04, EQUITY.SHARES:BOB.EXCO,        ESAVER,          158.344,     1583.44, # Shares can be non-integer in number
-2008 Mar 04, EQUITY.SHARES:BOB.EXCO,        ESAVER,          14652.518,   146525.18, # Bob's Rollin
+2008 Mar 04, EQUITY.SHARES:BOB.EXCO,        ESAVER,          14652.518,   146525.18, # More equity
 2008 Mar 05,           ANZ,          CASH,          0,        5.49, # Transfer to Bank
 2008 Mar 06,          CASH,        ESAVER,          0,        6.48, # Transfer to Savings
-2008 Mar 12,        ESAVER, ASSET.TERM.DEPOSIT:TERM00.CUA,          0,    70000.00, 3, 2008 Jun 12, # Term deposit 3 months
+
+
+##
+##
+2008 Mar 12,        ESAVER, ASSET.TERM.DEPOSIT:TERM00.CUA,          0,    70000.00, 3, # Term deposit 3 months
+
+## This is an example of a term deposit; the extra option after  the amount invested is the term in months. Since this is less  than a year
+## Minus-Plus will actually assign the account name as ASSET.CURRENT.DEPOSIT:TERM00.CUA. If it had been for longer than a year (so > 12 months)
+## it would remain as class ASSET.TERM until it was less than one year from maturity and  the be reassigned.
+
+
 2008 Mar 12,        ESAVER,           ANZ,          0,    50000.00, # Transfer to ANZ Account
 2008 Mar 13,           ANZ, ASSET.CAPITAL.TRUSTS:PXUPA.ASX,    150.000,    10982.95, 32.95, [PXUPA BUY 150 2008 Mar], [PXPUPA Chess Buy 2008 Mar], # Initial Investment PXUPA
 2008 Mar 13,           ANZ, ASSET.CAPITAL.SHARES:BENPA.ASX,    150.000,    13270.45, 32.95, [BENPA Buy 2008 Mar], [BENPA Chess Buy 2008 Mar], # Initial Investment BENPA
 2008 Mar 13,           ANZ, ASSET.CAPITAL.SHARES:SGBPD.ASX,    110.000,    10537.95, 32.95, [SGPBD Buy 2008 Mar], [SGBPD Chess Buy 2008 Mar], # Initial Investment - SGBPD
 2008 Mar 13,           ANZ, ASSET.CAPITAL.SHARES:IAGPB.ASX,    150.000,    14732.95, 32.95, [IAGPB Buy 150 2008 Mar], [IAGPB Chess 150 2008 Mar], # Initial Investment IAGPB
+
+##
+## In the above we see more new optional fields, in square brackets terms such as [PXUPA BUY 150 2008 Mar]
+## These are just file names for supporting documentation, which by default are in pdf format. (If not just specify a file type, eg [Some File.doc] for example.)
+##
+
 2008 Mar 13,           ANZ,        ESAVER,          0,      475.00, # Transfer to ESAVER
 2008 Mar 18, INCOME.INTEREST:ANZ.INT,           ANZ,          0,       50.29, # Interest (ANZ)
 2008 Mar 18,  INCOME.DIVIDEND:DIV.BHP.ASX,           CASH,           0,       663.02,      284.15, # BHP 356th Dividend
+
+
+## At last some income - both interest and a dividend. Now the case of dividends is particular, since while the shorthand name can be freely specified
+## if the dividends are to be associated with the underlying asset it is best to let Minus-Plus pick the short hand name; which is simply
+## DIV.SHORT.NAME for asset SHORT.NAME. This association is required when dividend payments need to be qualified for preferential tax treatment.
+##
+## The dividend intorudices another optional field, this time the imputation or franking credit associated with the payment of $663.02, namely $284.15. This
+## is tax offset (or credit) will be important for compiling the tax return later.
+
 2008 Mar 19,          CASH,        ESAVER,          0,      663.00, # Transfer to ESAVER
 ##
+
 2008 Mar 21, [CUA Statement 2008 Mar], # CUA Bank Statements
 CHECK, COST, CASH, 0.03
 CHECK, COST, ESAVER, 29378.10
 CHECK, COST, TERM00.CUA, 70000.00
-#
+
+## A transaction can actually be empty - and just specify a bank statement or other document, as above. Furthermore it is often useful
+## to check that the accounts and statements agree; so that no typos disturb the accounts. This is the purpose of the
+## control records CHECK, COST, CASH, etc. which confirm that the account balances agree with the values given in the statement
+
 2008 Mar 28,           ANZ,          CASH,          0,       50.00, # Transfer to CUA
 2008 Mar 29,          CASH,        ESAVER,          0,       50.00, # Transfer to ESAVER
 2008 Apr 01, INCOME.INTEREST:ESA.INT,        ESAVER,          0,      337.05, # eSaver Interest

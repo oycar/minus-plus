@@ -510,7 +510,7 @@ function income_tax_aud(now, past, benefits,
 @endif
   } # End of if any attempt to apply non-refundable assets
 
-  # Now apply refundable offsets
+  # Now apply refundable offsets - but note if used these will not generate a tax loss
   if (above_zero(refundable_offsets)) {
     tax_owed -= refundable_offsets
     printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > EOFY
@@ -583,8 +583,12 @@ function income_tax_aud(now, past, benefits,
 @endif
       tax_losses = 0
     }
-  } else { # Increase losses - franking offsets may not be zero
-    tax_losses = get_taxable_income(now, franking_offsets - tax_owed)
+
+  # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
+#  } else if (above_zero(franking_offsets)) { # Increase losses
+  } else if (below_zero(tax_owed + refundable_offsets)) { # Increase losses
+
+    tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
 @ifeq LOG income_tax
     printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > EOFY
 @endif
