@@ -20,7 +20,6 @@
 # Include header
 @include "mpx.h"
 
-
 # This function actually reads the CBA formatted record
 # It is very minimal
 function read_price(  a, p, t, x, symbol, date_string) {
@@ -1077,12 +1076,12 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # What proportion of the sum is allocated to each unit at time now?
 @ifeq LOG adjust_cost
-    printf "%s\n", a
-    printf "\tTimeStamp => %s\n", get_date(now)
-    printf "\tInitial Units => %.3f\n", get_units(a, now)
-    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now))
-    printf "\tCost Base Adjustment => %s\n", print_cash(x)
-    printf "\tCost Element         => %s\n", Cost_Element
+    printf "%s\n", a > "/dev/stderr"
+    printf "\tTimeStamp => %s\n", get_date(now) > "/dev/stderr"
+    printf "\tInitial Units => %.3f\n", get_units(a, now) > "/dev/stderr"
+    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
+    printf "\tCost Base Adjustment => %s\n", print_cash(x) > "/dev/stderr"
+    printf "\tCost Element         => %s\n", Cost_Element > "/dev/stderr"
 @endif # LOG
     # Either divide adjustment between all open parcels OR
     # concentrate with a parcel with the same timestamp
@@ -1095,7 +1094,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
 @ifeq LOG adjust_cost
         # Debugging
-        printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now))
+        printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
 @endif # LOG
         # Also record the parents cost
         # If this is a tax adjustment then only negative costs are significant
@@ -1114,7 +1113,9 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # Debugging
 @ifeq LOG adjust_cost
-    printf "\tAverage Adjustment Per Unit  => %s\n", print_cash(x / get_units(a, now))
+    printf "\tAverage Adjustment Per Unit  => %s\n",
+      print_cash(x / get_units(a, now)) \
+       > "/dev/stderr"
 @endif # LOG
 
     # Scan back down the parcels held and unsold at time now
@@ -1129,7 +1130,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # Debugging
 @ifeq LOG adjust_cost
-    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now))
+    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
 @endif # LOG
 
     # Balance costs
@@ -1156,16 +1157,18 @@ function update_cost(a, x, now,      p) {
 
   # Logging
 @ifeq LOG update_cost
-  printf "\tp => %16s x => %11s Date => %11s sum => %11s\n", p, print_cash(x), get_date(now), print_cash(get_cost(p, now))
+  printf "\tp => %16s x => %11s Date => %11s sum => %11s\n", p, print_cash(x), get_date(now), print_cash(get_cost(p, now)) > "/dev/stderr"
 @endif # LOG
   update_cost(p, x, now)
 }
 
 function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,        cost_base) {
 @ifeq LOG adjust_cost
-  printf "\t\tParcel  => %05d", p
-  printf " Opening Parcel Cost[%s]=> %s\n", element, print_cash(get_parcel_element(a, p, element, now))
-  printf "\t\t\t\tParcel Adjustment => %s\n", print_cash(parcel_adjustment)
+  printf "%s\n", a > "/dev/stderr"
+  printf "\tTimeStamp => %s\n", get_date(now) > "/dev/stderr"
+  printf "\t\tParcel  => %05d", p  > "/dev/stderr"
+  printf " Opening Parcel Cost[%s]=> %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > "/dev/stderr"
+  printf "\t\t\t\tParcel Adjustment => %s\n", print_cash(parcel_adjustment) > "/dev/stderr"
 @endif # LOG
 
   # save the cost adjustment/reduction related to this parcel
@@ -1209,7 +1212,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,  
 
   # Debugging
 @ifeq LOG adjust_cost
-  printf "\t\t\t\tReduced Parcel Cost[%s] => %s\n", element, print_cash(get_parcel_element(a, p, element, now))
+  printf "\t\t\t\tReduced Parcel Cost[%s] => %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > "/dev/stderr"
 @endif # LOG
 } # End of adjust_parcel_cost
 
@@ -1724,7 +1727,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
         # Already depreciated
 @ifeq LOG depreciate_now
         # Debugging
-        printf "\tAlready Depreciated to => %s\n", get_date(now)
+        printf "\tAlready Depreciated to => %s\n", get_date(now) > "/dev/stderr"
 @endif # LOG
         continue # Get next parcel
       }
@@ -1738,10 +1741,10 @@ function depreciate_now(a, now,       p, delta, sum_delta,
 
 @ifeq LOG depreciate_now
       # Debugging
-      printf "\tParcel => %04d\n", p
+      printf "\tParcel => %04d\n", p > "/dev/stderr"
       if (keys_in(Parcel_Tag, a, p))
-        printf "\tName   => %s\n", Parcel_Tag[a][p]
-      printf "\tMethod => %s\n", Method_Name[a]
+        printf "\tName   => %s\n", Parcel_Tag[a][p] > "/dev/stderr"
+      printf "\tMethod => %s\n", Method_Name[a] > "/dev/stderr"
 @endif # LOG
 
       # Refine factor at parcel level
@@ -1780,16 +1783,16 @@ function depreciate_now(a, now,       p, delta, sum_delta,
 
 @ifeq LOG depreciate_now
       # Debugging
-      printf "\tOpen  => %s\n", print_cash(open_value)
-      printf "\tDelta  => %s\n", print_cash(delta)
+      printf "\tOpen  => %s\n", print_cash(open_value) > "/dev/stderr"
+      printf "\tDelta  => %s\n", print_cash(delta) > "/dev/stderr"
       if (delta == open_value)
-        printf "\tZero Parcel => %d\n", p
+        printf "\tZero Parcel => %d\n", p > "/dev/stderr"
 @endif # LOG
     } # End of if unsold parcel
   } # End of each parcel
 
 @ifeq LOG depreciate_now
-  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "depreciate_now", get_short_name(a), get_date(now), get_reduced_cost(a, now)
+  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "depreciate_now", get_short_name(a), get_date(now), get_reduced_cost(a, now) > "/dev/stderr"
 @endif # LOG
 
   # Return the depreciation

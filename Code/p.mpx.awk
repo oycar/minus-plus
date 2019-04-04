@@ -1710,12 +1710,12 @@ function get_value(a, now) {
 # qualification window is expired
 function sell_qualified_units(a, u, now, half_window,      du, dq, key, next_key) {
 @ifeq LOG qualified_units
-  printf "Sell Qualified Units [%s]\n", get_short_name(a)
-  printf "\tDate              => %s\n", get_date(now)
-  printf "\tWindow End        => %s\n", get_date(now + half_window)
-  printf "\tQualified Units   => %.3f\n", get_qualified_units(a, now)
-  printf "\tProvisional Units => %.3f\n", get_qualified_units(a, now + half_window)
-  printf "\tSell              => %.3f\n", u
+  printf "Sell Qualified Units [%s]\n", get_short_name(a) > "/dev/stderr"
+  printf "\tDate              => %s\n", get_date(now) > "/dev/stderr"
+  printf "\tWindow End        => %s\n", get_date(now + half_window) > "/dev/stderr"
+  printf "\tQualified Units   => %.3f\n", get_qualified_units(a, now) > "/dev/stderr"
+  printf "\tProvisional Units => %.3f\n", get_qualified_units(a, now + half_window) > "/dev/stderr"
+  printf "\tSell              => %.3f\n", u > "/dev/stderr"
 @endif
 
   # Get the latest key not beyond the window
@@ -1729,11 +1729,11 @@ function sell_qualified_units(a, u, now, half_window,      du, dq, key, next_key
     next_key = find_key(Qualified_Units[a], just_before(key))
 
 @ifeq LOG qualified_units
-  printf "\tKey               => %s\n", get_date(key)
-  printf "\tUnits             => %.3f\n", get_qualified_units(a, key)
-  printf "\tNext Key          => %s\n", get_date(next_key)
-  printf "\tUnits             => %.3f\n", get_qualified_units(a, next_key)
-  printf "\tParcel            => %.3f\n", get_qualified_units(a, key) - get_qualified_units(a, next_key)
+  printf "\tKey               => %s\n", get_date(key) > "/dev/stderr"
+  printf "\tUnits             => %.3f\n", get_qualified_units(a, key) > "/dev/stderr"
+  printf "\tNext Key          => %s\n", get_date(next_key) > "/dev/stderr"
+  printf "\tUnits             => %.3f\n", get_qualified_units(a, next_key) > "/dev/stderr"
+  printf "\tParcel            => %.3f\n", get_qualified_units(a, key) - get_qualified_units(a, next_key) > "/dev/stderr"
 @endif
 
     # How many provisionally qualified units are at the key entry?
@@ -1748,13 +1748,13 @@ function sell_qualified_units(a, u, now, half_window,      du, dq, key, next_key
       # Reduce this parcel
       sum_entry(Qualified_Units[a], -du, key)
 @ifeq LOG qualified_units
-      printf "\tReduced Units     => %.3f\n",  -du
+      printf "\tReduced Units     => %.3f\n",  -du > "/dev/stderr"
 @endif
 
       du = 0
     } else {
 @ifeq LOG qualified_units
-      printf "\tReduced Units     => %.3f\n",  dq
+      printf "\tReduced Units     => %.3f\n",  dq > "/dev/stderr"
 @endif
 
       # This parcel is removed fully
@@ -1778,15 +1778,15 @@ function sell_qualified_units(a, u, now, half_window,      du, dq, key, next_key
   if (above_zero(du)) {
     sum_entry(Qualified_Units[a], - du, now) # Ok to make a non-proviosional negative parcel
 @ifeq LOG qualified_units
-    printf "\tAdjust Units      => %.3f\n", -du
+    printf "\tAdjust Units      => %.3f\n", -du > "/dev/stderr"
 @endif
   }
 
 @ifeq LOG qualified_units
-  printf "\tFinished Selling [%s]\n", Leaf[a]
-  printf "\tWindow End        => %s\n", get_date(now + half_window)
-  printf "\tQualified Units   => %.3f\n", get_qualified_units(a, now)
-  printf "\tProvisional Units => %.3f\n", get_qualified_units(a, now + half_window)
+  printf "\tFinished Selling [%s]\n", Leaf[a] > "/dev/stderr"
+  printf "\tWindow End        => %s\n", get_date(now + half_window) > "/dev/stderr"
+  printf "\tQualified Units   => %.3f\n", get_qualified_units(a, now) > "/dev/stderr"
+  printf "\tProvisional Units => %.3f\n", get_qualified_units(a, now + half_window) > "/dev/stderr"
 @endif
 }
 
@@ -1813,10 +1813,10 @@ function get_unrealized_gains(a, now,
   current_price = find_entry(Price[a], now)
 
 @ifeq LOG get_unrealized_gains
-  printf "Get Unrealized Gains (%s)\n", get_short_name(a)
-  printf "\tDate => %s\n",  get_date(now)
-  printf "\tPrice => %s\n", print_cash(current_price)
-  printf "\tAdjustments => %s\n", print_cash(gains)
+  printf "Get Unrealized Gains (%s)\n", get_short_name(a) > "/dev/stderr"
+  printf "\tDate => %s\n",  get_date(now) > "/dev/stderr"
+  printf "\tPrice => %s\n", print_cash(current_price) > "/dev/stderr"
+  printf "\tAdjustments => %s\n", print_cash(gains) > "/dev/stderr"
 @endif # LOG
 
   # Unrealized gains held at time t are those in unsold parcels
@@ -1829,9 +1829,9 @@ function get_unrealized_gains(a, now,
   }
 
 @ifeq LOG get_unrealized_gains
-  printf "\tGains   => %s\n", print_cash(gains)
-  printf "\tParcels => %03d\n", p
-  printf "\tUnits   => %05d\n", get_units(a, now)
+  printf "\tGains   => %s\n", print_cash(gains) > "/dev/stderr"
+  printf "\tParcels => %03d\n", p > "/dev/stderr"
+  printf "\tUnits   => %05d\n", get_units(a, now) > "/dev/stderr"
 @endif # LOG
 
   # The result
@@ -1842,13 +1842,13 @@ function get_unrealized_gains(a, now,
 function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
                                              last_parcel, p) {
 @ifeq LOG buy_units
-  printf "%s: %s units => %.3f amount => %11.2f\n", "buy_units", get_short_name(a), u, x
-  printf "\tU => %.3f Cost => %.2f\n", get_units(a, now), get_cost(a, now)
-  printf "\tTime => %s\n", get_date(now, LONG_FORMAT)
+  printf "%s: %s units => %.3f amount => %11.2f\n", "buy_units", get_short_name(a), u, x > "/dev/stderr"
+  printf "\tU => %.3f Cost => %.2f\n", get_units(a, now), get_cost(a, now) > "/dev/stderr"
+  printf "\tTime => %s\n", get_date(now, LONG_FORMAT) > "/dev/stderr"
   if (parcel_tag)
-    printf "\tParcel Name => %s\n", parcel_tag
+    printf "\tParcel Name => %s\n", parcel_tag > "/dev/stderr"
   if (parcel_timestamp >= Epoch)
-    printf "\tSet purchase date   => %s\n", get_date(parcel_timestamp)
+    printf "\tSet purchase date   => %s\n", get_date(parcel_timestamp) > "/dev/stderr"
 @endif # LOG
 
   # Some units are bought
@@ -1868,18 +1868,18 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
   if (is_capital(a) && Qualification_Window) {
     sum_entry(Qualified_Units[a], u, now + 0.5 * Qualification_Window)
 @ifeq LOG qualified_units
-    printf "Buy Units %s\n\tDate               => %s\n", Leaf[a], get_date(now)
-    printf "\tQualification Date => %s\n", get_date(now + 0.5 * Qualification_Window)
-    printf "\tBuy                => %.3f units\n", u
-    printf "\tQualified Units    => %.3f\n", get_qualified_units(a, now)
-    printf "\tProvisional Units  => %.3f\n", get_qualified_units(a, now + 0.5 * Qualification_Window)
+    printf "Buy Units %s\n\tDate               => %s\n", Leaf[a], get_date(now) > "/dev/stderr"
+    printf "\tQualification Date => %s\n", get_date(now + 0.5 * Qualification_Window) > "/dev/stderr"
+    printf "\tBuy                => %.3f units\n", u > "/dev/stderr"
+    printf "\tQualified Units    => %.3f\n", get_qualified_units(a, now) > "/dev/stderr"
+    printf "\tProvisional Units  => %.3f\n", get_qualified_units(a, now + 0.5 * Qualification_Window) > "/dev/stderr"
 @endif
   }
 
   # Debugging
 @ifeq LOG buy_units
-  printf "\t%s\n\t\tUnits => %.3f Cost => %.2f\n", get_short_name(a), get_units(a, now), get_cost(a, now)
-  printf "\t\tParcel => %05d\n", last_parcel
+  printf "\t%s\n\t\tUnits => %.3f Cost => %.2f\n", get_short_name(a), get_units(a, now), get_cost(a, now) > "/dev/stderr"
+  printf "\t\tParcel => %05d\n", last_parcel > "/dev/stderr"
 @endif # LOG
 
   # Buy u units for x
@@ -1889,11 +1889,11 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
   # Passive revaluation
   p = x / u
 @ifeq LOG buy_units
-  printf "\tPrice       => %11.2f\n", p
-  printf "\tParcel      => %05d\n", last_parcel
-  printf "\tCost        => %11.2f\n", x
+  printf "\tPrice       => %11.2f\n", p > "/dev/stderr"
+  printf "\tParcel      => %05d\n", last_parcel > "/dev/stderr"
+  printf "\tCost        => %11.2f\n", x > "/dev/stderr"
   if (keys_in(Parcel_Tag, a, last_parcel))
-    printf "\tParcel Name => %s\n", Parcel_Tag[a][last_parcel]
+    printf "\tParcel Name => %s\n", Parcel_Tag[a][last_parcel] > "/dev/stderr"
 @endif # LOG
 
   # Set the new price
@@ -1946,13 +1946,13 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, i) {
 #  At this point only the adjusted cost is made use of
 function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost) {
 @ifeq LOG sell_units
-  printf "%s: %s units => %.3f amount => %11.2f\n", "sell_units", get_short_name(ac), u, x
+  printf "%s: %s units => %.3f amount => %11.2f\n", "sell_units", get_short_name(ac), u, x > "/dev/stderr"
   if ("" != parcel_tag)
-    printf "\tSpecified parcel   => %s\n", parcel_tag
+    printf "\tSpecified parcel   => %s\n", parcel_tag > "/dev/stderr"
   if (parcel_timestamp >= Epoch)
-    printf "\tParcel bought at   => %s\n", get_date(parcel_timestamp)
-  printf "\tInitial Units      => %.3f\n", get_units(ac, now)
-  printf "\tInitial Total Cost => %s\n", print_cash(get_cost(ac, now))
+    printf "\tParcel bought at   => %s\n", get_date(parcel_timestamp) > "/dev/stderr"
+  printf "\tInitial Units      => %.3f\n", get_units(ac, now) > "/dev/stderr"
+  printf "\tInitial Total Cost => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 @endif # LOG
 
   # Try adjusting units now...
@@ -2029,13 +2029,13 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
 
 @ifeq LOG sell_units # // LOG
       # Identify which parcel matches
-      printf "\tprice => %11.2f\n", new_price
+      printf "\tprice => %11.2f\n", new_price > "/dev/stderr"
 
-      printf "\tSell from parcel => %05d\n", p
+      printf "\tSell from parcel => %05d\n", p > "/dev/stderr"
       if (parcel_tag)
-        printf "\t\tParcel Tag       => %s\n", Parcel_Tag[ac][p]
+        printf "\t\tParcel Tag       => %s\n", Parcel_Tag[ac][p] > "/dev/stderr"
       if (parcel_timestamp > Epoch)
-        printf "\t\tParcel TimeStamp => %s\n", get_date(Held_From[ac][p])
+        printf "\t\tParcel TimeStamp => %s\n", get_date(Held_From[ac][p]) > "/dev/stderr"
 @endif
 
       # Sell the parcel
@@ -2052,7 +2052,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
               p + 1, Units_Held[ac][p + 1], get_date(now),
               get_date(Held_From[ac][p + 1]), get_date(Held_Until[ac][p + 1]),
               print_cash(get_cost_modifications(ac, p + 1, now)),
-              print_cash(get_parcel_cost(ac, p + 1, now))
+              print_cash(get_parcel_cost(ac, p + 1, now)) > "/dev/stderr"
         } # Was this the last parcel sold
       } # Was a parcel split
 @endif # LOG
@@ -2063,8 +2063,8 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
   } # End of while statement
 
 @ifeq LOG sell_units
-  printf "\tFinal Units => %.3f\n", get_units(ac, now)
-  printf "\tFinal Total Cost     => %s\n", print_cash(get_cost(ac, now))
+  printf "\tFinal Units => %.3f\n", get_units(ac, now) > "/dev/stderr"
+  printf "\tFinal Total Cost     => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 @endif # LOG
 
   # Were all the requested units actually sold?
@@ -2083,7 +2083,7 @@ function sell_parcel(ac, p, du, amount_paid, now,      i, is_split) {
 
   # Amount paid
 @ifeq LOG sell_units
-  printf "\tAmount Paid => %s\n", print_cash(amount_paid)
+  printf "\tAmount Paid => %s\n", print_cash(amount_paid) > "/dev/stderr"
 @endif # LOG
 
   # Check for an empty parcel - allow for rounding error
@@ -2093,7 +2093,7 @@ function sell_parcel(ac, p, du, amount_paid, now,      i, is_split) {
   else { # Units remain - parcel not completely sold off
 @ifeq LOG sell_units
     printf "\tsplit parcel %3d on => %10.3f off => %10.3f\n\t\tadjustment => %s\n\t\tparcel cost => %s\n",
-          p, Units_Held[ac][p], du, print_cash(get_cost_modifications(ac, p, now)), print_cash(get_parcel_cost(ac, p, now))
+          p, Units_Held[ac][p], du, print_cash(get_cost_modifications(ac, p, now)), print_cash(get_parcel_cost(ac, p, now)) > "/dev/stderr"
 @endif # LOG
 
     # Shuffle parcels up by one
@@ -2121,7 +2121,7 @@ function sell_parcel(ac, p, du, amount_paid, now,      i, is_split) {
     get_date(Held_From[ac][p]), get_date(Held_Until[ac][p]),
     print_cash(get_cost_modifications(ac, p, now)),
     print_cash(get_parcel_cost(ac, p, now)),
-    print_cash(get_cash_out(ac, p, now))
+    print_cash(get_cash_out(ac, p, now)) > "/dev/stderr"
 @endif # LOG
 
   # Save realized gains
@@ -2142,11 +2142,11 @@ function sell_parcel(ac, p, du, amount_paid, now,      i, is_split) {
 
 @ifeq LOG sell_units
     if (near_zero(i))
-      printf "\tZero Depreciation\n"
+      printf "\tZero Depreciation\n" > "/dev/stderr"
     else if (i > 0) # This was a DEPRECIATION expense
-      printf "\tDepreciation => %s\n", print_cash(i)
+      printf "\tDepreciation => %s\n", print_cash(i) > "/dev/stderr"
     else if (i < 0) # This was APPRECIATION income
-      printf "\tAppreciation => %s\n", print_cash(-i)
+      printf "\tAppreciation => %s\n", print_cash(-i) > "/dev/stderr"
 @endif # LOG
 
     # Any excess income or expenses are recorded in the following special accounts
@@ -2207,7 +2207,7 @@ function save_parcel_gain(a, p, now,    x, held_time) {
 # Copy and split parcels
 function copy_parcel(ac, p, q,     e, key) {
 @ifeq LOG sell_units
-  printf "\t\t\tCopy parcel %3d => %3d\n", p, q
+  printf "\t\t\tCopy parcel %3d => %3d\n", p, q > "/dev/stderr"
 @endif # LOG
 
   # Copy parcel p => q
@@ -2284,7 +2284,7 @@ function match_parcel(a, p, parcel_tag, parcel_timestamp,
 
 # This checks all is ok
 function check_balance(now,        sum_assets, sum_liabilities, sum_equities, sum_expenses, sum_income, sum_adjustments, balance, show_balance) {
-  # The following should always be true 
+  # The following should always be true
   # Assets - Liabilities = Income + Expenses
   # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
   sum_assets =  get_cost("*ASSET", now) - get_cost("*INCOME.GAINS.REALIZED", now) - get_cost("*EXPENSE.LOSSES.REALIZED", now) - get_cost("*EXPENSE.UNREALIZED", now)
@@ -2309,20 +2309,20 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
 
   # Is there an error?
   if (!near_zero(balance)) {
-    printf "Problem - Accounts Unbalanced <%s>\n", $0
+    printf "Problem - Accounts Unbalanced <%s>\n", $0 > "/dev/stderr"
     show_balance = TRUE
   }
 
   # // Print the balance if necessary
   if (show_balance) {
-    printf "\tDate => %s\n", get_date(now)
-    printf "\tAssets      => %20.2f\n", sum_assets
-    printf "\tIncome      => %20.2f\n", sum_income
-    printf "\tExpenses    => %20.2f\n", sum_expenses
-    printf "\tLiabilities => %20.2f\n", sum_liabilities
-    printf "\tEquities    => %20.2f\n", sum_equities
-    printf "\tAdjustments => %20.2f\n", sum_adjustments
-    printf "\tBalance     => %20.2f\n", balance
+    printf "\tDate => %s\n", get_date(now) > "/dev/stderr"
+    printf "\tAssets      => %20.2f\n", sum_assets > "/dev/stderr"
+    printf "\tIncome      => %20.2f\n", sum_income > "/dev/stderr"
+    printf "\tExpenses    => %20.2f\n", sum_expenses > "/dev/stderr"
+    printf "\tLiabilities => %20.2f\n", sum_liabilities > "/dev/stderr"
+    printf "\tEquities    => %20.2f\n", sum_equities > "/dev/stderr"
+    printf "\tAdjustments => %20.2f\n", sum_adjustments > "/dev/stderr"
+    printf "\tBalance     => %20.2f\n", balance > "/dev/stderr"
     assert(near_zero(balance), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
 }
@@ -2360,7 +2360,7 @@ function allocate_costs(a, now,       p, second_element) {
 
   # Depreciating assets only use cost elements I or II
 @ifeq LOG allocate_costs
-  printf "Allocate Cost Element II\n%16s\n\tDate => %s\n", get_short_name(a), get_date(now)
+  printf "Allocate Cost Element II\n%16s\n\tDate => %s\n", get_short_name(a), get_date(now) > "/dev/stderr"
 @endif # LOG
 
   # Get each parcel
@@ -2371,8 +2371,8 @@ function allocate_costs(a, now,       p, second_element) {
     if (is_unsold(a, p, now)) {
       # Debugging
 @ifeq LOG allocate_costs
-      printf "\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now))
-      printf "\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now))
+      printf "\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now)) > "/dev/stderr"
+      printf "\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now)) > "/dev/stderr"
 @endif # LOG
 
       # Get the second element of the cost
@@ -2384,17 +2384,17 @@ function allocate_costs(a, now,       p, second_element) {
       }
 
 @ifeq LOG allocate_costs
-      printf "\t\tApply 2nd Element Cost => %s\n", second_element
-      printf "\t\tAfter Application\n"
-      printf "\t\tParcel            => %d\n", p
-      printf "\t\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now))
-      printf "\t\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now))
-      printf "\t\tParcel Cost       => %11.2f\n", get_parcel_cost(a, p, now)
+      printf "\t\tApply 2nd Element Cost => %s\n", second_element > "/dev/stderr"
+      printf "\t\tAfter Application\n" > "/dev/stderr"
+      printf "\t\tParcel            => %d\n", p > "/dev/stderr"
+      printf "\t\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now)) > "/dev/stderr"
+      printf "\t\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now)) > "/dev/stderr"
+      printf "\t\tParcel Cost       => %11.2f\n", get_parcel_cost(a, p, now) > "/dev/stderr"
 @endif # LOG
     } # End of if unsold parcel
   } # End of each parcel
 
 @ifeq LOG allocate_costs
-  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "allocate_costs", get_short_name(a), get_date(now), get_reduced_cost(a, now)
+  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "allocate_costs", get_short_name(a), get_date(now), get_reduced_cost(a, now) > "/dev/stderr"
 @endif # LOG
 }
