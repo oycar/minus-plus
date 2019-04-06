@@ -1298,7 +1298,8 @@ function get_parcel_element(a, p, element, now, adjusted,    sum) {
   sum = find_entry(Accounting_Cost[a][p][element], now) - adjusted
 
   # Remove the cash out component
-  return sum - get_cash_out(a, p, now)
+  #return sum - get_cash_out(a, p, now)
+  return sum
 }
 
 # The initial cost

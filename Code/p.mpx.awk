@@ -1204,8 +1204,8 @@ function parse_transaction(now, a, b, units, amount,
     adjust_cost(b,  amount, now)
 
     # Catch manual depreciation
-    if (is_fixed(a))
-      allocate_costs(a, now)
+    #if (is_fixed(a))
+    #  allocate_costs(a, now)
 
     # Record the transaction
     print_transaction(now, Comments, a, b, Write_Units, amount, fields, number_fields)
@@ -2325,76 +2325,4 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
     printf "\tBalance     => %20.2f\n", balance > "/dev/stderr"
     assert(near_zero(balance), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
-}
-
-# A control function which acts a useful shorthand for computing annual depreciation
-function depreciate_all(now,       a, current_depreciation, comments) {
-  # Depreciation is Cost Element I
-  comments = "Automatic EOFY Depreciation"
-  Automatic_Depreciation = TRUE
-  Cost_Element = I
-
-  # Depreciate everything
-  for (a in Leaf)
-    if (is_fixed(a) && is_open(a, now)) {
-      # Depreciate
-      current_depreciation = depreciate_now(a, now)
-      update_cost(a, - current_depreciation, now)
-
-      # Balance accounts
-      adjust_cost(DEPRECIATION, current_depreciation, now)
-
-      # Print the transaction
-      print_transaction(now, comments, a, DEPRECIATION, "(D)", current_depreciation)
-    }
-
-  # Restore defaults
-  Cost_Element = COST_ELEMENT
-  Automatic_Depreciation = FALSE
-}
-
-# Allocate second element costs to the first element
-# This always happens explicitly in the accounts
-# Is this correct?
-function allocate_costs(a, now,       p, second_element) {
-
-  # Depreciating assets only use cost elements I or II
-@ifeq LOG allocate_costs
-  printf "Allocate Cost Element II\n%16s\n\tDate => %s\n", get_short_name(a), get_date(now) > "/dev/stderr"
-@endif # LOG
-
-  # Get each parcel
-  for (p = 0; p < Number_Parcels[a]; p ++) {
-    # Is this parcel purchased yet?
-    if (Held_From[a][p] > now)
-      break # All done
-    if (is_unsold(a, p, now)) {
-      # Debugging
-@ifeq LOG allocate_costs
-      printf "\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now)) > "/dev/stderr"
-      printf "\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now)) > "/dev/stderr"
-@endif # LOG
-
-      # Get the second element of the cost
-      second_element = get_parcel_element(a, p, II, now)
-      if (!near_zero(second_element)) {
-        # The Second Element Cost is applied to the First Element
-        adjust_parcel_cost(a, p, now,   second_element,  I, FALSE)
-        adjust_parcel_cost(a, p, now, - second_element, II, FALSE)
-      }
-
-@ifeq LOG allocate_costs
-      printf "\t\tApply 2nd Element Cost => %s\n", second_element > "/dev/stderr"
-      printf "\t\tAfter Application\n" > "/dev/stderr"
-      printf "\t\tParcel            => %d\n", p > "/dev/stderr"
-      printf "\t\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now)) > "/dev/stderr"
-      printf "\t\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now)) > "/dev/stderr"
-      printf "\t\tParcel Cost       => %11.2f\n", get_parcel_cost(a, p, now) > "/dev/stderr"
-@endif # LOG
-    } # End of if unsold parcel
-  } # End of each parcel
-
-@ifeq LOG allocate_costs
-  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "allocate_costs", get_short_name(a), get_date(now), get_reduced_cost(a, now) > "/dev/stderr"
-@endif # LOG
 }

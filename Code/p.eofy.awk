@@ -83,6 +83,9 @@ function eofy_actions(now,      past, allocated_profits,
     #  Reset the time to July 01 at the standard hour
     print_depreciating_holdings(today(now, HOUR), today(past, HOUR), Show_Extra)
   }
+
+  # Allocate second element costs associated with fixed assets - at SOFY
+  allocate_second_element_costs(today(now, HOUR))
 }
 
 # Default balance journal is a no-op
@@ -405,8 +408,6 @@ function print_balance_sheet(now, past, is_detailed,
   # Here we need to adjust for accounting gains & losses
   assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
   assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
-  #assets[now]  =  get_cost("*ASSET", now)  #- get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.GAINS.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
-  #assets[past] =  get_cost("*ASSET", past) #- get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
 
   # Print a nice line
   print_underline(72, 0, EOFY)
@@ -577,9 +578,84 @@ function print_holdings(now,         p, a, c, sum_value, reduced_cost, adjustmen
   printf "\n" > EOFY
 }
 
+# Compute annual depreciation
+function depreciate_all(now,       a, current_depreciation, comments) {
+  # Depreciation is Cost Element I
+  comments = "Automatic EOFY Depreciation"
+  Automatic_Depreciation = TRUE
+  Cost_Element = I
+
+  # Depreciate everything
+  for (a in Leaf)
+    if (is_fixed(a) && is_open(a, now)) {
+      # Depreciate
+      current_depreciation = depreciate_now(a, now)
+      update_cost(a, - current_depreciation, now)
+
+      # Balance accounts
+      adjust_cost(DEPRECIATION, current_depreciation, now)
+
+      # Print the transaction
+      print_transaction(now, comments, a, DEPRECIATION, "(D)", current_depreciation)
+    }
+
+  # Restore defaults
+  Cost_Element = COST_ELEMENT
+  Automatic_Depreciation = FALSE
+}
+
+# Allocate second element costs
+function allocate_second_element_costs(now,       a, p, second_element) {
+  # Allocate everything
+  # Cost II => Cost I
+  for (a in Leaf)
+    if (is_fixed(a) && is_open(a, now)) {
+      # Depreciating assets only use cost elements I or II
+@ifeq LOG allocate_second_element_costs
+      printf "Allocate Cost Element II\n%16s\n\tDate => %s\n", get_short_name(a), get_date(now) > "/dev/stderr"
+@endif # LOG
+
+      # Get each parcel
+      for (p = 0; p < Number_Parcels[a]; p ++) {
+        # Is this parcel purchased yet?
+        if (Held_From[a][p] > now)
+          break # All done
+        if (is_unsold(a, p, now)) {
+          # Debugging
+@ifeq LOG allocate_second_element_costs
+          printf "\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now)) > "/dev/stderr"
+          printf "\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now)) > "/dev/stderr"
+@endif # LOG
+
+          # Get the second element of the cost
+          second_element = get_parcel_element(a, p, II, now)
+          if (!near_zero(second_element)) {
+            # The Second Element Cost is applied to the First Element
+            adjust_parcel_cost(a, p, now,   second_element,  I, FALSE)
+            adjust_parcel_cost(a, p, now, - second_element, II, FALSE)
+          }
+
+@ifeq LOG allocate_second_element_costs
+          printf "\t\tApply 2nd Element Cost => %s\n", second_element > "/dev/stderr"
+          printf "\t\tAfter Application\n" > "/dev/stderr"
+          printf "\t\tParcel            => %d\n", p > "/dev/stderr"
+          printf "\t\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now)) > "/dev/stderr"
+          ##printf "\t\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now)) > "/dev/stderr"
+          printf "\t\tParcel Cost       => %11.2f\n", get_parcel_cost(a, p, now) > "/dev/stderr"
+@endif # LOG
+        } # End of if unsold parcel
+      } # End of each parcel
+
+@ifeq LOG allocate_second_element_costs
+      printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "allocate_second_element_costs", get_short_name(a), get_date(now), get_reduced_cost(a, now) > "/dev/stderr"
+@endif # LOG
+    } # End of each fixed asset a
+}
+
+
 # This function is is for slightly different times than the other EOFY actions
 function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key, close_key, delta, open_cost, sum_dep, sum_open,
-                                                                  sale_depreciation, sale_appreciation, sum_adjusted, sum_proceeds) {
+                                                                  sale_depreciation, sale_appreciation, sum_adjusted) {
   is_detailed = ("" == is_detailed) ? FALSE : is_detailed
   sum_dep = ""
 
@@ -596,9 +672,6 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
       # The opening value of an asset with multiple parcels cannot be tied to a single time
       sum_open = 0
 
-      # Were any parcels sold in the last period?
-      sum_proceeds = 0
-
       # Get each parcel
       printf "%10s %15s ", Depreciation_Method[Method_Name[a]], get_short_name(a) > EOFY
       for (p = 0; p < Number_Parcels[a]; p ++) {
@@ -609,12 +682,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
 
         # Is there is a problem if item is sold exactly at same time as depreciation occurs...
         if (is_sold(a, p, now)) {
-          close_key = Held_Until[a][p]
-
-          # Was it sold during the period being considered?
-          if (close_key > past)
-            # Short cut macro
-            sum_proceeds += get_parcel_proceeds(a, p)
+          close_key = just_before(Held_Until[a][p])
         } else
           close_key = just_before(now)
 
@@ -633,9 +701,9 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
           # Depreciation is the sum of the I tax adjustments
           delta = get_parcel_tax_adjustment(a, p, I, open_key) - get_parcel_tax_adjustment(a, p, I, close_key)
           printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s",
-                    get_date(open_key), get_date(close_key), print_cash(open_cost),
+                    get_date(open_key), get_date(close_key, LONG_FORMAT), print_cash(open_cost),
                     print_cash(open_cost - delta),
-                    print_cash(get_parcel_cost(a, p, close_key) + delta - open_cost),
+                    print_cash(get_parcel_element(a, p, II, close_key)),
                     print_cash(get_parcel_cost(a, p, close_key)),
                     print_cash(delta) > EOFY
         } # End of is_detailed
@@ -644,7 +712,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
       # Clean up output
       if (is_detailed) {
         printf "\n" > EOFY
-        print_underline(186, 0, EOFY)
+        print_underline(197, 0, EOFY)
         printf "%26s ", get_short_name(a) > EOFY
       }
 
@@ -654,7 +722,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
       if (open_key < past)
         open_key = past # This must be less than now for this asset to be open and considered
       if (is_closed(a, now))
-        close_key = held_to(a, now)
+        close_key = just_before(held_to(a, now))
       else
         close_key = just_before(now)
 
@@ -666,9 +734,9 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
       # For depreciating assets depreciation corresponds to the tax adjustments
       # Period depreciation is the difference in the tax adjustments
       printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s\n",
-        get_date(open_key), get_date(close_key), print_cash(sum_open),
+        get_date(open_key), get_date(close_key, LONG_FORMAT), print_cash(sum_open),
         print_cash(sum_open - delta),
-        print_cash(get_cost(a, close_key) + delta - sum_open - sum_proceeds),
+        print_cash(get_cost_element(a, II, close_key)),
         print_cash(get_cost(a, close_key)),
         print_cash(delta) > EOFY
 
@@ -685,10 +753,10 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
 
   # Print a nice line
   if (!near_zero(sum_dep)) {
-    print_underline(186, 0, EOFY)
+    print_underline(197, 0, EOFY)
     printf "\tPeriod Depreciation     => %14s\n", print_cash(sum_dep) > EOFY
-    printf "\tOpening Cost            => %14s\n", print_cash(get_cost("*ASSET.FIXED", close_key) + sum_dep) > EOFY
-    printf "\tClosing Adjusted Cost   => %14s\n\n", print_cash(get_cost("*ASSET.FIXED", close_key)) > EOFY
+    printf "\tOpening Cost            => %14s\n", print_cash(get_cost("*ASSET.FIXED", open_key)) > EOFY
+    printf "\tClosing Adjusted Cost   => %14s\n\n", print_cash(get_cost("*ASSET.FIXED", just_after(close_key))) > EOFY
   }
 } # End of print depreciating holdings
 
@@ -817,7 +885,7 @@ function print_parcel_gain(a, p, now, current_price, cgt_schedule,
     p, units, get_date(Held_From[a][p]), get_date(Held_From[a][p] + held_time), print_cash(get_cash_in(a, p, now)),
        print_cash(paid), print_cash(get_parcel_cost(a, p, now)) > cgt_schedule
   if (near_zero(parcel_adjustments)) {
-    printf " %15s => %14s Per Unit => %14s", description, print_cash(tax_gains < 0 ? -tax_gains : gains), print_cash(get_parcel_cost(a, p, now) / units, 4) > cgt_schedule
+    printf " %15s => %14s Per Unit => %14s", description, print_cash(tax_gains < 0 ? - tax_gains : gains), print_cash(get_parcel_cost(a, p, now) / units, 4) > cgt_schedule
     if (keys_in(Parcel_Tag, a, p))
       printf "%20s\n", Parcel_Tag[a][p], p > EOFY
     else
