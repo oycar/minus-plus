@@ -1865,8 +1865,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
 
   # Depreciating assets only use cost elements I or II
 
-  printf "Compute Depreciation\n%16s\n\tDate => %s\n", (Leaf[(a)]), get_date(now, LONG_FORMAT)
-
 
   # First pass at setting depreciation factor
   first_year_factor = FALSE
@@ -1894,9 +1892,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       if (now in Accounting_Cost[a][p][I]) {
         # Already depreciated
 
-        # Debugging
-        printf "\tAlready Depreciated to => %s\n", get_date(now) > "/dev/stderr"
-
         continue # Get next parcel
       }
 
@@ -1907,12 +1902,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       # The opening value - cost element I
       open_value = get_parcel_element(a, p, I, open_key)
 
-
-      # Debugging
-      printf "\tParcel => %04d\n", p > "/dev/stderr"
-      if ((( a in Parcel_Tag) && ( p in Parcel_Tag[ a])))
-        printf "\tName   => %s\n", Parcel_Tag[a][p] > "/dev/stderr"
-      printf "\tMethod => %s\n", Method_Name[a] > "/dev/stderr"
 
 
       # Refine factor at parcel level
@@ -1934,8 +1923,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       }
 
 
-      printf "\tFactor => %.3f\n", factor
-
 
       # This block is the only difference between prime cost and diminishing value
       if ("PC" != Method_Name[a]) # Diminishing Value or Pool (not Prime Cost)
@@ -1950,17 +1937,9 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       sum_delta += delta
 
 
-      # Debugging
-      printf "\tOpen  => %s\n", print_cash(open_value) > "/dev/stderr"
-      printf "\tDelta  => %s\n", print_cash(delta) > "/dev/stderr"
-      if (delta == open_value)
-        printf "\tZero Parcel => %d\n", p > "/dev/stderr"
-
     } # End of if unsold parcel
   } # End of each parcel
 
-
-  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "depreciate_now", (Leaf[(a)]), get_date(now), (get_cost(a,  now)) > "/dev/stderr"
 
 
   # Return the depreciation
@@ -2292,7 +2271,7 @@ function eofy_actions(now,      past, allocated_profits,
 
 
   # Depreciate everything - at EOFY
-  depreciate_all(yesterday(now, (12)))
+  depreciate_all(yesterday(now, (12)), yesterday(past, (12)))
 
   # Set EOFY accounts
   # Very careful ordering of get/set actions is required
@@ -2836,13 +2815,13 @@ function print_holdings(now,         p, a, c, sum_value, reduced_cost, adjustmen
 }
 
 # Compute annual depreciation
-function depreciate_all(now,       a, current_depreciation, comments) {
+function depreciate_all(now,      a, current_depreciation, comments) {
   # Depreciation is Cost Element I
   comments = "Automatic EOFY Depreciation"
-  Automatic_Depreciation = TRUE
+  #Automatic_Depreciation = TRUE
   Cost_Element = I
 
-  # Depreciate everything
+  # Depreciate all open fixed assets
   for (a in Leaf)
     if (((a) ~ /^ASSET\.FIXED[.:]/) && is_open(a, now)) {
       # Depreciate
@@ -2858,7 +2837,7 @@ function depreciate_all(now,       a, current_depreciation, comments) {
 
   # Restore defaults
   Cost_Element = COST_ELEMENT
-  Automatic_Depreciation = FALSE
+  #Automatic_Depreciation = FALSE
 }
 
 # Allocate second element costs
@@ -2905,6 +2884,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
   # Print out the assets in alphabetical order
   for (a in Leaf)
     if (((a) ~ /^ASSET\.FIXED[.:]/) && (is_open(a, now) || is_open(a, past))) {
+
       if ("" == sum_dep) {
         printf "\n" > EOFY
         print Journal_Title > EOFY
@@ -2923,7 +2903,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
         if (open_key < past)
           open_key = past # This must be earlier than now for this asset to be open and considered
 
-        # Is there is a problem if item is sold exactly at same time as depreciation occurs...
+        # Is there is a problem if item is sold exactly at same time as depreciation occurs? (no if done carefully)
         if ((Held_Until[(a)][( p)] <= ( now))) {
           close_key = ((Held_Until[a][p]) - 1)
         } else
@@ -2998,8 +2978,8 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
   if (!(((sum_dep) <= Epsilon) && ((sum_dep) >= -Epsilon))) {
     print_underline(197, 0, EOFY)
     printf "\tPeriod Depreciation     => %14s\n", print_cash(sum_dep) > EOFY
-    printf "\tOpening Cost            => %14s\n", print_cash(get_cost("*ASSET.FIXED", open_key)) > EOFY
-    printf "\tClosing Adjusted Cost   => %14s\n\n", print_cash(get_cost("*ASSET.FIXED", ((close_key) + 1))) > EOFY
+    #printf "\tOpening Cost            => %14s\n", print_cash(get_cost("*ASSET.FIXED", open_key)) > EOFY
+    #printf "\tClosing Adjusted Cost   => %14s\n\n", print_cash(get_cost("*ASSET.FIXED", just_after(close_key))) > EOFY
   }
 } # End of print depreciating holdings
 
@@ -6419,19 +6399,52 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, i) {
 # Sell units
 #  Sale receipts go to cash_out and happen at Held_Until
 #  At this point only the adjusted cost is made use of
-function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost) {
+function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost, catch_up_depreciation, t) {
+
+  printf "%s: %s units => %.3f amount => %11.2f\n", "sell_units", (Leaf[(ac)]), u, x > "/dev/stderr"
+  if ("" != parcel_tag)
+    printf "\tSpecified parcel   => %s\n", parcel_tag > "/dev/stderr"
+  if (parcel_timestamp >= Epoch)
+    printf "\tParcel bought at   => %s\n", get_date(parcel_timestamp) > "/dev/stderr"
+  printf "\tInitial Units      => %.3f\n", ((__MPX_H_TEMP__ = find_key(Total_Units[ac],   now))?( Total_Units[ac][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[ac][0]):( 0)))) > "/dev/stderr"
+  printf "\tInitial Total Cost => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 
 
   # Try adjusting units now...
   sum_entry(Total_Units[ac],  -u,  now)
-
 
   # For a depreciating asset with multiple parcels (apart from a pooled asset) then
   # the proportion of the asset being sold depends on the
   # original cost of each unit; not on the number of units
   proportional_cost = FALSE
   if (((ac) ~ /^ASSET\.FIXED[.:]/)) {
-    # Two complications - a fully depreciated asset
+    # Is this asset's depreciation upto date?
+    # Depreciate
+
+    printf "\tDate => %s\n",  get_date(now, LONG_FORMAT)> "/dev/stderr"
+    printf "\tEOFY => %s\n",  get_date(FY_Time, LONG_FORMAT)> "/dev/stderr"
+
+    if (now > FY_Time) {
+      t = yesterday(FY_Time, (12))
+      catch_up_depreciation = depreciate_now(ac, t)
+      if (!(((catch_up_depreciation) <= Epsilon) && ((catch_up_depreciation) >= -Epsilon))) {
+        update_cost(ac, - catch_up_depreciation, t)
+
+        # Balance accounts
+        adjust_cost(DEPRECIATION, catch_up_depreciation, t)
+
+        # Print the transaction
+        print_transaction(t, "Catch-Up Depreciation", ac, DEPRECIATION, "(D)", catch_up_depreciation)
+
+        printf "\tCatch-Up Depreciation => %s\n", print_cash(catch_up_depreciation) > "/dev/stderr"
+        printf "\tApplied At Time => %s\n", get_date(t, LONG_FORMAT) > "/dev/stderr"
+        printf "\tModified Total Cost => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
+
+      }
+
+    }
+
+    # More complications - a fully depreciated asset
     # or a Pooled asset
     if ("POOL" == Method_Name[ac]) {
       # For a pooled asset we must see a unique parcel
@@ -6495,10 +6508,33 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
         new_price = get_parcel_cost(ac, p, now) * proportional_cost
 
 
+      # Identify which parcel matches
+      printf "\tprice => %11.2f\n", new_price > "/dev/stderr"
+
+      printf "\tSell from parcel => %05d\n", p > "/dev/stderr"
+      if (parcel_tag)
+        printf "\t\tParcel Tag       => %s\n", Parcel_Tag[ac][p] > "/dev/stderr"
+      if (parcel_timestamp > Epoch)
+        printf "\t\tParcel TimeStamp => %s\n", get_date(Held_From[ac][p]) > "/dev/stderr"
+
 
       # Sell the parcel
       did_split = sell_parcel(ac, p, du, du * new_price, now)
 
+
+      if (did_split) {
+        # Parcel was split
+        if (0 == u) {
+          # Was this the last sold parcel
+          if (p + 1 < Number_Parcels[ac])
+            # Was a parcel kept
+            printf "\tkept parcel => %05d on  => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n",
+              p + 1, Units_Held[ac][p + 1], get_date(now),
+              get_date(Held_From[ac][p + 1]), get_date(Held_Until[ac][p + 1]),
+              print_cash(get_cost_modifications(ac, p + 1, now)),
+              print_cash(get_parcel_cost(ac, p + 1, now)) > "/dev/stderr"
+        } # Was this the last parcel sold
+      } # Was a parcel split
 
     } # End of match parcel
 
@@ -6506,6 +6542,9 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     p ++
   } # End of while statement
 
+
+  printf "\tFinal Units => %.3f\n", ((__MPX_H_TEMP__ = find_key(Total_Units[ac],   now))?( Total_Units[ac][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[ac][0]):( 0)))) > "/dev/stderr"
+  printf "\tFinal Total Cost     => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 
 
   # Were all the requested units actually sold?
@@ -6515,79 +6554,98 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
   update_cost(ac, -x, now)
 }
 
-function sell_parcel(ac, p, du, amount_paid, now,      i, is_split) {
+function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
   # The sale date
-  Held_Until[ac][p] = now
+  Held_Until[a][p] = now
 
   # No parcel split yet
   is_split = FALSE
 
   # Amount paid
 
+  printf "\tAmount Paid => %s\n", print_cash(amount_paid) > "/dev/stderr"
+
 
   # Check for an empty parcel - allow for rounding error
-  if ((((Units_Held[ac][p] - du) <= Epsilon) && ((Units_Held[ac][p] - du) >= -Epsilon)))
+  if ((((Units_Held[a][p] - du) <= Epsilon) && ((Units_Held[a][p] - du) >= -Epsilon)))
     # Parcel is sold off
-    Units_Held[ac][p] = du
+    Units_Held[a][p] = du
   else { # Units remain - parcel not completely sold off
+
+    printf "\tsplit parcel %3d on => %10.3f off => %10.3f\n\t\tadjustment => %s\n\t\tparcel cost => %s\n",
+          p, Units_Held[a][p], du, print_cash(get_cost_modifications(a, p, now)), print_cash(get_parcel_cost(a, p, now)) > "/dev/stderr"
 
 
     # Shuffle parcels up by one
-    for (i = Number_Parcels[ac]; i > p + 1; i --)
+    for (i = Number_Parcels[a]; i > p + 1; i --)
       # Copy the parcels
-      copy_parcel(ac, i - 1, i)
+      copy_parcel(a, i - 1, i)
 
     # At this point we need to split parcels p & p + 1
-    split_parcel(ac, p, du)
+    split_parcel(a, p, du)
     is_split = TRUE
 
     # One extra parcel
-    Number_Parcels[ac] += 1
+    Number_Parcels[a] += 1
   } # End of if splitting a parcel
 
   # The sale price
   # This is always recorded as cost_element 0 since it is not actually a true cost
   # This must be recorded as cash flowing out of the account
   # A parcel is only ever sold once so we can simply set the cost
-  (Accounting_Cost[ac][p][0][( now)] = ( -amount_paid))
+  (Accounting_Cost[a][p][0][( now)] = ( -amount_paid))
 
+
+  printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n",
+    p, du,  get_date(now),
+    get_date(Held_From[a][p]), get_date(Held_Until[a][p]),
+    print_cash(get_cost_modifications(a, p, now)),
+    print_cash(get_parcel_cost(a, p, now)),
+    print_cash(get_cash_out(a, p, now)) > "/dev/stderr"
 
 
   # Save realized gains
-  if (!((ac) ~ /^ASSET\.FIXED[.:]/))
-    save_parcel_gain(ac, p, now)
-  else {
-    # A depreciating asset will neither have capital gains nor losses
-    # so it will have accounting cost zero
-
-    # Only need to save depreciation or appreciation
-    i = sum_cost_elements(Accounting_Cost[ac][p], now) # The cost of a depreciating asset
-
-    # Set it to zero (use element 0)
-    sum_entry(Accounting_Cost[ac][p][0], -i, now)
-
-    # We need to adjust the asset sums by this too
-    update_cost(ac, -i, now)
-
-
-
-    # Any excess income or expenses are recorded in the following special accounts
-    if (((i) >  Epsilon)) # This was a DEPRECIATION expense
-      adjust_cost(SOLD_DEPRECIATION, i, now)
-    else if (((i) < -Epsilon)) # This was APPRECIATION income
-      adjust_cost(SOLD_APPRECIATION, i, now)
-  }
-
-  # Any tax adjustments are zeroed out here too - why?
-  #
-  # Do this at the end because they can influence capital gains
-  #
-  # This can create a spurious zero adjustment at now...
-  #zero_costs(Tax_Adjustments[ac][p], now)
+  if (!((a) ~ /^ASSET\.FIXED[.:]/))
+    save_parcel_gain(a, p, now)
+  else
+    sell_fixed_parcel(a, p, now)
 
   # Was a parcel split
   return is_split
 } # End of if non-zero Parcel
+
+#
+# When a parcel of a fixed asset is sold
+# it changes the depreciation amounts
+# these are effected at time now
+function sell_fixed_parcel(a, p, now,     x) {
+  # A depreciating asset will neither have capital gains nor losses
+  # so it will have accounting cost zero
+
+  # Only need to save depreciation or appreciation
+  x = sum_cost_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset
+
+  # Set it to zero (use element 0)
+  sum_entry(Accounting_Cost[a][p][0], -x, now)
+
+  # We need to adjust the asset sums by this too
+  update_cost(a, -x, now)
+
+
+  if (((x) >  Epsilon)) # This was a DEPRECIATION expense
+    printf "\tDepreciation => %s\n", print_cash(x) > "/dev/stderr"
+  else if (((x) < -Epsilon)) # This was an APPRECIATION income
+    printf "\tAppreciation => %s\n", print_cash(-x) > "/dev/stderr"
+  else
+    printf "\tZero Depreciation\n" > "/dev/stderr"
+
+
+  # Any excess income or expenses are recorded
+  if (((x) >  Epsilon)) # This was a DEPRECIATION expense
+    adjust_cost(SOLD_DEPRECIATION, x, now)
+  else if (((x) < -Epsilon)) # This was APPRECIATION income
+    adjust_cost(SOLD_APPRECIATION, x, now)
+}
 
 # Save a capital gain
 # The gain was made at time "now" on at asset purchased at "date_purchased"
@@ -6622,12 +6680,12 @@ function save_parcel_gain(a, p, now,    x, held_time) {
     else
       adjust_cost(SHORT_GAINS, x, now)
   }
-
-  return
 }
 
 # Copy and split parcels
 function copy_parcel(ac, p, q,     e, key) {
+
+  printf "\t\t\tCopy parcel %3d => %3d\n", p, q > "/dev/stderr"
 
 
   # Copy parcel p => q

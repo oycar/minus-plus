@@ -35,7 +35,7 @@ function eofy_actions(now,      past, allocated_profits,
 @endif
 
   # Depreciate everything - at EOFY
-  depreciate_all(yesterday(now, HOUR))
+  depreciate_all(yesterday(now, HOUR), yesterday(past, HOUR))
 
   # Set EOFY accounts
   # Very careful ordering of get/set actions is required
@@ -579,13 +579,13 @@ function print_holdings(now,         p, a, c, sum_value, reduced_cost, adjustmen
 }
 
 # Compute annual depreciation
-function depreciate_all(now,       a, current_depreciation, comments) {
+function depreciate_all(now,      a, current_depreciation, comments) {
   # Depreciation is Cost Element I
   comments = "Automatic EOFY Depreciation"
-  Automatic_Depreciation = TRUE
+  #Automatic_Depreciation = TRUE
   Cost_Element = I
 
-  # Depreciate everything
+  # Depreciate all open fixed assets
   for (a in Leaf)
     if (is_fixed(a) && is_open(a, now)) {
       # Depreciate
@@ -601,7 +601,7 @@ function depreciate_all(now,       a, current_depreciation, comments) {
 
   # Restore defaults
   Cost_Element = COST_ELEMENT
-  Automatic_Depreciation = FALSE
+  #Automatic_Depreciation = FALSE
 }
 
 # Allocate second element costs
@@ -662,6 +662,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
   # Print out the assets in alphabetical order
   for (a in Leaf)
     if (is_fixed(a) && (is_open(a, now) || is_open(a, past))) {
+
       if ("" == sum_dep) {
         printf "\n" > EOFY
         print Journal_Title > EOFY
@@ -680,7 +681,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
         if (open_key < past)
           open_key = past # This must be earlier than now for this asset to be open and considered
 
-        # Is there is a problem if item is sold exactly at same time as depreciation occurs...
+        # Is there is a problem if item is sold exactly at same time as depreciation occurs? (no if done carefully)
         if (is_sold(a, p, now)) {
           close_key = just_before(Held_Until[a][p])
         } else
@@ -755,8 +756,8 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
   if (!near_zero(sum_dep)) {
     print_underline(197, 0, EOFY)
     printf "\tPeriod Depreciation     => %14s\n", print_cash(sum_dep) > EOFY
-    printf "\tOpening Cost            => %14s\n", print_cash(get_cost("*ASSET.FIXED", open_key)) > EOFY
-    printf "\tClosing Adjusted Cost   => %14s\n\n", print_cash(get_cost("*ASSET.FIXED", just_after(close_key))) > EOFY
+    #printf "\tOpening Cost            => %14s\n", print_cash(get_cost("*ASSET.FIXED", open_key)) > EOFY
+    #printf "\tClosing Adjusted Cost   => %14s\n\n", print_cash(get_cost("*ASSET.FIXED", just_after(close_key))) > EOFY
   }
 } # End of print depreciating holdings
 
