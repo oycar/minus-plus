@@ -35,7 +35,8 @@ function eofy_actions(now,      past, allocated_profits,
 @endif
 
   # Depreciate everything - at EOFY
-  depreciate_all(yesterday(now, HOUR), yesterday(past, HOUR))
+  #depreciate_all(yesterday(now, HOUR))
+  depreciate_all(now)
 
   # Set EOFY accounts
   # Very careful ordering of get/set actions is required
@@ -81,11 +82,13 @@ function eofy_actions(now,      past, allocated_profits,
 
     # Print the depreciation schedule
     #  Reset the time to July 01 at the standard hour
-    print_depreciating_holdings(today(now, HOUR), today(past, HOUR), Show_Extra)
+    #print_depreciating_holdings(today(now, HOUR), today(past, HOUR), Show_Extra)
+    print_depreciating_holdings(just_after(now), past, Show_Extra)
   }
 
   # Allocate second element costs associated with fixed assets - at SOFY
-  allocate_second_element_costs(today(now, HOUR))
+  #allocate_second_element_costs(today(now, HOUR))
+  allocate_second_element_costs(now)
 }
 
 # Default balance journal is a no-op
@@ -582,7 +585,6 @@ function print_holdings(now,         p, a, c, sum_value, reduced_cost, adjustmen
 function depreciate_all(now,      a, current_depreciation, comments) {
   # Depreciation is Cost Element I
   comments = "Automatic EOFY Depreciation"
-  #Automatic_Depreciation = TRUE
   Cost_Element = I
 
   # Depreciate all open fixed assets
@@ -601,7 +603,7 @@ function depreciate_all(now,      a, current_depreciation, comments) {
 
   # Restore defaults
   Cost_Element = COST_ELEMENT
-  #Automatic_Depreciation = FALSE
+  # = FALSE
 }
 
 # Allocate second element costs

@@ -1970,7 +1970,8 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     printf "\tEOFY => %s\n",  get_date(FY_Time, LONG_FORMAT)> "/dev/stderr"
 @endif
     if (now > FY_Time) {
-      t = yesterday(FY_Time, HOUR)
+      #t = yesterday(FY_Time, HOUR)
+      t = just_before(FY_Time)
       catch_up_depreciation = depreciate_now(ac, t)
       if (!near_zero(catch_up_depreciation)) {
         update_cost(ac, - catch_up_depreciation, t)
@@ -1986,7 +1987,6 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
         printf "\tModified Total Cost => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 @endif
       }
-
     }
 
     # More complications - a fully depreciated asset
