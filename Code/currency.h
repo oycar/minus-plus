@@ -20,11 +20,10 @@
 # along with this program.  If not, see <http:#www.gnu.org/licenses/>.
 
 
-
 # // Default Currency Symbol
 @ifndef JOURNAL_CURRENCY
 @define JOURNAL_CURRENCY ("AUD")
-
+@endif # // JOURNAL_CURRENCY
 
 @ifeq JOURNAL_CURRENCY "AUD"
 #// Extra definitions for AUD
@@ -35,14 +34,13 @@
 
 @defeval CARRY_FORWARD_LIMIT  ("")
 @defeval WRITE_BACK_LIMIT     ("")
-
+#
 @elif JOURNAL_CURRENCY "USD"
+# // US Dollars
 # // Add localized State Variables & Scalars
 @define MPX_ARRAYS (SHARED_ARRAYS " Capital_Gains_Tax_Bands ")
 @define MPX_SCALARS (SHARED_SCALARS "")
 #
 @defeval CARRY_FORWARD_LIMIT  @eval (5 * 366 * ONE_DAY)
 @defeval WRITE_BACK_LIMIT     @eval (3 * 366 * ONE_DAY)
-
-@endif # // USD
 @endif # // JOURNAL_CURRENCY

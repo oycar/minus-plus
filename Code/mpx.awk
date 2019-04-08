@@ -44,6 +44,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Control Export format
 
 
@@ -251,6 +253,18 @@ END {
 
 
 # // Default Currency Symbol
+
+
+
+#// Extra definitions for AUD
+#// Add localized State Variables & Scalars
+# // Add localized State Variables & Scalars
+
+
+
+
+
+#
 
 
 
@@ -3392,9 +3406,9 @@ function get_capital_gains(now, past,       cgt_schedule,
 
     # Now consider the losses
     # Need to consider a maximum loss window beyond which losses will not be carried
-    cgt_losses = get_cost(CAPITAL_LOSSES, ((now) - 1)) - get_cost(CAPITAL_LOSSES, ((CARRY_FORWARD_LIMIT)?( ((now) - CARRY_FORWARD_LIMIT)):( Epoch)))
-    if (CARRY_FORWARD_LIMIT)
-      printf "\t%27s => %14s\n", "Losses Carried Forward Since", get_date(((CARRY_FORWARD_LIMIT)?( ((now) - CARRY_FORWARD_LIMIT)):( Epoch))) > cgt_schedule
+    cgt_losses = get_cost(CAPITAL_LOSSES, ((now) - 1)) - get_cost(CAPITAL_LOSSES, (((""))?( ((now) - (""))):( Epoch)))
+    if ((""))
+      printf "\t%27s => %14s\n", "Losses Carried Forward Since", get_date((((""))?( ((now) - (""))):( Epoch))) > cgt_schedule
     if (!(((cgt_losses) <= Epsilon) && ((cgt_losses) >= -Epsilon)))
       printf "\t%27s => %14s\n", "Carried Capital Losses", print_cash(cgt_losses) > cgt_schedule
 
@@ -3468,12 +3482,12 @@ function get_capital_gains(now, past,       cgt_schedule,
     }
 
     # Losses might sometimes be written back against earlier gains
-    if (WRITE_BACK_LIMIT && !(((cgt_losses) <= Epsilon) && ((cgt_losses) >= -Epsilon))) {
+    if (("") && !(((cgt_losses) <= Epsilon) && ((cgt_losses) >= -Epsilon))) {
       # Try writing back losses
       printf "\n\t%27s => %14s\n", "Write Back Losses Available", print_cash(cgt_losses) > cgt_schedule
 
       # Rewrite refundable offsets to just before now so they can be zeroed later at a distinct timestamp
-      cgt_losses = write_back_losses(((now) - 1), ((now) + one_year(now, -1)), ((WRITE_BACK_LIMIT)?( ((now) - WRITE_BACK_LIMIT)):( Epoch)), cgt_losses, cgt_schedule)
+      cgt_losses = write_back_losses(((now) - 1), ((now) + one_year(now, -1)), (((""))?( ((now) - (""))):( Epoch)), cgt_losses, cgt_schedule)
     }
 
     # All done
@@ -4504,13 +4518,6 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
       # The adjustment
       unqualified *= imputation_credits
 
-      printf "Underlying Asset %s\n", Leaf[underlying_asset] > "/dev/stderr"
-      printf "\tTax Credits %s[%s]      => %s\n", Leaf[Tax_Credits[underlying_asset]], get_date(now), print_cash(- imputation_credits) > "/dev/stderr"
-      printf "\tUnqualified Tax Credits => %s\n", print_cash(- unqualified) > "/dev/stderr"
-      printf "\tTotal Tax Credits       => %s\n", print_cash(- get_cost(Tax_Credits[underlying_asset], now)) > "/dev/stderr"
-      printf "\tFranking Balance        => %s\n", print_cash(get_cost(FRANKING, now)) > "/dev/stderr"
-      printf "\tTotal Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, now)) > "/dev/stderr"
-
 
       # Now sum the unqualified credits in this account
       # This would occur when state files are used
@@ -4519,9 +4526,6 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
       # Adjust the franking account too... (opposite sign - this is asset like)
       set_cost(FRANKING, get_cost(FRANKING, now) + unqualified, ((now) + 1))
 
-
-      printf "\tNew Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, ((now) + 1))) > "/dev/stderr"
-      printf "\tnew Franking Balance  => %s\n", print_cash(get_cost(FRANKING, ((now) + 1))) > "/dev/stderr"
 
     } # No credits at time now
   } # No tax credits for this account
@@ -5031,14 +5035,14 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?(TRUE):(FALSE))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(MPX_ARRAYS MPX_SCALARS)
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_Time Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
-      if (!index(MPX_ARRAYS, Array_Names[x])) {
-        assert(index(MPX_SCALARS, Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
+      if (!index(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate "), Array_Names[x])) {
+        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_Time Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
         Scalar_Names[x] = Array_Names[x]
@@ -5047,8 +5051,8 @@ function initialize_state(    x) {
   } else {
     # Use default read and write list
     Write_Variables = FALSE
-    MPX_Arrays = MPX_ARRAYS
-    MPX_Scalars = MPX_SCALARS
+    MPX_Arrays = ("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
+    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_Time Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
     split(MPX_Scalars, Scalar_Names, " ")
