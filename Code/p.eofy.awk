@@ -758,8 +758,6 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
   if (!near_zero(sum_dep)) {
     print_underline(197, 0, EOFY)
     printf "\tPeriod Depreciation     => %14s\n", print_cash(sum_dep) > EOFY
-    #printf "\tOpening Cost            => %14s\n", print_cash(get_cost("*ASSET.FIXED", open_key)) > EOFY
-    #printf "\tClosing Adjusted Cost   => %14s\n\n", print_cash(get_cost("*ASSET.FIXED", just_after(close_key))) > EOFY
   }
 } # End of print depreciating holdings
 
@@ -782,7 +780,7 @@ function print_dividend_qualification(now, past, is_detailed,
   if (is_detailed)
     printf "Detailed Dividend Qualification Report\n" > EOFY
   else
-    printf " Dividend Qualification Report\n" > EOFY
+    printf "Dividend Qualification Report\n" > EOFY
   printf "For the period starting %s and ending %s\n", get_date(past), get_date(yesterday(now)) > EOFY
 
   # A header
@@ -815,10 +813,10 @@ function print_dividend_qualification(now, past, is_detailed,
         payment = - get_delta_cost(a, key)
 
         # The qualifying date is one day before the ex-dividend date
-        qualifying_date = get_exdividend_date(underlying_asset, key) - ONE_DAY
+        qualifying_date = just_after(yesterday(get_exdividend_date(underlying_asset, key), HOUR))
 
         # If this date is valid now compute the proportion of the dividend is qualified
-        assert(qualifying_date > 0, sprintf("Can't compute qualified dividends without an ex-dividend date for the <%s> payment on <%s>",  Leaf[a], get_date(key)))
+        assert(qualifying_date > 0, sprintf("%s: %s <%s>",  Leaf[a], Read_Date_Error, get_date(key)))
 
         # These are the units that were qualified on the qualifying date
         qualified_units = get_qualified_units(underlying_asset, qualifying_date)
@@ -830,11 +828,11 @@ function print_dividend_qualification(now, past, is_detailed,
         if (!near_zero(total_units - qualified_units)) {
           q = maximum_entry(Qualified_Units[underlying_asset], qualifying_date, qualifying_date + 0.5 * Qualification_Window)
           qualified_units = max_value(q, qualified_units)
-          qualified_fraction = qualified_units / get_units(underlying_asset, qualifying_date)
+          qualified_fraction = qualified_units / total_units
 
           # Should never be greater than unity
           assert(!above_zero(qualified_fraction - 1.0), sprintf("Qualified Units[%s] => %.3f > Units held on qualification date <%s>",
-            underlying_asset, qualified_units, get_units(underlying_asset, qualifying_date)))
+            underlying_asset, qualified_units, total_units))
         } else
           qualified_fraction = 1.0
 

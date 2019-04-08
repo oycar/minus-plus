@@ -95,7 +95,7 @@ function read_qualifying_dates(  a, q_date, p_date) {
 function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) {
 
   # We start at the time "now" in the accounts
-  # Whihc should be equal to or shortly after the
+  # Which should be equal to or shortly after the
   # payment date - now since  the
   # payment date must be after the qualifying date
   # search back to find the earlier entries
@@ -109,8 +109,10 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
-    if (value > now)
+    if (value > now) {
+      Read_Date_Error = "Payment date is later than current date"
       return DATE_ERROR
+    }
     else if (near_zero(discrepancy))
       return exdividend_key
 
@@ -137,13 +139,16 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
     }
 
     # Best match was exdividend_key
-    if (discrepancy > ONE_WEEK)
+    if (discrepancy > ONE_WEEK) {
+      Read_Date_Error = "Failed to find a payment date within one week of current date"
       return DATE_ERROR
+    }
 
     return exdividend_key
   }
 
   # Failed to find a qualification date
+  Read_Date_Error = "Failed to find any payment date"
   return DATE_ERROR
 }
 

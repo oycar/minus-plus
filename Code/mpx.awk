@@ -359,7 +359,7 @@ function read_qualifying_dates(  a, q_date, p_date) {
 function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) {
 
   # We start at the time "now" in the accounts
-  # Whihc should be equal to or shortly after the
+  # Which should be equal to or shortly after the
   # payment date - now since  the
   # payment date must be after the qualifying date
   # search back to find the earlier entries
@@ -373,8 +373,10 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
-    if (value > now)
+    if (value > now) {
+      Read_Date_Error = "Payment date is later than current date"
       return (-1)
+    }
     else if ((((discrepancy) <= Epsilon) && ((discrepancy) >= -Epsilon)))
       return exdividend_key
 
@@ -401,13 +403,16 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
     }
 
     # Best match was exdividend_key
-    if (discrepancy > 604800)
+    if (discrepancy > 604800) {
+      Read_Date_Error = "Failed to find a payment date within one week of current date"
       return (-1)
+    }
 
     return exdividend_key
   }
 
   # Failed to find a qualification date
+  Read_Date_Error = "Failed to find any payment date"
   return (-1)
 }
 
@@ -1865,8 +1870,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
 
   # Depreciating assets only use cost elements I or II
 
-  printf "Compute Depreciation\n%16s\n\tDate => %s\n", (Leaf[(a)]), get_date(now, LONG_FORMAT)
-
 
   # First pass at setting depreciation factor
   first_year_factor = FALSE
@@ -1894,9 +1897,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       if (now in Accounting_Cost[a][p][I]) {
         # Already depreciated
 
-        # Debugging
-        printf "\tAlready Depreciated to => %s\n", get_date(now) > "/dev/stderr"
-
         continue # Get next parcel
       }
 
@@ -1907,12 +1907,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       # The opening value - cost element I
       open_value = get_parcel_element(a, p, I, open_key)
 
-
-      # Debugging
-      printf "\tParcel => %04d\n", p > "/dev/stderr"
-      if ((( a in Parcel_Tag) && ( p in Parcel_Tag[ a])))
-        printf "\tName   => %s\n", Parcel_Tag[a][p] > "/dev/stderr"
-      printf "\tMethod => %s\n", Method_Name[a] > "/dev/stderr"
 
 
       # Refine factor at parcel level
@@ -1934,8 +1928,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       }
 
 
-      printf "\tFactor => %.3f\n", factor
-
 
       # This block is the only difference between prime cost and diminishing value
       if ("PC" != Method_Name[a]) # Diminishing Value or Pool (not Prime Cost)
@@ -1950,17 +1942,9 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       sum_delta += delta
 
 
-      # Debugging
-      printf "\tOpen  => %s\n", print_cash(open_value) > "/dev/stderr"
-      printf "\tDelta  => %s\n", print_cash(delta) > "/dev/stderr"
-      if (delta == open_value)
-        printf "\tZero Parcel => %d\n", p > "/dev/stderr"
-
     } # End of if unsold parcel
   } # End of each parcel
 
-
-  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "depreciate_now", (Leaf[(a)]), get_date(now), (get_cost(a,  now)) > "/dev/stderr"
 
 
   # Return the depreciation
@@ -3001,8 +2985,6 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
   if (!(((sum_dep) <= Epsilon) && ((sum_dep) >= -Epsilon))) {
     print_underline(197, 0, EOFY)
     printf "\tPeriod Depreciation     => %14s\n", print_cash(sum_dep) > EOFY
-    #printf "\tOpening Cost            => %14s\n", print_cash(get_cost("*ASSET.FIXED", open_key)) > EOFY
-    #printf "\tClosing Adjusted Cost   => %14s\n\n", print_cash(get_cost("*ASSET.FIXED", just_after(close_key))) > EOFY
   }
 } # End of print depreciating holdings
 
@@ -3025,7 +3007,7 @@ function print_dividend_qualification(now, past, is_detailed,
   if (is_detailed)
     printf "Detailed Dividend Qualification Report\n" > EOFY
   else
-    printf " Dividend Qualification Report\n" > EOFY
+    printf "Dividend Qualification Report\n" > EOFY
   printf "For the period starting %s and ending %s\n", get_date(past), get_date(yesterday(now)) > EOFY
 
   # A header
@@ -3058,10 +3040,10 @@ function print_dividend_qualification(now, past, is_detailed,
         payment = - (get_cost(a,  key) - get_cost(a, (( key) - 1)))
 
         # The qualifying date is one day before the ex-dividend date
-        qualifying_date = get_exdividend_date(underlying_asset, key) - (86400)
+        qualifying_date = ((yesterday(get_exdividend_date(underlying_asset, key), (12))) + 1)
 
         # If this date is valid now compute the proportion of the dividend is qualified
-        assert(qualifying_date > 0, sprintf("Can't compute qualified dividends without an ex-dividend date for the <%s> payment on <%s>",  Leaf[a], get_date(key)))
+        assert(qualifying_date > 0, sprintf("%s: %s <%s>",  Leaf[a], Read_Date_Error, get_date(key)))
 
         # These are the units that were qualified on the qualifying date
         qualified_units = ((Qualification_Window)?(  ((__MPX_H_TEMP__ = find_key(Qualified_Units[underlying_asset],   qualifying_date))?( Qualified_Units[underlying_asset][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Qualified_Units[underlying_asset][0]):( 0))))):( ((__MPX_H_TEMP__ = find_key(Total_Units[underlying_asset],    qualifying_date))?( Total_Units[underlying_asset][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[underlying_asset][0]):( 0))))))
@@ -3073,11 +3055,11 @@ function print_dividend_qualification(now, past, is_detailed,
         if (!(((total_units - qualified_units) <= Epsilon) && ((total_units - qualified_units) >= -Epsilon))) {
           q = maximum_entry(Qualified_Units[underlying_asset], qualifying_date, qualifying_date + 0.5 * Qualification_Window)
           qualified_units = (((q)>( qualified_units))?(q):( qualified_units))
-          qualified_fraction = qualified_units / ((__MPX_H_TEMP__ = find_key(Total_Units[underlying_asset],   qualifying_date))?( Total_Units[underlying_asset][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[underlying_asset][0]):( 0))))
+          qualified_fraction = qualified_units / total_units
 
           # Should never be greater than unity
           assert(!((qualified_fraction - 1.0) >  Epsilon), sprintf("Qualified Units[%s] => %.3f > Units held on qualification date <%s>",
-            underlying_asset, qualified_units, ((__MPX_H_TEMP__ = find_key(Total_Units[underlying_asset],   qualifying_date))?( Total_Units[underlying_asset][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[underlying_asset][0]):( 0))))))
+            underlying_asset, qualified_units, total_units))
         } else
           qualified_fraction = 1.0
 
@@ -4519,22 +4501,31 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
       # Create an unqualified account
       unqualified_account = initialize_account("SPECIAL.OFFSET.FRANKING.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
 
+      # The adjustment
+      unqualified *= imputation_credits
+
+      printf "Underlying Asset %s\n", Leaf[underlying_asset] > "/dev/stderr"
+      printf "\tTax Credits %s[%s]      => %s\n", Leaf[Tax_Credits[underlying_asset]], get_date(now), print_cash(- imputation_credits) > "/dev/stderr"
+      printf "\tUnqualified Tax Credits => %s\n", print_cash(- unqualified) > "/dev/stderr"
+      printf "\tTotal Tax Credits       => %s\n", print_cash(- get_cost(Tax_Credits[underlying_asset], now)) > "/dev/stderr"
+      printf "\tFranking Balance        => %s\n", print_cash(get_cost(FRANKING, now)) > "/dev/stderr"
+      printf "\tTotal Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, now)) > "/dev/stderr"
+
+
       # Now sum the unqualified credits in this account
       # This would occur when state files are used
-      # check for places when get_delta_cost() can be used
-      # also add a macro that does adjust_cost safely eg safe_adjust_cost()
-      set_cost(unqualified_account, get_cost(unqualified_account, ((now) - 1)) - unqualified * imputation_credits, now)
+      set_cost(unqualified_account, get_cost(unqualified_account, now) - unqualified, ((now) + 1))
 
       # Adjust the franking account too... (opposite sign - this is asset like)
-      set_cost(FRANKING, get_cost(FRANKING, ((now) - 1)) + unqualified * imputation_credits, now)
+      set_cost(FRANKING, get_cost(FRANKING, now) + unqualified, ((now) + 1))
 
+
+      printf "\tNew Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, ((now) + 1))) > "/dev/stderr"
+      printf "\tnew Franking Balance  => %s\n", print_cash(get_cost(FRANKING, ((now) + 1))) > "/dev/stderr"
 
     } # No credits at time now
   } # No tax credits for this account
-
-  # Credits adjusted
-  return
-}
+} # All done
 
 #!/usr/local/bin/gawk -f
 # p.smsf_modules.awk
@@ -5349,12 +5340,12 @@ function parse_transaction(now, a, b, units, amount,
   # Special franking provisions
   if (a == TAX) {
     # Reduce franking
-    adjust_cost(FRANKING,     - amount, now)
+    adjust_cost(FRANKING, - amount, now)
 
     print_transaction(now, "Reduce Franking Balance", FRANKING, NULL, 0, amount)
    } else if (((b) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)) {
     # Increase franking
-    adjust_cost(FRANKING,       amount, now)
+    adjust_cost(FRANKING, amount, now)
 
     print_transaction(now, "Increase Franking Balance", NULL, FRANKING, 0, amount)
   }
@@ -5447,15 +5438,10 @@ function parse_transaction(now, a, b, units, amount,
           assert(FALSE, sprintf("Can't link a tax credit account to income account %s", a))
       }
 
-      # Need to establish if the franking account is needed
-      if (((credit_account) ~ /^SPECIAL\.OFFSET\.FRANKING[.:]/)) {
-        adjust_cost(FRANKING, tax_credits, now)
-        use_name = FRANKING
-      } else
-        use_name = NULL
-
+      # Adjust franking account and credit account
+      adjust_cost(FRANKING, tax_credits, now)
       adjust_cost(credit_account, - tax_credits, now)
-      print_transaction(now, ("# Tax Credits"), credit_account, NULL, 0, tax_credits)
+      print_transaction(now, ("# " Leaf[underlying_asset] " Tax Credits"), credit_account, FRANKING, 0, tax_credits)
     } else
       tax_credits = 0
 
@@ -5463,7 +5449,7 @@ function parse_transaction(now, a, b, units, amount,
     if (!(((Real_Value[2]) <= Epsilon) && ((Real_Value[2]) >= -Epsilon))) {
       # Always treated as positive
       adjust_cost(LIC_CREDITS, - Real_Value[2], now)
-      print_transaction(now, ("# " Leaf[a] " LIC Credits"), LIC_CREDITS, NULL, 0, Real_Value[2])
+      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_CREDITS, NULL, 0, Real_Value[2])
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present

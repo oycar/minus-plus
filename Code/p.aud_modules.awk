@@ -770,23 +770,28 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
       # Create an unqualified account
       unqualified_account = initialize_account("SPECIAL.OFFSET.FRANKING.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
 
-      # Now sum the unqualified credits in this account
-      # This would occur when state files are used
-      # check for places when get_delta_cost() can be used
-      # also add a macro that does adjust_cost safely eg safe_adjust_cost()
-      set_cost(unqualified_account, get_cost(unqualified_account, just_before(now)) - unqualified * imputation_credits, now)
-
-      # Adjust the franking account too... (opposite sign - this is asset like)
-      set_cost(FRANKING, get_cost(FRANKING, just_before(now)) + unqualified * imputation_credits, now)
-
+      # The adjustment
+      unqualified *= imputation_credits
 @ifeq LOG dividend_qualification
       printf "Underlying Asset %s\n", Leaf[underlying_asset] > "/dev/stderr"
-      printf "Total Tax Credits %s[%s] => %s\n", Leaf[Tax_Credits[underlying_asset]], get_date(now), print_cash(- imputation_credits) > "/dev/stderr"
-      printf "Unqualified Tax Credits %s\n", print_cash(- unqualified * imputation_credits) > "/dev/stderr"
+      printf "\tTax Credits %s[%s]      => %s\n", Leaf[Tax_Credits[underlying_asset]], get_date(now), print_cash(- imputation_credits) > "/dev/stderr"
+      printf "\tUnqualified Tax Credits => %s\n", print_cash(- unqualified) > "/dev/stderr"
+      printf "\tTotal Tax Credits       => %s\n", print_cash(- get_cost(Tax_Credits[underlying_asset], now)) > "/dev/stderr"
+      printf "\tFranking Balance        => %s\n", print_cash(get_cost(FRANKING, now)) > "/dev/stderr"
+      printf "\tTotal Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, now)) > "/dev/stderr"
+@endif
+
+      # Now sum the unqualified credits in this account
+      # This would occur when state files are used
+      set_cost(unqualified_account, get_cost(unqualified_account, now) - unqualified, just_after(now))
+
+      # Adjust the franking account too... (opposite sign - this is asset like)
+      set_cost(FRANKING, get_cost(FRANKING, now) + unqualified, just_after(now))
+
+@ifeq LOG dividend_qualification
+      printf "\tNew Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, just_after(now))) > "/dev/stderr"
+      printf "\tnew Franking Balance  => %s\n", print_cash(get_cost(FRANKING, just_after(now))) > "/dev/stderr"
 @endif
     } # No credits at time now
   } # No tax credits for this account
-
-  # Credits adjusted
-  return
-}
+} # All done

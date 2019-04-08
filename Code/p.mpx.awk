@@ -745,12 +745,12 @@ function parse_transaction(now, a, b, units, amount,
   # Special franking provisions
   if (a == TAX) {
     # Reduce franking
-    adjust_cost(FRANKING,     - amount, now)
+    adjust_cost(FRANKING, - amount, now)
 
     print_transaction(now, "Reduce Franking Balance", FRANKING, NULL, 0, amount)
    } else if (is_tax(b)) {
     # Increase franking
-    adjust_cost(FRANKING,       amount, now)
+    adjust_cost(FRANKING, amount, now)
 
     print_transaction(now, "Increase Franking Balance", NULL, FRANKING, 0, amount)
   }
@@ -843,15 +843,10 @@ function parse_transaction(now, a, b, units, amount,
           assert(FALSE, sprintf("Can't link a tax credit account to income account %s", a))
       }
 
-      # Need to establish if the franking account is needed
-      if (is_franking(credit_account)) {
-        adjust_cost(FRANKING, tax_credits, now)
-        use_name = FRANKING
-      } else
-        use_name = NULL
-
+      # Adjust franking account and credit account
+      adjust_cost(FRANKING, tax_credits, now)
       adjust_cost(credit_account, - tax_credits, now)
-      print_transaction(now, ("# Tax Credits"), credit_account, NULL, 0, tax_credits)
+      print_transaction(now, ("# " Leaf[underlying_asset] " Tax Credits"), credit_account, FRANKING, 0, tax_credits)
     } else
       tax_credits = 0
 
@@ -859,7 +854,7 @@ function parse_transaction(now, a, b, units, amount,
     if (!near_zero(Real_Value[2])) {
       # Always treated as positive
       adjust_cost(LIC_CREDITS, - Real_Value[2], now)
-      print_transaction(now, ("# " Leaf[a] " LIC Credits"), LIC_CREDITS, NULL, 0, Real_Value[2])
+      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_CREDITS, NULL, 0, Real_Value[2])
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present

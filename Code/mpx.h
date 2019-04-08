@@ -155,7 +155,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define adjust_units(a, du, now) sum_entry(Total_Units[a], du, now)
 
 # // Qualified units - reading is simple - no window qualified units equal all units
-@define get_qualified_units(a, now) ternary(Qualification_Window,  find_entry(Qualified_Units[a], now), get_units(a, now),)
+@define get_qualified_units(a, now) ternary(Qualification_Window,  find_entry(Qualified_Units[a], now), get_units(a, now))
 
 
 #// GST proportion at time (t)
