@@ -3641,8 +3641,8 @@ CHECK, COST, TERM03.CUA, 1314.87
 2017 Jun 30,      CASH.INT,          CASH,          0,        0.11, # Cash interest
 2017 Jun 30,        ESAVER,   BOB.LOAN,  0,    27518.04, # Lump Sum Payment (Bob)
 2017 Jun 30,        ESAVER,   BOB.LOAN, 0,    17481.96, # Lump Sum Payment (Bob)
-## Fix up accumulated GST ERRORS - just a fudge
-2017 Jun 30, TAX.GST, ALICE.LOAN, 0, 70.76, # These GST amounts were not claimed historically
+## Fix up accumulated GST ERRORS
+2017 Jun 30, TAX.GST, ALICE.LOAN, 0, 70.76, # Fixes
 # EOFY transactions
 #
 2017 Jun 30, AMEYS.ENERGIZER,     DISPOSALS,     -1.000,        0.00, # Write off energizer

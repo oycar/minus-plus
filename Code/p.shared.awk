@@ -1221,25 +1221,68 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,  
 @endif # LOG
 } # End of adjust_parcel_cost
 
+# # The idea of the "cost" of the account
+# # This is the same as the reduced cost
+# function get_cost(a, now,      i, sum_cost) {
+#   # Initial cost
+#   sum_cost = 0
+#
+#   # Adjustments for units bought
+#   if (is_unitized(a)) {
+#     for (i = 0; i < Number_Parcels[a]; i ++) {
+#       if (Held_From[a][i] > now) # All further transactions occured after (now)
+#         break # All done
+#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
+#         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
+#     }
+#   } else if (a in Cost_Basis) # Cash-like
+#     sum_cost = find_entry(Cost_Basis[a], now)
+#
+#   return sum_cost
+# }
+
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
-function get_cost(a, now,      i, sum_cost) {
-  # Initial cost
-  sum_cost = 0
-
+function get_cost(a, now,     i, sum_cost) {
   # Adjustments for units bought
   if (is_unitized(a)) {
+    # Initial cost
+    sum_cost = 0
+
     for (i = 0; i < Number_Parcels[a]; i ++) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
     }
+    return sum_cost
   } else if (a in Cost_Basis) # Cash-like
-    sum_cost = find_entry(Cost_Basis[a], now)
+    return find_entry(Cost_Basis[a], now)
 
-  return sum_cost
+  return 0
 }
+
+# The tax adjustments at time (now)
+# Note that depreciation is always a tax adjustment
+function get_cost_adjustment(a, now,   i, sum_adjustments) {
+  # Initial adjustments
+  sum_adjustments = 0
+
+  # Adjustments for units bought
+  # Do not apply to equities
+  if (is_asset(a)) {
+    for (i = 0; i < Number_Parcels[a]; i ++) {
+      if (Held_From[a][i] > now) # All further transactions occured after (now)
+        break # All done
+      if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
+        sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
+    }
+  }
+
+  return sum_adjustments
+}
+
+
 
 # set the cost to a specified value (new_cost)
 function set_cost(a, new_cost, now,     initial_cost) {
@@ -1266,6 +1309,10 @@ function sum_market_gains(now,     sum, a) {
 
 # Sum  the cost elements
 function sum_cost_elements(array, now,     sum_elements, e) {
+@ifeq LOG DEBUG
+  assert(isarray(array), "<" $0 "> sum_cost_elements:  needs an array")
+@endif
+
   sum_elements = 0
   for (e in array) # Should this include [0] or not?
     sum_elements += find_entry(array[e], now)
@@ -1291,7 +1338,7 @@ function get_cost_element(a, element, now,      i, sum_cost) {
 }
 
 # The parcel cost
-function get_parcel_element(a, p, element, now, adjusted,    sum) {
+function get_parcel_element(a, p, element, now, adjusted) {
   # Adjusted or reduced cost?
   if (adjusted)
     # The adjusted parcel cost
@@ -1300,11 +1347,7 @@ function get_parcel_element(a, p, element, now, adjusted,    sum) {
     adjusted = 0
 
   # This elements costs
-  sum = find_entry(Accounting_Cost[a][p][element], now) - adjusted
-
-  # Remove the cash out component
-  #return sum - get_cash_out(a, p, now)
-  return sum
+  return find_entry(Accounting_Cost[a][p][element], now) - adjusted
 }
 
 # The initial cost
@@ -1357,43 +1400,44 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
   return sum - get_cash_out(a, p, now)
 }
 
-# The tax adjustments at time (now)
-# Note that depreciation is always a tax adjustment
-function get_Tax_Adjustments(a, now,   i, sum_adjustments) {
-  # Initial adjustments
-  sum_adjustments = 0
+# # The tax adjustments at time (now)
+# # Note that depreciation is always a tax adjustment
+# function get_cost_adjustment(a, now,   i, sum_adjustments) {
+#   # Initial adjustments
+#   sum_adjustments = 0
+#
+#   # Adjustments for units bought
+#   # Do not apply to equities
+#   if (!is_equity(a)) {
+#     for (i = 0; i < Number_Parcels[a]; i ++) {
+#       if (Held_From[a][i] > now) # All further transactions occured after (now)
+#         break # All done
+#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
+#         sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
+#     }
+#   }
+#
+#   return sum_adjustments
+# }
 
-  # Adjustments for units bought
-  # Do not apply to equities
-  if (!is_equity(a)) {
-    for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
-        break # All done
-      sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
-    }
-  }
-
-  return sum_adjustments
-}
-
-# Get the tax adjustment for a particular element
-function get_tax_element_adjustment(a, element, now,      i, sum_adjustments) {
-  # Initial adjustments
-  sum_adjustments = 0
-
-  # Adjustments for units bought
-  # Do not apply to equities
-  if (!is_equity(a)) {
-    for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
-        break # All done
-      sum_adjustments += get_parcel_tax_adjustment(a, i, element, now)
-
-    }
-  }
-
-  return sum_adjustments
-}
+# # Get the tax adjustment for a particular element
+# function get_tax_element_adjustment(a, element, now,      i, sum_adjustments) {
+#   # Initial adjustments
+#   sum_adjustments = 0
+#
+#   # Adjustments for units bought
+#   # Do not apply to equities
+#   if (!is_equity(a)) {
+#     for (i = 0; i < Number_Parcels[a]; i ++) {
+#       if (Held_From[a][i] > now) # All further transactions occured after (now)
+#         break # All done
+#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
+#         sum_adjustments += get_parcel_tax_adjustment(a, i, element, now)
+#     }
+#   }
+#
+#   return sum_adjustments
+# }
 
 # Print out transactions
 # Generalize for the case of a single entry transaction

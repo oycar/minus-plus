@@ -177,7 +177,6 @@ END {
 
 
 
-
 # // Get a single tranaction from the account
 
 
@@ -188,7 +187,6 @@ END {
 
 
 # // Qualified units - reading is simple - no window qualified units equal all units
-
 
 
 #// GST proportion at time (t)
@@ -249,7 +247,6 @@ END {
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http:#www.gnu.org/licenses/>.
-
 
 
 # // Default Currency Symbol
@@ -1455,25 +1452,70 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,  
 
 } # End of adjust_parcel_cost
 
+# # The idea of the "cost" of the account
+# # This is the same as the reduced cost
+# function get_cost(a, now,      i, sum_cost) {
+#   # Initial cost
+#   sum_cost = 0
+#
+#   # Adjustments for units bought
+#   if (is_unitized(a)) {
+#     for (i = 0; i < Number_Parcels[a]; i ++) {
+#       if (Held_From[a][i] > now) # All further transactions occured after (now)
+#         break # All done
+#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
+#         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
+#     }
+#   } else if (a in Cost_Basis) # Cash-like
+#     sum_cost = find_entry(Cost_Basis[a], now)
+#
+#   return sum_cost
+# }
+
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
-function get_cost(a, now,      i, sum_cost) {
-  # Initial cost
-  sum_cost = 0
-
+function get_cost(a, now, adjustment,     i, sum_cost) {
   # Adjustments for units bought
   if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
+    # Initial cost
+    sum_cost = 0
+
     for (i = 0; i < Number_Parcels[a]; i ++) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if ((Held_Until[(a)][( i)] > ( now))) # This is an unsold parcel at time (now)
         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
     }
-  } else if (a in Cost_Basis) # Cash-like
-    sum_cost = ((__MPX_H_TEMP__ = find_key(Cost_Basis[a],  now))?( Cost_Basis[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Cost_Basis[a][0]):( 0))))
 
+  } else if (a in Cost_Basis) # Cash-like
+    return ((__MPX_H_TEMP__ = find_key(Cost_Basis[a],  now))?( Cost_Basis[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Cost_Basis[a][0]):( 0))))
+  else
+    return 0
+    
   return sum_cost
 }
+
+# The tax adjustments at time (now)
+# Note that depreciation is always a tax adjustment
+function get_cost_adjustment(a, now,   i, sum_adjustments) {
+  # Initial adjustments
+  sum_adjustments = 0
+
+  # Adjustments for units bought
+  # Do not apply to equities
+  if (((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/)) {
+    for (i = 0; i < Number_Parcels[a]; i ++) {
+      if (Held_From[a][i] > now) # All further transactions occured after (now)
+        break # All done
+      if ((Held_Until[(a)][( i)] > ( now))) # This is an unsold parcel at time (now)
+        sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
+    }
+  }
+
+  return sum_adjustments
+}
+
+
 
 # set the cost to a specified value (new_cost)
 function set_cost(a, new_cost, now,     initial_cost) {
@@ -1500,6 +1542,8 @@ function sum_market_gains(now,     sum, a) {
 
 # Sum  the cost elements
 function sum_cost_elements(array, now,     sum_elements, e) {
+
+
   sum_elements = 0
   for (e in array) # Should this include [0] or not?
     sum_elements += ((__MPX_H_TEMP__ = find_key(array[e],  now))?( array[e][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( array[e][0]):( 0))))
@@ -1525,7 +1569,7 @@ function get_cost_element(a, element, now,      i, sum_cost) {
 }
 
 # The parcel cost
-function get_parcel_element(a, p, element, now, adjusted,    sum) {
+function get_parcel_element(a, p, element, now, adjusted) {
   # Adjusted or reduced cost?
   if (adjusted)
     # The adjusted parcel cost
@@ -1534,11 +1578,7 @@ function get_parcel_element(a, p, element, now, adjusted,    sum) {
     adjusted = 0
 
   # This elements costs
-  sum = ((__MPX_H_TEMP__ = find_key(Accounting_Cost[a][p][element],  now))?( Accounting_Cost[a][p][element][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Accounting_Cost[a][p][element][0]):( 0)))) - adjusted
-
-  # Remove the cash out component
-  #return sum - get_cash_out(a, p, now)
-  return sum
+  return ((__MPX_H_TEMP__ = find_key(Accounting_Cost[a][p][element],  now))?( Accounting_Cost[a][p][element][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Accounting_Cost[a][p][element][0]):( 0)))) - adjusted
 }
 
 # The initial cost
@@ -1591,43 +1631,44 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
   return sum - get_cash_out(a, p, now)
 }
 
-# The tax adjustments at time (now)
-# Note that depreciation is always a tax adjustment
-function get_Tax_Adjustments(a, now,   i, sum_adjustments) {
-  # Initial adjustments
-  sum_adjustments = 0
+# # The tax adjustments at time (now)
+# # Note that depreciation is always a tax adjustment
+# function get_cost_adjustment(a, now,   i, sum_adjustments) {
+#   # Initial adjustments
+#   sum_adjustments = 0
+#
+#   # Adjustments for units bought
+#   # Do not apply to equities
+#   if (!is_equity(a)) {
+#     for (i = 0; i < Number_Parcels[a]; i ++) {
+#       if (Held_From[a][i] > now) # All further transactions occured after (now)
+#         break # All done
+#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
+#         sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
+#     }
+#   }
+#
+#   return sum_adjustments
+# }
 
-  # Adjustments for units bought
-  # Do not apply to equities
-  if (!((a) ~ /^EQUITY[.:]/)) {
-    for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
-        break # All done
-      sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
-    }
-  }
-
-  return sum_adjustments
-}
-
-# Get the tax adjustment for a particular element
-function get_tax_element_adjustment(a, element, now,      i, sum_adjustments) {
-  # Initial adjustments
-  sum_adjustments = 0
-
-  # Adjustments for units bought
-  # Do not apply to equities
-  if (!((a) ~ /^EQUITY[.:]/)) {
-    for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
-        break # All done
-      sum_adjustments += (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ i][ element],  ( now)))?( Tax_Adjustments[a][ i][ element][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ i][ element][0]):( 0)))))
-
-    }
-  }
-
-  return sum_adjustments
-}
+# # Get the tax adjustment for a particular element
+# function get_tax_element_adjustment(a, element, now,      i, sum_adjustments) {
+#   # Initial adjustments
+#   sum_adjustments = 0
+#
+#   # Adjustments for units bought
+#   # Do not apply to equities
+#   if (!is_equity(a)) {
+#     for (i = 0; i < Number_Parcels[a]; i ++) {
+#       if (Held_From[a][i] > now) # All further transactions occured after (now)
+#         break # All done
+#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
+#         sum_adjustments += get_parcel_tax_adjustment(a, i, element, now)
+#     }
+#   }
+#
+#   return sum_adjustments
+# }
 
 # Print out transactions
 # Generalize for the case of a single entry transaction
@@ -2818,7 +2859,7 @@ function print_holdings(now,         p, a, c, sum_value, reduced_cost, adjustmen
                     print_cash(get_cost(a, now)), print_cash(get_value(a, now) - get_cost(a, now))  > EOFY
 
       # Check the adjusted cost
-      adjustments = get_Tax_Adjustments(a, now)
+      adjustments = get_cost_adjustment(a, now)
       if (!(((adjustments) <= Epsilon) && ((adjustments) >= -Epsilon)))
         printf "\t%123s => %14s\n", "Adjusted", print_cash(get_cost(a, now) - adjustments) > EOFY
 
@@ -2897,24 +2938,24 @@ function allocate_second_element_costs(now,       a, p, second_element) {
 
 
 # This function is is for slightly different times than the other EOFY actions
-function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key, close_key, delta, open_cost, sum_dep, sum_open,
+function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key, close_key, parcel_depreciation, account_depreciation, open_cost, total_depreciaiton, sum_open,
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
   is_detailed = ("" == is_detailed) ? FALSE : is_detailed
-  sum_dep = ""
+  total_depreciation = ""
 
   # Print out the assets in alphabetical order
   for (a in Leaf)
     if (((a) ~ /^ASSET\.FIXED[.:]/) && (is_open(a, now) || is_open(a, past))) {
 
-      if ("" == sum_dep) {
+      if ("" == total_depreciation) {
         printf "\n" > EOFY
         print Journal_Title > EOFY
         printf "Depreciation Schedule for the Period [%11s, %11s]\n", get_date(past), get_date(now) > EOFY
-        sum_dep = 0 # Total value summed here
+        total_depreciation = 0 # Total value summed here
       }
 
       # The opening value of an asset with multiple parcels cannot be tied to a single time
-      sum_open = 0
+      account_depreciation = sum_open = 0
 
       # Get each parcel
       printf "%10s %15s ", Depreciation_Method[Method_Name[a]], (Leaf[(a)]) > EOFY
@@ -2934,6 +2975,9 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
         open_cost = get_parcel_cost(a, p, open_key)
         sum_open += open_cost
 
+        # Always get the parcel depreciation
+        parcel_depreciation = (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( open_key)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0))))) - (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( close_key)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0)))))
+
         # Record detailed statement
         # Is this a named parcel?
         if (is_detailed) {
@@ -2943,14 +2987,16 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
             printf "\n%26d ", p > EOFY
 
           # Depreciation is the sum of the I tax adjustments
-          delta = (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( open_key)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0))))) - (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( close_key)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0)))))
           printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s",
-                    get_date(open_key), get_date(close_key, LONG_FORMAT), print_cash(open_cost),
+                    get_date(open_key), get_date(close_key), print_cash(open_cost),
                     print_cash(open_cost - delta),
                     print_cash(get_parcel_element(a, p, II, close_key)),
                     print_cash(get_parcel_cost(a, p, close_key)),
-                    print_cash(delta) > EOFY
+                    print_cash(parcel_depreciation) > EOFY
         } # End of is_detailed
+
+        #  Just track the total depreciation
+        account_depreciation   += parcel_depreciation
       } # End of each parcel
 
       # Clean up output
@@ -2970,20 +3016,17 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
       else
         close_key = ((now) - 1)
 
-      # If close_key was set so was open_key
-      # Total depreciation in this period
-      delta = get_tax_element_adjustment(a, I, open_key) - get_tax_element_adjustment(a, I, close_key)
-      sum_dep   += delta
-
       # For depreciating assets depreciation corresponds to the tax adjustments
       # Period depreciation is the difference in the tax adjustments
       printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s\n",
-        get_date(open_key), get_date(close_key, LONG_FORMAT), print_cash(sum_open),
+        get_date(open_key), get_date(close_key), print_cash(sum_open),
         print_cash(sum_open - delta),
         print_cash(get_cost_element(a, II, close_key)),
         print_cash(get_cost(a, close_key)),
-        print_cash(delta) > EOFY
+        print_cash(account_depreciation) > EOFY
 
+      # Track total depreciation too
+      total_depreciation += account_depreciation
     } # End of a depreciating asset
 
   # Is there any depreciation/appreciation due to the sale of depreciating assets?
@@ -2993,12 +3036,12 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
     printf "\n\tDepreciation from Sales => %14s\n", print_cash(sale_depreciation) > EOFY
   if (!(((sale_appreciation) <= Epsilon) && ((sale_appreciation) >= -Epsilon)))
     printf "\n\tAppreciation from Sales => %14s\n", print_cash(-sale_appreciation) > EOFY
-  sum_dep += sale_depreciation + sale_appreciation
+  total_depreciation += sale_depreciation + sale_appreciation
 
   # Print a nice line
-  if (!(((sum_dep) <= Epsilon) && ((sum_dep) >= -Epsilon))) {
+  if (!(((total_depreciation) <= Epsilon) && ((total_depreciation) >= -Epsilon))) {
     print_underline(197, 0, EOFY)
-    printf "\tPeriod Depreciation     => %14s\n", print_cash(sum_dep) > EOFY
+    printf "\tPeriod Depreciation     => %14s\n", print_cash(total_depreciation) > EOFY
   }
 } # End of print depreciating holdings
 

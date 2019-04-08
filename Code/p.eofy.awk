@@ -31,11 +31,10 @@ function eofy_actions(now,      past, allocated_profits,
 
 @ifeq LOG eofy_actions
   # EOFY actions
-  printf "EOFY Actions\n\tDate => %s\n", get_date(now, LONG_FORMAT) > "/dev/stderr"
+  printf "EOFY Actions\n\tDate => %s\n", get_date(now) > "/dev/stderr"
 @endif
 
   # Depreciate everything - at EOFY
-  #depreciate_all(yesterday(now, HOUR))
   depreciate_all(now)
 
   # Set EOFY accounts
@@ -82,12 +81,10 @@ function eofy_actions(now,      past, allocated_profits,
 
     # Print the depreciation schedule
     #  Reset the time to July 01 at the standard hour
-    #print_depreciating_holdings(today(now, HOUR), today(past, HOUR), Show_Extra)
     print_depreciating_holdings(just_after(now), past, Show_Extra)
   }
 
   # Allocate second element costs associated with fixed assets - at SOFY
-  #allocate_second_element_costs(today(now, HOUR))
   allocate_second_element_costs(now)
 }
 
@@ -162,7 +159,7 @@ function print_realized_gains(now, past, is_detailed,       cgt_schedule, gains_
           if (gains < parcel_adjustments - Epsilon) {
             parcel_gains = gains - parcel_adjustments
             # Sold - capital gain
-            if (held_time >= ONE_YEAR) {
+            if (held_time >= CGT_PERIOD) {
               description = "Long Gain    "
               disc_gains += parcel_gains
             } else {
@@ -214,6 +211,7 @@ function print_realized_gains(now, past, is_detailed,       cgt_schedule, gains_
 function print_operating_statement(now, past, is_detailed,     benefits, losses,
                                                                gains, market_gains,
                                                                more_past, label, x) {
+
   # Set arguments
   more_past = last_year(past)
   is_detailed = ("" == is_detailed) ? 1 : 2
@@ -563,7 +561,7 @@ function print_holdings(now,         p, a, c, sum_value, reduced_cost, adjustmen
                     print_cash(get_cost(a, now)), print_cash(get_value(a, now) - get_cost(a, now))  > EOFY
 
       # Check the adjusted cost
-      adjustments = get_Tax_Adjustments(a, now)
+      adjustments = get_cost_adjustment(a, now)
       if (!near_zero(adjustments))
         printf "\t%123s => %14s\n", "Adjusted", print_cash(get_cost(a, now) - adjustments) > EOFY
 
@@ -656,24 +654,24 @@ function allocate_second_element_costs(now,       a, p, second_element) {
 
 
 # This function is is for slightly different times than the other EOFY actions
-function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key, close_key, delta, open_cost, sum_dep, sum_open,
+function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key, close_key, parcel_depreciation, account_depreciation, open_cost, total_depreciaiton, sum_open,
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
   is_detailed = ("" == is_detailed) ? FALSE : is_detailed
-  sum_dep = ""
+  total_depreciation = ""
 
   # Print out the assets in alphabetical order
   for (a in Leaf)
     if (is_fixed(a) && (is_open(a, now) || is_open(a, past))) {
 
-      if ("" == sum_dep) {
+      if ("" == total_depreciation) {
         printf "\n" > EOFY
         print Journal_Title > EOFY
         printf "Depreciation Schedule for the Period [%11s, %11s]\n", get_date(past), get_date(now) > EOFY
-        sum_dep = 0 # Total value summed here
+        total_depreciation = 0 # Total value summed here
       }
 
       # The opening value of an asset with multiple parcels cannot be tied to a single time
-      sum_open = 0
+      account_depreciation = sum_open = 0
 
       # Get each parcel
       printf "%10s %15s ", Depreciation_Method[Method_Name[a]], get_short_name(a) > EOFY
@@ -693,6 +691,9 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
         open_cost = get_parcel_cost(a, p, open_key)
         sum_open += open_cost
 
+        # Always get the parcel depreciation
+        parcel_depreciation = get_parcel_tax_adjustment(a, p, I, open_key) - get_parcel_tax_adjustment(a, p, I, close_key)
+
         # Record detailed statement
         # Is this a named parcel?
         if (is_detailed) {
@@ -702,14 +703,16 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
             printf "\n%26d ", p > EOFY
 
           # Depreciation is the sum of the I tax adjustments
-          delta = get_parcel_tax_adjustment(a, p, I, open_key) - get_parcel_tax_adjustment(a, p, I, close_key)
           printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s",
-                    get_date(open_key), get_date(close_key, LONG_FORMAT), print_cash(open_cost),
+                    get_date(open_key), get_date(close_key), print_cash(open_cost),
                     print_cash(open_cost - delta),
                     print_cash(get_parcel_element(a, p, II, close_key)),
                     print_cash(get_parcel_cost(a, p, close_key)),
-                    print_cash(delta) > EOFY
+                    print_cash(parcel_depreciation) > EOFY
         } # End of is_detailed
+
+        #  Just track the total depreciation
+        account_depreciation   += parcel_depreciation
       } # End of each parcel
 
       # Clean up output
@@ -729,20 +732,17 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
       else
         close_key = just_before(now)
 
-      # If close_key was set so was open_key
-      # Total depreciation in this period
-      delta = get_tax_element_adjustment(a, I, open_key) - get_tax_element_adjustment(a, I, close_key)
-      sum_dep   += delta
-
       # For depreciating assets depreciation corresponds to the tax adjustments
       # Period depreciation is the difference in the tax adjustments
       printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s\n",
-        get_date(open_key), get_date(close_key, LONG_FORMAT), print_cash(sum_open),
+        get_date(open_key), get_date(close_key), print_cash(sum_open),
         print_cash(sum_open - delta),
         print_cash(get_cost_element(a, II, close_key)),
         print_cash(get_cost(a, close_key)),
-        print_cash(delta) > EOFY
+        print_cash(account_depreciation) > EOFY
 
+      # Track total depreciation too
+      total_depreciation += account_depreciation
     } # End of a depreciating asset
 
   # Is there any depreciation/appreciation due to the sale of depreciating assets?
@@ -752,12 +752,12 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
     printf "\n\tDepreciation from Sales => %14s\n", print_cash(sale_depreciation) > EOFY
   if (!near_zero(sale_appreciation))
     printf "\n\tAppreciation from Sales => %14s\n", print_cash(-sale_appreciation) > EOFY
-  sum_dep += sale_depreciation + sale_appreciation
+  total_depreciation += sale_depreciation + sale_appreciation
 
   # Print a nice line
-  if (!near_zero(sum_dep)) {
+  if (!near_zero(total_depreciation)) {
     print_underline(197, 0, EOFY)
-    printf "\tPeriod Depreciation     => %14s\n", print_cash(sum_dep) > EOFY
+    printf "\tPeriod Depreciation     => %14s\n", print_cash(total_depreciation) > EOFY
   }
 } # End of print depreciating holdings
 
@@ -774,6 +774,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          key, next_key, payment,
                                          print_header) {
 
+  ## Output Stream => Dividend_Report
 
   # For each dividend in the previous financial
   print Journal_Title > EOFY

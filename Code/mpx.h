@@ -141,7 +141,6 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define is_unsold(a, p, now) (Held_Until[(a)][(p)] > (now))
 @define get_short_name(name) (Leaf[(name)])
 @define get_reduced_cost(a, now) (get_cost(a, now))
-@define get_adjusted_cost(a, now) (get_cost(a, now) - get_Tax_Adjustments(a, now))
 @define get_parcel_tax_adjustment(a, p, element, now) (find_entry(Tax_Adjustments[a][p][element], (now)))
 @define get_parcel_proceeds(a, p) (first_entry(Accounting_Cost[a][p][0]))
 
@@ -156,7 +155,6 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 # // Qualified units - reading is simple - no window qualified units equal all units
 @define get_qualified_units(a, now) ternary(Qualification_Window,  find_entry(Qualified_Units[a], now), get_units(a, now))
-
 
 #// GST proportion at time (t)
 @define gst_proportion(t) ternary(__MPX_H_TEMP__ = find_entry(GST_Rate,t), __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__), 0)
