@@ -601,7 +601,6 @@ function depreciate_all(now,      a, current_depreciation, comments) {
 
   # Restore defaults
   Cost_Element = COST_ELEMENT
-  # = FALSE
 }
 
 # Allocate second element costs

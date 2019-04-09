@@ -133,6 +133,11 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Round to zero
 @define round_zero(x) ternary(near_zero(x), 0, x)
 
+# // Numerical comparisons
+@define greater_than(x, y) ((x - y) > 0)
+@define less_than(x, y)    ((x - y) < 0)
+@define greater_than_or_equal(x, y) ((x - y) >= 0)
+@define less_than_or_equal(x, y)    ((x - y) <= 0)
 
 @define is_closed(a, now) (!is_open((a), (now)))
 @define is_new(a) ("" == first_key(Cost_Basis[a]))
@@ -203,6 +208,16 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // The carry forward and write back limits
 @define carry_forward_limit(t) ternary(CARRY_FORWARD_LIMIT, ((t) - CARRY_FORWARD_LIMIT), Epoch)
 @define write_back_limit(t) ternary(WRITE_BACK_LIMIT, ((t) - WRITE_BACK_LIMIT), Epoch)
+
+# // Multi-Line Macro
+@define filter_block(key, data, start, end) for (key in data) {\
+  if (key - end > 0)\
+    continue;\
+  if (key - start >= 0)\
+    stack[key] = data[key];\
+  else\
+    break;\
+}
 
 
 

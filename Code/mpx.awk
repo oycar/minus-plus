@@ -44,8 +44,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Control Export format
 
 
@@ -166,6 +164,11 @@ END {
 # // Round to zero
 
 
+# // Numerical comparisons
+
+
+
+
 
 
 
@@ -270,6 +273,9 @@ END {
 # // Unlimited goes all the way to the Epoch
 # // No need to compute the number of years exactly
 # // The carry forward and write back limits
+
+
+
 
 
 
@@ -479,7 +485,7 @@ function set_array(array, keys, first_key, last_key, value, flag) {
   # The idea of deleting the a temporary scalar entry in this function was based on
   # Ed Morton's code found here => https://groups.google.com/forum/#!topic/comp.lang.awk/vKiSODr6Bds
   # Catch errors
-  assert(isarray(array), "set_array: Not an array")
+
 
   # Delete temporary key
   if (flag) {
@@ -522,9 +528,6 @@ function write_state(array_names, scalar_names,    name) {
   # The scalars - compact form
   for (name in scalar_names)
     printf "<<,%s,%s,>>\n", scalar_names[name], format_value(SYMTAB[scalar_names[name]]) > Write_State
-  #
-  # # The last line is (oddly enough) when the journal starts - this allows initialization to occur when file read back in
-  # printf "START_JOURNAL\n" > Write_State
 }
 
 # This walks the array that we want to dump to file
@@ -1474,7 +1477,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,  
 
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
-function get_cost(a, now, adjustment,     i, sum_cost) {
+function get_cost(a, now,     i, sum_cost) {
   # Adjustments for units bought
   if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
     # Initial cost
@@ -1486,13 +1489,11 @@ function get_cost(a, now, adjustment,     i, sum_cost) {
       if ((Held_Until[(a)][( i)] > ( now))) # This is an unsold parcel at time (now)
         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
     }
-
+    return sum_cost
   } else if (a in Cost_Basis) # Cash-like
     return ((__MPX_H_TEMP__ = find_key(Cost_Basis[a],  now))?( Cost_Basis[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Cost_Basis[a][0]):( 0))))
-  else
-    return 0
-    
-  return sum_cost
+
+  return 0
 }
 
 # The tax adjustments at time (now)
@@ -2331,7 +2332,6 @@ function eofy_actions(now,      past, allocated_profits,
 
 
   # Depreciate everything - at EOFY
-  #depreciate_all(yesterday(now, HOUR))
   depreciate_all(now)
 
   # Set EOFY accounts
@@ -2378,12 +2378,10 @@ function eofy_actions(now,      past, allocated_profits,
 
     # Print the depreciation schedule
     #  Reset the time to July 01 at the standard hour
-    #print_depreciating_holdings(today(now, HOUR), today(past, HOUR), Show_Extra)
     print_depreciating_holdings(((now) + 1), past, Show_Extra)
   }
 
   # Allocate second element costs associated with fixed assets - at SOFY
-  #allocate_second_element_costs(today(now, HOUR))
   allocate_second_element_costs(now)
 }
 
@@ -2510,6 +2508,7 @@ function print_realized_gains(now, past, is_detailed,       cgt_schedule, gains_
 function print_operating_statement(now, past, is_detailed,     benefits, losses,
                                                                gains, market_gains,
                                                                more_past, label, x) {
+
   # Set arguments
   more_past = ((past) + one_year(past, -1))
   is_detailed = ("" == is_detailed) ? 1 : 2
@@ -2899,7 +2898,6 @@ function depreciate_all(now,      a, current_depreciation, comments) {
 
   # Restore defaults
   Cost_Element = COST_ELEMENT
-  # = FALSE
 }
 
 # Allocate second element costs
@@ -3058,6 +3056,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          key, next_key, payment,
                                          print_header) {
 
+  ## Output Stream => Dividend_Report
 
   # For each dividend in the previous financial
   print Journal_Title > EOFY
@@ -5268,9 +5267,7 @@ function set_array_bands(now, bands, nf,     i, k) {
     bands[now][0] = strtonum($nf)
 
   }
-
 }
-
 
 function read_input_record(   t, n, a, threshold) {
   # Skip empty lines
@@ -5903,7 +5900,6 @@ function update_fixed_account(a, now, maturity,       active_account, x, thresho
   return active_account
 }
 
-
 # A wrapper function updates allocated profits when required ()
 function update_profits(now,     delta_profits) {
   # Compute the profits that need to be allocated to members
@@ -6138,7 +6134,7 @@ END {
 
   # Delete empty accounts
   # Filter out data entries that were added by PP or QQ records
-  # do not overlap with the the holding period
+  # that do not overlap with the the holding period
   filter_data(Last_Time)
 
   # Make sure any eofy transactions are recorded
@@ -6174,11 +6170,76 @@ END {
     if (!Write_Variables)
       printf "START_JOURNAL\n" > Write_State
   }
-
-   # Transactions
-   if (Show_Transactions)
-     list_transactions()
 } #// END
+#
+# Filter Data
+#
+# Filter out irrelevant data - data that is out-of-range
+# can arise from reading p&q records
+# BUT retain all recent records
+#
+# function filter_data(now,      array_names, name) {
+#   # Which data arrays are to be filtered
+#   if (!split(Filter_Data, array_names, " "))
+#     return # Nothing to filter
+#
+#   # Filter the data arrays
+#   for (name in array_names)
+#     filter_array(now, SYMTAB[array_names[name]], array_names[name])
+# }
+
+# # Handle each array in turn
+# function filter_array(now, data_array, name,
+#                            a, p, start_parcel, end_parcel,
+#                            stack, key) {
+# @ifeq LOG filter_data
+#   printf "Filter %s\n", name > "/dev/stderr"
+# @endif
+#
+#   # See if the data are useful
+#   for (a in Leaf)
+#     if ((a in data_array) && is_unitized(a))
+#       if (ever_held(a)) {
+#
+#         # Get each parcel in turn and list the contiguous blocks of time held
+#         for (p = 0; p < Number_Parcels[a]; p ++) {
+#           # Check the data against each parcel
+#           start_parcel = Held_From[a][p]
+#           end_parcel = Held_Until[a][p]
+# @ifeq LOG filter_data
+#           # List this block
+#           printf "%12s, %03d, %s, %s\n", Leaf[a], p, get_date(start_parcel), get_date(end_parcel) > "/dev/stderr"
+# @endif
+#
+#           # Check the data against each parcel
+#           for (key in data_array[a]) {
+#             # Keep those within the parcel
+#             if (key - end_parcel > 0)
+#               continue
+#             if (key - start_parcel >= 0)
+#               stack[key] = data_array[a][key]
+#             else
+#               break
+#           } # End of each key
+#
+#           # Remove anything kept to speed up processing
+#           for (key in stack)
+#             delete data_array[a][key]
+#         } # End of each parcel p
+#
+# @ifeq LOG filter_data
+#         for (key in stack)
+#           printf "\tKeep   => %s\n", get_date(key) > "/dev/stderr"
+# @endif
+#         # Copy the kept items back
+#         for (key in stack)
+#           data_array[a][key] = stack[key]
+#         delete stack
+#       } else # Never held!
+#         unlink_account(a)
+#
+#     # End of each asset a
+# }
 
 #
 # Filter Data
@@ -6192,14 +6253,14 @@ function filter_data(now,      array_names, name) {
     return # Nothing to filter
 
   # Filter the data arrays
-  for (name in array_names) {
-
+  for (name in array_names)
     filter_array(now, SYMTAB[array_names[name]], array_names[name])
-  }
 }
 
 # Handle each array in turn
-function filter_array(now, data_array, name,         t, a, p, start_block, end_block, block_id) {
+function filter_array(now, data_array, name,
+                           a, p, start_block, end_block, block_id,
+                           stack, key) {
 
   # list holding "blocks" - ie non-overlapping holding periods
   # Each block is preceeded and/or followed by "gaps"
@@ -6207,59 +6268,77 @@ function filter_array(now, data_array, name,         t, a, p, start_block, end_b
     if ((a in data_array) && ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/))
       if ((Held_From[(a)][0] > Epoch)) {
         # Get each parcel in turn and list the contiguous blocks of time held
-        start_block = end_block = ((Epoch) - 1)
-        block_id = -1
-        for (p = 0; p < Number_Parcels[a]; p ++) {
+        start_block = Held_From[a][0]
+        end_block = Held_Until[a][0]
+        block_id = 0
+        for (p = 1; p < Number_Parcels[a]; p ++) {
           # This starts a new holding block if the purchase date is after the current end date
-          if (Held_From[a][p] > end_block) {
-            if (end_block > start_block) {
+          if (((Held_From[a][p] -  end_block) > 0)) {
+            # Filter the old block
+
+            # List this block
+            printf "%12s, %03d, %s, %s\n", Leaf[a], block_id, get_date(start_block), get_date(end_block) > "/dev/stderr"
 
 
-            } else
-              # Any entries before this block can be filtered out
-              filter_block(a, data_array, name, ((end_block) + 1), ((Held_From[a][p]) - 1))
+            # # Check the data against each block
+            for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
+
+            # Remove anything kept to speed up processing
+            for (key in stack)
+              delete data_array[a][key]
 
             # A new block
             block_id ++
-            start_block = end_block = Held_From[a][p]
-          }
-
-          # Each parcel is held until when?
-          t = (((Held_Until[a][p])<( now))?(Held_Until[a][p]):( now))
-
-          # Does this extend the holding period?
-          if (t > end_block)
-            end_block = t
+            start_block = Held_From[a][p]
+            end_block = Held_Until[a][p]
+          } else if (((Held_Until[a][p] -  end_block) > 0)) # extend the old block
+            end_block = Held_Until[a][p]
 
           # If this parcel is open we have completed all possible blocks
-          if (t == now)
+          if ((Held_Until[(a)][( p)] > ( now)))
             break
         } # End of each parcel p
 
         # The last holding block
 
-        if (end_block < now)
-          filter_block(a, data_array, name, ((end_block) + 1), now)
+          # List this block
+          printf "%12s, %03d, %s, %s\n", Leaf[a], block_id, get_date(start_block), get_date(end_block) > "/dev/stderr"
 
-        # delete duplicates
-        #delete_duplicate_entries(Price[a])
+          # Check the data against each block
+          for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
+
+          # # Remove anything kept to speed up processing
+          # for (key in stack)
+          #   delete data_array[a][key]
+
+
+        for (key in stack)
+          printf "\tKeep   => %s\n", get_date(key) > "/dev/stderr"
+
+        # Copy the kept items back
+        for (key in stack)
+          data_array[a][key] = stack[key]
+        delete stack
+
       } else # Never held!
         unlink_account(a)
 
     # End of each asset a
 }
-
-# This simply removes out-of-range data ("name") from a time delimited block
-function filter_block(a, data, name, start, end,      key) {
-
-  # Get each price key and check it lies within the current block
-  for (key in data[a]) {
-    if (is_between(key, start, end)) {
-
-      delete data[a][key]
-    }
-    } # End of each key
-} # End of filter block
+#
+# # This simply removes out-of-range data ("name") from a time delimited block
+# function filter_block(a, data, name, start, end,      key) {
+#
+#   # Get each price key and check it lies within the current block
+#   for (key in data[a]) {
+#     if (is_between(key, start, end)) {
+# @ifeq LOG filter_data
+#       printf "\t%s => Delete %s[%s]\n", Leaf[a], name, get_date(key) > "/dev/stderr"
+# @endif
+#       delete data[a][key]
+#     }
+#     } # End of each key
+# } # End of filter block
 
 # The current value of an asset
 function get_value(a, now) {
@@ -6284,7 +6363,7 @@ function sell_qualified_units(a, u, now, half_window,      du, dq, key, next_key
   # While keys exist that are in the future
   # adjust them on a last-in-first-out basis
   du = u
-  while (key > now) {
+  while (((key -  now) > 0)) {
     # We will need the next key
     next_key = find_key(Qualified_Units[a], ((key) - 1))
 
@@ -6359,7 +6438,7 @@ function get_unrealized_gains(a, now,
 
   # Unrealized gains held at time t are those in unsold parcels
   for (p = 0; p < Number_Parcels[a]; p++) {
-    if (Held_From[a][p] > now) # All further transactions occured after (now)
+    if (((Held_From[a][p] -  now) > 0)) # All further transactions occured after (now)
       break # All done
     if ((Held_Until[(a)][( p)] > ( now))) # This is an unsold parcel at time (now)
       # If value > cash_in this is an unrealized gain

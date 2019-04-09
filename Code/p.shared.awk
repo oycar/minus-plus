@@ -184,8 +184,8 @@ function read_state(nf,    i, x, value) {
   if (nf == 1) { # No
     SYMTAB[Variable_Name] = value
 @ifeq LOG read_state
-  # Logging
-  printf " => %s\n", value > "/dev/stderr"
+    # Logging
+    printf " => %s\n", value > "/dev/stderr"
 @endif
   } else {
     # The rest of the keys
@@ -214,7 +214,9 @@ function set_array(array, keys, first_key, last_key, value, flag) {
   # The idea of deleting the a temporary scalar entry in this function was based on
   # Ed Morton's code found here => https://groups.google.com/forum/#!topic/comp.lang.awk/vKiSODr6Bds
   # Catch errors
+@ifeq LOG DEBUG
   assert(isarray(array), "set_array: Not an array")
+@endif
 
   # Delete temporary key
   if (flag) {
@@ -257,9 +259,6 @@ function write_state(array_names, scalar_names,    name) {
   # The scalars - compact form
   for (name in scalar_names)
     printf "<<,%s,%s,>>\n", scalar_names[name], format_value(SYMTAB[scalar_names[name]]) > Write_State
-  #
-  # # The last line is (oddly enough) when the journal starts - this allows initialization to occur when file read back in
-  # printf "START_JOURNAL\n" > Write_State
 }
 
 # This walks the array that we want to dump to file

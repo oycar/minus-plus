@@ -626,9 +626,7 @@ function set_array_bands(now, bands, nf,     i, k) {
     printf " => %11.2f\n", bands[now][0] > "/dev/stderr"
 @endif
   }
-
 }
-
 
 function read_input_record(   t, n, a, threshold) {
   # Skip empty lines
@@ -1304,7 +1302,6 @@ function update_fixed_account(a, now, maturity,       active_account, x, thresho
   return active_account
 }
 
-
 # A wrapper function updates allocated profits when required ()
 function update_profits(now,     delta_profits) {
   # Compute the profits that need to be allocated to members
@@ -1556,7 +1553,7 @@ END {
 
   # Delete empty accounts
   # Filter out data entries that were added by PP or QQ records
-  # do not overlap with the the holding period
+  # that do not overlap with the the holding period
   filter_data(Last_Time)
 
   # Make sure any eofy transactions are recorded
@@ -1592,11 +1589,8 @@ END {
     if (!Write_Variables)
       printf "START_JOURNAL\n" > Write_State
   }
-
-   # Transactions
-   if (Show_Transactions)
-     list_transactions()
 } #// END
+#
 
 #
 # Filter Data
@@ -1610,16 +1604,17 @@ function filter_data(now,      array_names, name) {
     return # Nothing to filter
 
   # Filter the data arrays
-  for (name in array_names) {
-@ifeq LOG filter_data
-    printf "Filter %s\n", array_names[name] > "/dev/stderr"
-@endif
+  for (name in array_names)
     filter_array(now, SYMTAB[array_names[name]], array_names[name])
-  }
 }
 
 # Handle each array in turn
-function filter_array(now, data_array, name,         t, a, p, start_block, end_block, block_id) {
+function filter_array(now, data_array, name,
+                           a, p, start_block, end_block, block_id,
+                           stack, key) {
+@ifeq LOG filter_data
+ printf "Filter Data %s\n", name > "/dev/stderr"
+@endif
 
   # list holding "blocks" - ie non-overlapping holding periods
   # Each block is preceeded and/or followed by "gaps"
@@ -1627,67 +1622,58 @@ function filter_array(now, data_array, name,         t, a, p, start_block, end_b
     if ((a in data_array) && is_unitized(a))
       if (ever_held(a)) {
         # Get each parcel in turn and list the contiguous blocks of time held
-        start_block = end_block = just_before(Epoch)
-        block_id = -1
-        for (p = 0; p < Number_Parcels[a]; p ++) {
+        start_block = Held_From[a][0]
+        end_block = Held_Until[a][0]
+        block_id = 0
+        for (p = 1; p < Number_Parcels[a]; p ++) {
           # This starts a new holding block if the purchase date is after the current end date
-          if (Held_From[a][p] > end_block) {
-            if (end_block > start_block) {
+          if (greater_than(Held_From[a][p], end_block)) {
+            # Filter the old block
 @ifeq LOG filter_data
-              # List this block
-              printf "%36s, %16s, %03d, %11s, %11s\n", a, get_short_name(a), block_id + 1, get_date(start_block), get_date(end_block) > "/dev/stderr"
+            # List this block
+            printf "%12s, %03d, %s, %s\n", Leaf[a], block_id, get_date(start_block), get_date(end_block) > "/dev/stderr"
 @endif
 
-            } else
-              # Any entries before this block can be filtered out
-              filter_block(a, data_array, name, just_after(end_block), just_before(Held_From[a][p]))
+            # # Check the data against each block
+            filter_block(key, data_array[a], start_block, end_block)
+
+            # Remove anything kept to speed up processing
+            for (key in stack)
+              delete data_array[a][key]
 
             # A new block
             block_id ++
-            start_block = end_block = Held_From[a][p]
-          }
-
-          # Each parcel is held until when?
-          t = min_value(Held_Until[a][p], now)
-
-          # Does this extend the holding period?
-          if (t > end_block)
-            end_block = t
+            start_block = Held_From[a][p]
+            end_block = Held_Until[a][p]
+          } else if (greater_than(Held_Until[a][p], end_block)) # extend the old block
+            end_block = Held_Until[a][p]
 
           # If this parcel is open we have completed all possible blocks
-          if (t == now)
+          if (is_unsold(a, p, now))
             break
         } # End of each parcel p
 
         # The last holding block
 @ifeq LOG filter_data
-        # List this block
-        printf "%36s, %16s, %03d, %11s, %11s\n", a, get_short_name(a), block_id + 1, get_date(start_block), get_date(end_block) > "/dev/stderr"
+          printf "%12s, %03d, %s, %s\n", Leaf[a], block_id, get_date(start_block), get_date(end_block) > "/dev/stderr"
 @endif
-        if (end_block < now)
-          filter_block(a, data_array, name, just_after(end_block), now)
+          # Check the data against each block
+          filter_block(key, data_array[a], start_block, end_block)
 
-        # delete duplicates
-        #delete_duplicate_entries(Price[a])
+@ifeq LOG filter_data
+        for (key in stack)
+          printf "\tKeep   => %s\n", get_date(key) > "/dev/stderr"
+@endif
+        # Copy the kept items back
+        for (key in stack)
+          data_array[a][key] = stack[key]
+        delete stack
+
       } else # Never held!
         unlink_account(a)
 
     # End of each asset a
 }
-
-# This simply removes out-of-range data ("name") from a time delimited block
-function filter_block(a, data, name, start, end,      key) {
-
-  # Get each price key and check it lies within the current block
-  for (key in data[a]) {
-    if (is_between(key, start, end)) {
-@ifeq LOG filter_data
-      printf "\t%s => Delete %s[%s]\n", Leaf[a], name, get_date(key) > "/dev/stderr"
-@endif
-      delete data[a][key]
-    }
-    } # End of each key
-} # End of filter block
 
 # The current value of an asset
 function get_value(a, now) {
@@ -1719,16 +1705,16 @@ function sell_qualified_units(a, u, now, half_window,      du, dq, key, next_key
   # While keys exist that are in the future
   # adjust them on a last-in-first-out basis
   du = u
-  while (key > now) {
+  while (greater_than(key, now)) {
     # We will need the next key
     next_key = find_key(Qualified_Units[a], just_before(key))
 
 @ifeq LOG qualified_units
-  printf "\tKey               => %s\n", get_date(key) > "/dev/stderr"
-  printf "\tUnits             => %.3f\n", get_qualified_units(a, key) > "/dev/stderr"
-  printf "\tNext Key          => %s\n", get_date(next_key) > "/dev/stderr"
-  printf "\tUnits             => %.3f\n", get_qualified_units(a, next_key) > "/dev/stderr"
-  printf "\tParcel            => %.3f\n", get_qualified_units(a, key) - get_qualified_units(a, next_key) > "/dev/stderr"
+    printf "\tKey               => %s\n", get_date(key) > "/dev/stderr"
+    printf "\tUnits             => %.3f\n", get_qualified_units(a, key) > "/dev/stderr"
+    printf "\tNext Key          => %s\n", get_date(next_key) > "/dev/stderr"
+    printf "\tUnits             => %.3f\n", get_qualified_units(a, next_key) > "/dev/stderr"
+    printf "\tParcel            => %.3f\n", get_qualified_units(a, key) - get_qualified_units(a, next_key) > "/dev/stderr"
 @endif
 
     # How many provisionally qualified units are at the key entry?
@@ -1816,7 +1802,7 @@ function get_unrealized_gains(a, now,
 
   # Unrealized gains held at time t are those in unsold parcels
   for (p = 0; p < Number_Parcels[a]; p++) {
-    if (Held_From[a][p] > now) # All further transactions occured after (now)
+    if (greater_than(Held_From[a][p], now)) # All further transactions occured after (now)
       break # All done
     if (is_unsold(a, p, now)) # This is an unsold parcel at time (now)
       # If value > cash_in this is an unrealized gain
