@@ -701,15 +701,7 @@ function income_tax_aud(now, past, benefits,
 
   # Now we need Deferred Tax - the hypothetical liability that would be due if all
   # assets were liquidated today
-  deferred_gains = get_deferred_gains(now, capital_losses, Show_Extra)
-
-  # If not actually losses these are all taxed as long gains
-  if (below_zero(deferred_gains)) {
-    deferred_gains *= (1.0 - rational_value(CGT_Discount))
-
-    # Print final taxable deferred gains
-    printf "\t%27s => %14s\n", "Taxable Deferred Gains", print_cash(- deferred_gains) > EOFY
-  }
+  deferred_gains = get_cost(DEFERRED_GAINS, now)
 
   # Schedule is finished
   print_underline(43, 0, EOFY)

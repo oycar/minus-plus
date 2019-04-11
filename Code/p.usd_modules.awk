@@ -449,7 +449,7 @@ function income_tax_usd(now, past, benefits,
 
   # Now we need Deferred Tax - the hypothetical liability that would be due if all
   # assets were liquidated today
-  deferred_gains = get_deferred_gains(now, capital_losses, Show_Extra) # Test me out
+  deferred_gains = get_cost(DEFERRED_GAINS, now)
 
   # If not actually losses these are all taxed as long gains
   if (below_zero(deferred_gains)) {

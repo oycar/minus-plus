@@ -518,12 +518,14 @@ function set_special_accounts() {
 
   # Taxable capital gains are in special accounts
   # Tax Adjustments have potentially been applied to these quantities
-  # These names need to be improved?
   LONG_GAINS    = initialize_account("SPECIAL.GAINS:LONG.GAINS")
   LONG_LOSSES   = initialize_account("SPECIAL.LOSSES:LONG.LOSSES")
   SHORT_GAINS   = initialize_account("SPECIAL.GAINS:SHORT.GAINS")
   SHORT_LOSSES  = initialize_account("SPECIAL.LOSSES:SHORT.LOSSES")
   #
+  # Deferred Gains & Losses too (all long...)
+  DEFERRED_GAINS  = initialize_account("SPECIAL.GAINS:DEFERRED.GAINS")
+  DEFERRED_LOSSES = initialize_account("SPECIAL.LOSSES:DEFERRED.LOSSES")
 }
 
 #
