@@ -907,6 +907,8 @@ function get_date(time, format) {
   # ok - if format is zero use timestamp
   if (0 == format)
     return time
+  if (time == Future)
+    return "     -     "
   return strftime(format, time, UTC)
 }
 

@@ -60,6 +60,13 @@ BEGIN {
   # An array to hold real values
   make_array(Real_Value)
 
+  # And a gains stack
+  make_array(Gains_Stack)
+  Long_Gains_Key   = "Long Gains  "
+  Long_Losses_Key  = "Long Losses "
+  Short_Gains_Key  = "Short Gains "
+  Short_Losses_Key = "Short Losses"
+
   # Sort arrays this way...
   Array_Sort = sort_arrays_on("@ind_num_desc")
   Variable_Name = ""
