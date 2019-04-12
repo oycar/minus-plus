@@ -60,6 +60,12 @@ function eofy_actions(now,      past, allocated_profits,
   # And deferred gains
   get_deferred_gains(now, past, Show_Extra)
 
+  # Print Market Gains
+  print_market_gains(now, past, Show_Extra)
+
+  # Print the depreciation schedule
+  print_depreciating_holdings(just_after(now), past, Show_Extra)
+
   # We need to compute EOFY statements
   # First the operating statement (income & expenses)
   benefits = print_operating_statement(now, past, 1)
@@ -70,18 +76,8 @@ function eofy_actions(now,      past, allocated_profits,
   # A Super fund must allocate assets to members - this requires account balancing
   @Balance_Profits_Function(now, past, allocated_profits)
 
-  # The balance sheet and holdings statement set no global values
-  if ("/dev/null" != EOFY) {
-    # Print the balance sheet
-    print_balance_sheet(now, past, 1)
-
-    # Print Holdings
-    print_holdings(now)
-
-    # Print the depreciation schedule
-    #  Reset the time to July 01 at the standard hour
-    print_depreciating_holdings(just_after(now), past, Show_Extra)
-  }
+  # Print the balance sheet
+  print_balance_sheet(now, past, 1)
 
   # Allocate second element costs associated with fixed assets - at SOFY
   allocate_second_element_costs(now)
@@ -93,17 +89,17 @@ function balance_journal(now, past, initial_allocation) {
 }
 
 
-# Realized Gains Reconciliation
-# Only needed when printing out information
+# Gains Reconciliation
+# Both Realized & Unrealized Gains
 #
-function print_gains(now, past, is_detailed, gains_type, gains_stream,
+function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time,
 
-                                                            gains_flag,
+                                                            is_realized_flag,
                                                             gains_event, current_price, p, a,
                                                             key,
                                                             description,
                                                             parcel_gains, adjusted_gains,
-                                                            held_time, sale_time,
+                                                            held_time,
                                                             label, no_header_printed,
 
                                                             long_gains, short_gains,
@@ -124,10 +120,13 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream,
   printf "%s Report for Period Ending %s\n", gains_type, get_date(yesterday(now))  > gains_stream
 
   # Are we printing out a detailed schedule?
-  is_detailed = ("" == is_detailed) ? FALSE : is_detailed
+  is_detailed = ternary(is_detailed, is_detailed, FALSE)
 
   # A flag to discriminate realized and unrealized gains
-  gains_flag = ("Realized Gains" == gains_type)
+  is_realized_flag = ("Realized Gains" == gains_type)
+
+  # A default sold time = the Future
+  sold_time = ternary(sold_time, sold_time, Future)
 
   # No header printed
   no_header_printed = TRUE
@@ -138,14 +137,14 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream,
 
   # For each asset sold in the current period
   for (a in Leaf)
-    if (is_capital(a) && (gains_flag || is_open(a, now))) {
+    if (is_capital(a) && (is_realized_flag || is_open(a, now))) {
       gains_event = FALSE
       proceeds = cost = reduced_cost = adjusted_cost = 0 # Total cost summed here
       long_gains = short_gains = long_losses = short_losses = 0
       units_sold = 0
 
       # The price
-      if (!gains_flag)
+      if (!is_realized_flag)
         current_price = find_entry(Price[a], now)
 
       # Need to select parcels by sold date
@@ -155,17 +154,17 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream,
 
         # Check if sold in the (past, now) window (capital gains)
         # or if it is unsold (deferred gains)
-        if ((is_sold(a, p, now) == gains_flag) && is_unsold(a, p, past)) {
+        if ((is_sold(a, p, now) == is_realized_flag) && is_unsold(a, p, past)) {
           if (!gains_event) {
-            # First stab at header
+            # Two types of header
             if (is_detailed)
-              printf "\n%12s %10s %9s %11s %11s %15s ", "Asset", "Parcel", "Units", "From", "To", "Cost"> gains_stream
+              printf "\n%12s %10s %9s %11s %10s %16s %15s %14s %14s %15s %9s %20s %15s\n",
+                      "Asset", "Parcel", "Units", "From", "To", "Cost", "Proceeds",
+                      "Reduced", "Adjusted", "Accounting", "Type", "Taxable", "Per Unit" > gains_stream
             else if (no_header_printed)
-              printf "%12s %12s %12s ", "Asset", "Units", "Cost" > gains_stream
-
-            if (is_detailed || no_header_printed)
-              printf "%15s %14s %14s %10s %18s %15s\n",
-                      "Proceeds", "Reduced", "Adjusted", "Type", "Taxable", "Accounting" > gains_stream
+              printf "%12s %12s %12s %15s %14s %14s %15s %9s %20s\n",
+                     "Asset", "Units", "Cost",
+                     "Proceeds", "Reduced", "Adjusted", "Accounting", "Type", "Taxable" > gains_stream
 
             # print Name
             label = get_short_name(a)
@@ -176,14 +175,17 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream,
           # Keep track
           units = Units_Held[a][p]
           units_sold += units
-          sold_time   = ternary(gains_flag, Held_Until[a][p], Future)
-          held_time = get_held_time(sold_time, Held_From[a][p])
+          if (is_realized_flag)
+            held_time = get_held_time(Held_Until[a][p], Held_From[a][p])
+          else
+            held_time = get_held_time(sold_time, Held_From[a][p])
+
           reduced_cost  += get_parcel_cost(a, p, now)
           adjusted_cost += get_parcel_cost(a, p, now, TRUE)
 
           # cash in and out
           parcel_cost     =   get_cash_in(a, p, now)
-          if (gains_flag)
+          if (is_realized_flag)
             parcel_proceeds = - get_cash_out(a, p, now)
           else
             parcel_proceeds = current_price * Units_Held[a][p]
@@ -193,7 +195,7 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream,
 
           # Total gains (accounting gains)
           gains = sum_cost_elements(Accounting_Cost[a][p], now)
-          if (!gains_flag) # This is not sold yet
+          if (!is_realized_flag) # This is not sold yet
             gains -=  parcel_proceeds
 
           # Keep track of accounting gains
@@ -243,15 +245,16 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream,
           # Print out the parcel information
           if (is_detailed) {
             # If printing out in detail
-            printf "%13s %7d %12.3f [%11s, %11s] %14s %14s %14s %14s %14s %14s %15s\n",
+            printf "%13s %7d %12.3f [%11s, %11s] %14s %14s %14s %14s %14s %14s %15s %15s\n",
               label, p, units, get_date(Held_From[a][p]), get_date(Held_From[a][p] + held_time),
                  print_cash(parcel_cost),
                  print_cash(parcel_proceeds),
                  print_cash(get_parcel_cost(a, p, now)),
                  print_cash(get_parcel_cost(a, p, now, TRUE)),
+                 print_cash(- gains),
                  description,
                  print_cash(- parcel_gains),
-                 print_cash(- gains) > gains_stream
+                 print_cash(- parcel_gains / units, 4) > gains_stream
 
             # Clear label
             label = ""
@@ -289,18 +292,18 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream,
           printf "%14s %14s %14s %14s %14s %15s",
             print_cash(proceeds),
             print_cash(reduced_cost), print_cash(adjusted_cost),
-            key, print_cash(- Gains_Stack[key]),
-            print_cash(proceeds - reduced_cost) > gains_stream
+            print_cash(proceeds - reduced_cost),
+            key, print_cash(- Gains_Stack[key]) > gains_stream
           delete Gains_Stack[key]
         } else
-          printf "%14s %14s %14s %45s",
+          printf "%14s %14s %14s %15s",
             print_cash(proceeds),
             print_cash(reduced_cost), print_cash(adjusted_cost),
             print_cash(proceeds - reduced_cost) > gains_stream
 
         # Extra entries
         for (key in Gains_Stack)
-          printf "\n%*s %14s", 101 + 35 * is_detailed, key, print_cash(- Gains_Stack[key]) > gains_stream
+          printf "\n%*s %14s", 116 + 35 * is_detailed, key, print_cash(- Gains_Stack[key]) > gains_stream
 
         printf "\n" > gains_stream
         delete Gains_Stack[key]
@@ -435,7 +438,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, gain
  gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
 
  # First print the gains out in detail
- accounting_gains = print_gains(now, past, is_detailed, "Market Gains", gains_stream)
+ accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", gains_stream)
  losses = Gains_Stack[Long_Losses_Key]
  gains  = Gains_Stack[Long_Gains_Key]
  delete Gains_Stack
@@ -628,20 +631,28 @@ function print_operating_statement(now, past, is_detailed,     benefits, losses,
 }
 
 # Print balance sheet
-function print_balance_sheet(now, past, is_detailed,
+function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
+
+  # The reports_stream is the pipe to write the schedule out to
+  reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
+
+  # Return if nothing to do
+  if ("/dev/null" == reports_stream)
+    return
+
   # By default not detailed
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # This is an extended version of check balance but also
   # draws on information from the operating statement and tax statement
   # Let's go
-  printf "\n%s\n", Journal_Title > EOFY
-  printf "Statement of Financial Position\n" > EOFY
-  printf "For the period starting %s and ending %s\n", get_date(past), get_date(yesterday(now)) > EOFY
-  print_underline(80, 1, EOFY)
-  printf "%53s %26s\n", strftime("%Y", now, UTC), strftime("%Y", past, UTC) > EOFY
-  printf "%53s %26s\n", "$", "$" > EOFY
+  printf "\n%s\n", Journal_Title > reports_stream
+  printf "Statement of Financial Position\n" > reports_stream
+  printf "For the period starting %s and ending %s\n", get_date(past), get_date(yesterday(now)) > reports_stream
+  print_underline(80, 1, reports_stream)
+  printf "%53s %26s\n", strftime("%Y", now, UTC), strftime("%Y", past, UTC) > reports_stream
+  printf "%53s %26s\n", "$", "$" > reports_stream
 
   # We start with the current assets (cash)
   label = sprintf("Current Assets\n")
@@ -652,9 +663,9 @@ function print_balance_sheet(now, past, is_detailed,
   current_assets[past] = get_cost("*ASSET.CURRENT", past)
 
   # Print a nice line
-  print_underline(72, 0, EOFY)
+  print_underline(72, 0, reports_stream)
   printf "\t%24s %21s %26s\n\n", "Total Current Assets",
-          print_cash(current_assets[now]), print_cash(current_assets[past]) > EOFY
+          print_cash(current_assets[now]), print_cash(current_assets[past]) > reports_stream
 
   # Now the non-current assets
   label = sprintf("Non-Current Assets\n")
@@ -665,12 +676,12 @@ function print_balance_sheet(now, past, is_detailed,
   assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
 
   # Print a nice line
-  print_underline(72, 0, EOFY)
-  printf "\t%24s %21s %26s\n\n", "Total Non–Current Assets", print_cash(assets[now] - current_assets[now]), print_cash(assets[past] - current_assets[past]) > EOFY
+  print_underline(72, 0, reports_stream)
+  printf "\t%24s %21s %26s\n\n", "Total Non–Current Assets", print_cash(assets[now] - current_assets[now]), print_cash(assets[past] - current_assets[past]) > reports_stream
 
   # Print Total Assets
-  print_underline(72, 0, EOFY)
-  printf "\t%24s %21s %26s\n\n", "Total Assets", print_cash(assets[now]), print_cash(assets[past]) > EOFY
+  print_underline(72, 0, reports_stream)
+  printf "\t%24s %21s %26s\n\n", "Total Assets", print_cash(assets[now]), print_cash(assets[past]) > reports_stream
 
   # Treat tax payments/refunds as liabilities
   label = sprintf("Tax Liabilities\n")
@@ -684,9 +695,9 @@ function print_balance_sheet(now, past, is_detailed,
 
   # Print a nice line
   if (!label) {
-    print_underline(72, 0, EOFY)
+    print_underline(72, 0, reports_stream)
     printf "\t%24s%21s %26s\n\n", "Total Current Liabilities",
-              print_cash(current_liabilities[now]), print_cash(current_liabilities[past]) > EOFY
+              print_cash(current_liabilities[now]), print_cash(current_liabilities[past]) > reports_stream
   }
 
   # Need non-current Liabilities
@@ -706,15 +717,15 @@ function print_balance_sheet(now, past, is_detailed,
 
   # Print a nice line
   if (!label) {
-    print_underline(72, 0, EOFY)
+    print_underline(72, 0, reports_stream)
     printf "\t%27s %18s %26s\n", "Total Long Term Liabilities",
-      print_cash(liabilities[now] - current_liabilities[now]), print_cash(liabilities[past] - current_liabilities[past]) > EOFY
+      print_cash(liabilities[now] - current_liabilities[now]), print_cash(liabilities[past] - current_liabilities[past]) > reports_stream
   }
 
-  print_underline(72, 0, EOFY)
-  print_underline(72, 0, EOFY)
+  print_underline(72, 0, reports_stream)
+  print_underline(72, 0, reports_stream)
   printf "\t%27s %18s %26s\n\n", "Total Liabilities",
-    print_cash(liabilities[now]), print_cash(liabilities[past]) > EOFY
+    print_cash(liabilities[now]), print_cash(liabilities[past]) > reports_stream
 
   # Now find total Equity
   label = sprintf("Share Equity\n")
@@ -726,16 +737,16 @@ function print_balance_sheet(now, past, is_detailed,
 
   # Print a nice line
   if (!label) {
-    print_underline(72, 0, EOFY)
+    print_underline(72, 0, reports_stream)
     printf "\t%24s %21s %26s\n\n", "Total Equity",
-                print_cash(equity[now]), print_cash(equity[past]) > EOFY
+                print_cash(equity[now]), print_cash(equity[past]) > reports_stream
   }
 
   # Print Accumulated Profits (INCOME - EXPENSES) == (ASSETS - LIABILITY - EQUITY)
-  print_underline(72, 0, EOFY)
+  print_underline(72, 0, reports_stream)
   printf "\t%24s %21s %26s\n", "Accumulated Profits",
-    print_cash(assets[now] - liabilities[now] - equity[now]), print_cash(assets[past] - liabilities[past] - equity[past]) > EOFY
-  print_underline(72, 0, EOFY)
+    print_cash(assets[now] - liabilities[now] - equity[now]), print_cash(assets[past] - liabilities[past] - equity[past]) > reports_stream
+  print_underline(72, 0, reports_stream)
 
   # Tidy up
   delete assets
@@ -744,93 +755,16 @@ function print_balance_sheet(now, past, is_detailed,
 }
 
 # Print the holdings at time now
-function print_holdings(now,         p, a, c, sum_value, reduced_cost, adjustments, current_price, tagged, prec) {
-  printf "\n%s\n", Journal_Title > EOFY
-  printf "Statement of Holdings at Date => %s\n", get_date(now) > EOFY
+function print_market_gains(now, past, is_detailed,    gains_stream) {
+  # Show current gains/losses
+   # The gains_stream is the pipe to write the schedule out to
+   gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
 
-  # Total disposals are added to closed holdings
-  reduced_cost = 0
-  printf "Current Holdings\n" > EOFY
-  for (a in Leaf)
-    if (is_cash(a)){
-      c = get_cost(a, now)
-      if (!near_zero(c)) {
-        printf "\tCash      %16s => %14s\n", get_short_name(a), print_cash(c) > EOFY
-        reduced_cost += c
-      }
-    }
-
-  # Print a nice line
-  print_underline(42, 0, EOFY)
-  printf "\tCurrent Assets Value => %14s\n\n", print_cash(reduced_cost) > EOFY
-
-  # Print the current holdings
-  reduced_cost = "" # Total cost summed here
-  for (a in Leaf)
-    if (is_capital(a) && is_open(a, now)) {
-      if ("" == reduced_cost) {
-        printf "Other Holdings\n" > EOFY
-        sum_value = reduced_cost = 0 # Total cost summed here
-      }
-      current_price = find_entry(Price[a], now)
-      reduced_cost  += get_cost(a, now) # The reduced cost or true cost
-      sum_value += get_value(a, now)
-
-      # HOLDING NAME
-      printf "%15s", get_short_name(a) > EOFY
-
-      # Need to select parcels by sold date
-      if (Show_Extra) {
-        # Some parcels are still held
-        tagged = FALSE
-        for (p = 0; p < Number_Parcels[a]; p++)
-          if (Held_From[a][p] <= now) {
-            if (is_unsold(a, p, now)) {
-              if (!tagged) {
-                printf "\n\tHeld Parcels\n" > EOFY
-                tagged = TRUE
-              }
-              print_parcel_gain(a, p, now, current_price, EOFY)
-            }
-          } else
-            break
-      } # end of if showing detailed
-
-      # Summary
-      if (Show_Extra) {
-        print_underline(168, 0, EOFY)
-        printf "\t" > EOFY
-      }
-
-      # get precision for price
-      if (current_price >= 1.0e04)
-        prec = 2
-      else
-        prec = 4
-
-      # The rest of the line
-      printf "      Units => %10.3f Price => %12s [%11s] Cost => %14s Value => %14s Reduced => %14s Unrealized Gain => %14s\n",
-                    get_units(a, now), print_cash(current_price, prec), get_date(find_key(Price[a], now)), print_cash(get_cost_element(a, I, now)),
-                    print_cash(get_value(a, now)),
-                    print_cash(get_cost(a, now)), print_cash(get_value(a, now) - get_cost(a, now))  > EOFY
-
-      # Check the adjusted cost
-      adjustments = get_cost_adjustment(a, now)
-      if (!near_zero(adjustments))
-        printf "\t%123s => %14s\n", "Adjusted", print_cash(get_cost(a, now) - adjustments) > EOFY
-
-      if (Show_Extra)
-        printf "\n" > EOFY
-    } # End of print current holdings
-
-  # Print a nice line
-  if ("" != reduced_cost) {
-    print_underline(174, 0, EOFY)
-    printf "\t%97s => %14s Reduced => %14s Unrealized Gain => %14s\n", "Total Value",
-      print_cash(sum_value), print_cash(reduced_cost), print_cash(sum_value - reduced_cost) > EOFY
+   # First print the gains out in detail
+   if ("/dev/null" != gains_stream) {
+     print_gains(now, past, is_detailed, "Market Gains", gains_stream, now)
+     delete Gains_Stack
   }
-
-  printf "\n" > EOFY
 }
 
 # Compute annual depreciation
@@ -893,7 +827,6 @@ function allocate_second_element_costs(now,       a, p, second_element) {
           printf "\t\tAfter Application\n" > "/dev/stderr"
           printf "\t\tParcel            => %d\n", p > "/dev/stderr"
           printf "\t\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now)) > "/dev/stderr"
-          ##printf "\t\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now)) > "/dev/stderr"
           printf "\t\tParcel Cost       => %11.2f\n", get_parcel_cost(a, p, now) > "/dev/stderr"
 @endif # LOG
         } # End of if unsold parcel
@@ -907,8 +840,16 @@ function allocate_second_element_costs(now,       a, p, second_element) {
 
 
 # This function is is for slightly different times than the other EOFY actions
-function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key, close_key, parcel_depreciation, account_depreciation, open_cost, total_depreciaiton, sum_open,
+function print_depreciating_holdings(now, past, is_detailed,      reports_stream, a, p, open_key, close_key, parcel_depreciation, account_depreciation, open_cost, total_depreciaiton, sum_open,
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
+
+  # The reports_stream is the pipe to write the schedule out to
+  reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
+
+  # Return if nothing to do
+  if ("/dev/null" == reports_stream)
+    return
+
   is_detailed = ("" == is_detailed) ? FALSE : is_detailed
   total_depreciation = ""
 
@@ -917,9 +858,9 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
     if (is_fixed(a) && (is_open(a, now) || is_open(a, past))) {
 
       if ("" == total_depreciation) {
-        printf "\n" > EOFY
-        print Journal_Title > EOFY
-        printf "Depreciation Schedule for the Period [%11s, %11s]\n", get_date(past), get_date(now) > EOFY
+        printf "\n" > reports_stream
+        print Journal_Title > reports_stream
+        printf "Depreciation Schedule for the Period [%11s, %11s]\n", get_date(past), get_date(now) > reports_stream
         total_depreciation = 0 # Total value summed here
       }
 
@@ -927,7 +868,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
       account_depreciation = sum_open = 0
 
       # Get each parcel
-      printf "%10s %15s ", Depreciation_Method[Method_Name[a]], get_short_name(a) > EOFY
+      printf "%10s %15s ", Depreciation_Method[Method_Name[a]], get_short_name(a) > reports_stream
       for (p = 0; p < Number_Parcels[a]; p ++) {
         # When was this parcel  opened?
         open_key = Held_From[a][p] # First parcel opened here
@@ -951,9 +892,9 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
         # Is this a named parcel?
         if (is_detailed) {
           if (keys_in(Parcel_Tag, a, p))
-            printf "\n%20s %5d ", Parcel_Tag[a][p], p > EOFY
+            printf "\n%20s %5d ", Parcel_Tag[a][p], p > reports_stream
           else
-            printf "\n%26d ", p > EOFY
+            printf "\n%26d ", p > reports_stream
 
           # Depreciation is the sum of the I tax adjustments
           printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s",
@@ -961,7 +902,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
                     print_cash(open_cost - delta),
                     print_cash(get_parcel_element(a, p, II, close_key)),
                     print_cash(get_parcel_cost(a, p, close_key)),
-                    print_cash(parcel_depreciation) > EOFY
+                    print_cash(parcel_depreciation) > reports_stream
         } # End of is_detailed
 
         #  Just track the total depreciation
@@ -970,9 +911,9 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
 
       # Clean up output
       if (is_detailed) {
-        printf "\n" > EOFY
-        print_underline(197, 0, EOFY)
-        printf "%26s ", get_short_name(a) > EOFY
+        printf "\n" > reports_stream
+        print_underline(197, 0, reports_stream)
+        printf "%26s ", get_short_name(a) > reports_stream
       }
 
       # Depreciation is the sum of the tax adjustments
@@ -992,7 +933,7 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
         print_cash(sum_open - delta),
         print_cash(get_cost_element(a, II, close_key)),
         print_cash(get_cost(a, close_key)),
-        print_cash(account_depreciation) > EOFY
+        print_cash(account_depreciation) > reports_stream
 
       # Track total depreciation too
       total_depreciation += account_depreciation
@@ -1002,15 +943,15 @@ function print_depreciating_holdings(now, past, is_detailed,      a, p, open_key
   sale_appreciation = get_cost(SOLD_APPRECIATION, now) - get_cost(SOLD_APPRECIATION, past)
   sale_depreciation = get_cost(SOLD_DEPRECIATION, now) - get_cost(SOLD_DEPRECIATION, past)
   if (!near_zero(sale_depreciation))
-    printf "\n\tDepreciation from Sales => %14s\n", print_cash(sale_depreciation) > EOFY
+    printf "\n\tDepreciation from Sales => %14s\n", print_cash(sale_depreciation) > reports_stream
   if (!near_zero(sale_appreciation))
-    printf "\n\tAppreciation from Sales => %14s\n", print_cash(-sale_appreciation) > EOFY
+    printf "\n\tAppreciation from Sales => %14s\n", print_cash(-sale_appreciation) > reports_stream
   total_depreciation += sale_depreciation + sale_appreciation
 
   # Print a nice line
   if (!near_zero(total_depreciation)) {
-    print_underline(197, 0, EOFY)
-    printf "\tPeriod Depreciation     => %14s\n", print_cash(total_depreciation) > EOFY
+    print_underline(197, 0, reports_stream)
+    printf "\tPeriod Depreciation     => %14s\n", print_cash(total_depreciation) > reports_stream
   }
 } # End of print depreciating holdings
 
