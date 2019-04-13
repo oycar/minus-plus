@@ -155,9 +155,6 @@ BEGIN {
 
   # Transaction line defaults
   new_line()
-  # #
-  # # Initialize state file information
-  # initialize_state()
 
   # Default Portfolio Name and document URI
   Journal_Title = "NEMO"
@@ -186,6 +183,18 @@ BEGIN {
   # Set time format
   set_months()
 
+  # Which gains reports are printed
+  # c Capital Gains
+  # d Deferred Gains
+  # m Market Gains
+  #
+  # Default is "c:d"
+  make_array(All_Reports)
+  make_array(Extra_Reports)
+  if (!Show_Reports)
+    Show_Reports = SHOW_REPORTS
+  set_reports(Show_Reports)
+
   # Show detailed summary
   if ("" == Show_Extra)
     Show_Extra = 0
@@ -194,11 +203,7 @@ BEGIN {
   if ("" == Show_All)
     Show_All = 0
 
-  # Report file
-  if (!Reports)
-    Reports = "/dev/null"
-
-  # EOFY statements are printed to a specific stream
+  # EOFY statements are not printed until requested
   EOFY = "/dev/null"
 
   # Which account to track
@@ -343,11 +348,11 @@ BEGIN {
   assert(Last_Time != DATE_ERROR, Read_Date_Error)
 
   # Need to initialize FY information
-  if (FY)
-    initialize_fy(FY "-" FY_Date)
-  else { # Turn off EOFY reporting
-    Reports = "/dev/null"
-
+  if (FY) {
+    # Initialize the financial year
+    Stop_Time = read_date(FY "-" FY_Date, 0)
+    Start_Time = last_year(Stop_Time)
+  } else {
     # Default Start_Time and Stop_Time
     if (!Start_Time)
       Start_Time = Last_Time
@@ -356,6 +361,7 @@ BEGIN {
       assert(DATE_ERROR != Start_Time, "Start_Time " Read_Date_Error)
     }
 
+    # Is a specific stop time set
     if (!Stop_Time)
       Stop_Time = Future
     else {
@@ -414,20 +420,6 @@ $1 ~ /(CHECK|SET|SET_BANDS|SET_ENTRY)/ {
 
 
 ## Functions start here
-
-
-# Initialize the financial year
-function initialize_fy(fy_date) {
-  # Month name format
-  Stop_Time = read_date(fy_date, 0)
-  Start_Time = last_year(Stop_Time)
-
-  # Override
-  if (EOFY == Reports)
-    Reports = "/dev/stdout"
-}
-
-
 # Initialize read/write of state files
 function initialize_state(    x) {
   # Get which variables to write out

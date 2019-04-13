@@ -70,6 +70,17 @@ END {
 
 
 
+# // Default Reports
+
+
+
+
+
+
+
+
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -2269,6 +2280,30 @@ function set_months(   i, month_name, mon) {
   delete month_name
 }
 
+# set whicg gains reports to show
+function set_reports(show_reports,   i, array) {
+  split(("c:d:f:m:q:z"), array, ":")
+  for (i in array)
+    All_Reports[array[i]] = TRUE
+  delete array
+
+  split(show_reports, array, ":")
+  for (i in array) {
+    array[i] = tolower(substr(array[i], 1, 1))
+    assert((array[i] in All_Reports), "Unknown report code <" array[i] "> should be z (zero extra reports), c (capital gains), d (deferred gains), f (fixed assets), m (market gains) or q (qualified dividends)")
+    if ("z" == array[i]) {
+      delete Extra_Reports
+      Extra_Reports["z"] = TRUE
+      break 
+    } else
+      Extra_Reports[array[i]] = TRUE
+  }
+
+  delete array
+  delete All_Reports
+  return
+}
+
 # Get the time stamp m months in the  future
 function add_months(now, number_months,   y, m, d,
                                           delta_years, delta_months) {
@@ -2328,7 +2363,7 @@ function eofy_actions(now,      past, allocated_profits,
   # EOFY actions
   # Turn on reporting?
   if (now > Start_Time)
-    EOFY = Reports
+    EOFY = "/dev/stderr"
 
   # past is referred to now
   past = ((now) + one_year(now, -1))
@@ -2401,7 +2436,7 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
                                                             description,
                                                             parcel_gains, adjusted_gains,
                                                             held_time,
-                                                            label, no_header_printed,
+                                                            label, no_header_printed, proceeds_label,
 
                                                             long_gains, short_gains,
                                                             long_losses, short_losses,
@@ -2428,6 +2463,9 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
 
   # A default sold time = the Future
   sold_time = ((sold_time)?( sold_time):( Future))
+
+  # The proceeds label
+  proceeds_label = ((is_realized_flag)?( "Proceeds"):( "  Value "))
 
   # No header printed
   no_header_printed = TRUE
@@ -2460,12 +2498,12 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
             # Two types of header
             if (is_detailed)
               printf "\n%12s %10s %9s %11s %10s %16s %15s %14s %14s %15s %9s %20s %15s\n",
-                      "Asset", "Parcel", "Units", "From", "To", "Cost", "Proceeds",
+                      "Asset", "Parcel", "Units", "From", "To", "Cost", proceeds_label,
                       "Reduced", "Adjusted", "Accounting", "Type", "Taxable", "Per Unit" > gains_stream
             else if (no_header_printed)
               printf "%12s %12s %12s %15s %14s %14s %15s %9s %20s\n",
                      "Asset", "Units", "Cost",
-                     "Proceeds", "Reduced", "Adjusted", "Accounting", "Type", "Taxable" > gains_stream
+                     proceeds_label, "Reduced", "Adjusted", "Accounting", "Type", "Taxable" > gains_stream
 
             # print Name
             label = (Leaf[(a)])
@@ -2635,7 +2673,10 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The gains_stream is the pipe to write the schedule out to
-    gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
+    if (("c" in Extra_Reports))
+      gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
+    else
+      gains_stream = "/dev/null"
 
     # First print the gains out in detail when required
     if ("/dev/null" != gains_stream) {
@@ -2736,7 +2777,10 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, gain
                                                           gains, losses) {
 
  # The gains_stream is the pipe to write the schedule out to
- gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
+ if (("d" in Extra_Reports))
+   gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
+ else
+   gains_stream = "/dev/null"
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", gains_stream)
@@ -3059,7 +3103,10 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    gains_stream) {
   # Show current gains/losses
    # The gains_stream is the pipe to write the schedule out to
-   gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
+   if (("m" in Extra_Reports))
+     gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
+   else
+     return
 
    # First print the gains out in detail
    if ("/dev/null" != gains_stream) {
@@ -3132,7 +3179,10 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
+  if (("f" in Extra_Reports))
+    reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
+  else
+    return
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3250,6 +3300,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
 ## Compute whether dividends are qualified or not
 function print_dividend_qualification(now, past, is_detailed,
 
+                                         dividend_stream,
                                          a, underlying_asset, credit_account,
                                          qualifying_date,
                                          qualified_units, total_units, qualified_fraction, q,
@@ -3257,14 +3308,18 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
+  if (("q" in Extra_Reports))
+    dividend_stream = ("" == EOFY) ? "/dev/null" : EOFY
+  else
+    dividend_stream = "/dev/null"
 
   # For each dividend in the previous financial
-  print Journal_Title > EOFY
+  print Journal_Title > dividend_stream
   if (is_detailed)
-    printf "Detailed Dividend Qualification Report\n" > EOFY
+    printf "Detailed Dividend Qualification Report\n" > dividend_stream
   else
-    printf "Dividend Qualification Report\n" > EOFY
-  printf "For the period starting %s and ending %s\n", get_date(past), get_date(yesterday(now)) > EOFY
+    printf "Dividend Qualification Report\n" > dividend_stream
+  printf "For the period starting %s and ending %s\n", get_date(past), get_date(yesterday(now)) > dividend_stream
 
   # A header
   print_header = TRUE
@@ -3281,12 +3336,12 @@ function print_dividend_qualification(now, past, is_detailed,
       while (key > past) {
         # A heading
         if (print_header) {
-          printf "\n\n%22s\n", "Dividends" > EOFY
+          printf "\n\n%22s\n", "Dividends" > dividend_stream
           print_header = FALSE
         }
 
         # The current asset
-        assert(a in Underlying_Asset, "Can't find underlying asset for %s" Leaf[a]) > EOFY
+        assert(a in Underlying_Asset, "Can't find underlying asset for %s" Leaf[a]) > dividend_stream
         underlying_asset = Underlying_Asset[a]
 
         # We will need the next key
@@ -3320,7 +3375,7 @@ function print_dividend_qualification(now, past, is_detailed,
           qualified_fraction = 1.0
 
         # The output - show ex-dividend date not qualifying date
-        printf "\t%22s %11s %11s %14s %7.5f\n", Leaf[underlying_asset], get_date(key), get_date(qualifying_date + (86400)), print_cash(payment), qualified_fraction > EOFY
+        printf "\t%22s %11s %11s %14s %7.5f\n", Leaf[underlying_asset], get_date(key), get_date(qualifying_date + (86400)), print_cash(payment), qualified_fraction > dividend_stream
 
         # Make the appropriate changes for the current tax jurisdiction
         @Dividend_Qualification_Function(a, underlying_asset, key, 1.0 - qualified_fraction)
@@ -3330,64 +3385,6 @@ function print_dividend_qualification(now, past, is_detailed,
       } # End of while each key in the window
     } # End of if a dividend
 } # End of function print_dividend_qualification
-
-# Module for printing out parcel capital gains
-# FIXME almost redundant
-function print_parcel_gain(a, p, now, current_price, cgt_schedule,
-                             paid, description, units, tax_gains, gains, held_time, parcel_adjustments) {
-  # Default values
-  cgt_schedule = ("" == cgt_schedule) ? "/dev/stdout" : cgt_schedule
-  current_price = ("" == current_price) ? ((__MPX_H_TEMP__ = find_key(Price[a],  now))?( Price[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Price[a][0]):( 0)))) : current_price
-
-  # Keep track
-  gains = sum_cost_elements(Accounting_Cost[a][p], now)
-
-  # Held
-  held_time = get_held_time(now, Held_From[a][p])
-  units = Units_Held[a][p]
-  paid  = current_price * units
-  gains -= paid
-  parcel_adjustments = sum_cost_elements(Tax_Adjustments[a][p], now)
-
-  # We want taxable gains
-  if (gains < parcel_adjustments - Epsilon) { # This is a capital gain cash_in < cash_out
-    tax_gains = gains - parcel_adjustments
-    if (held_time  >= 31622400)
-      description = "Long Gain    "
-    else
-      description = "Short Gain   "
-  } else {
-    tax_gains = 0
-    if (gains > Epsilon)
-      description = "Taxable Loss "
-    else
-      description = "Zero Gain    "
-  }
-
-  # Complicated logic for layout
-  # Top line has accounting losses or gains if they differ from taxable losses or gains
-  printf "\t%6d Units => %10.3f Held => [%11s, %11s] Cost => %14s Value => %14s Reduced => %14s",
-    p, units, get_date(Held_From[a][p]), get_date(Held_From[a][p] + held_time), print_cash(get_cash_in(a, p, now)),
-       print_cash(paid), print_cash(get_parcel_cost(a, p, now)) > cgt_schedule
-  if ((((parcel_adjustments) <= Epsilon) && ((parcel_adjustments) >= -Epsilon))) {
-    printf " %15s => %14s Per Unit => %14s", description, print_cash(tax_gains < 0 ? - tax_gains : gains), print_cash(get_parcel_cost(a, p, now) / units, 4) > cgt_schedule
-    if ((( a in Parcel_Tag) && ( p in Parcel_Tag[ a])))
-      printf "%20s\n", Parcel_Tag[a][p], p > EOFY
-    else
-      printf "\n" > EOFY
-  } else {
-    # Next line has adjusted cost and tax gains or losses
-    if ((((tax_gains) <= Epsilon) && ((tax_gains) >= -Epsilon)) && gains < 0) {
-      # Zero tax gains
-      description = "Zero Gain    "
-      gains = 0
-    }
-
-    # The accounting gain/loss is simple
-    printf " %15s => %14s\n", "Accounting Gain", print_cash(- gains) > cgt_schedule
-    printf "\t%117s => %13s %15s => %14s\n", "Adjusted", print_cash(get_parcel_cost(a, p, now, TRUE)), description, print_cash(tax_gains < 0 ? -tax_gains : gains) > cgt_schedule
-  }
-}
 
 ## Helper functions
 
@@ -3559,34 +3556,6 @@ function print_underline(l, notab, fd,    i) {
   for (i = 0; i <= l; i++)
     printf "_" > fd
   printf "\n" > fd
-}
-
-# Code sharing between capital gains and deferred gains
-# FIXME almost redundant
-function print_gains_summary(units_sold, sum_cost, sum_paid, adjusted_cost, reduced_cost, width, disc_gains, other_gains, tax_losses, output_stream,
-                             label, gain_type) {
-  # If units sold is negative these are deferred gains...
-  if (units_sold < 0) {
-    label = "Held"
-    gain_type = "Deferred"
-    units_sold = - units_sold
-  } else {
-    gain_type = "Taxable"
-    label = "Sold"
-  }
-
-  # Shared code for printing gains summaries
-  printf "\t%6s Units => %10.3f %*s => %14s Value => %14s Reduced  => %13s Accounting Gain => %14s\n", label,
-    units_sold, 4 + width, "Cost", print_cash(sum_cost), print_cash(sum_paid), print_cash(reduced_cost), print_cash(sum_paid - reduced_cost) > output_stream
-
-  # Check the adjusted cost
-  if (adjusted_cost != reduced_cost)
-    printf "\t%*s => %13s\n", 82 + width, "Adjusted", print_cash(adjusted_cost) > output_stream
-
-  printf "\t%*s => %14s\n", 115 + width, (gain_type " Gain"), print_cash(- disc_gains) > output_stream
-  if (!(((other_gains) <= Epsilon) && ((other_gains) >= -Epsilon)))
-    printf "\t%*s => %14s\n", 115 + width, "Other Gain",      print_cash(- other_gains) > output_stream
-  printf "\t%*s => %14s\n", 115 + width, (gain_type " Loss"),    print_cash(tax_losses) > output_stream
 }
 
 
@@ -4426,10 +4395,6 @@ function income_tax_aud(now, past, benefits,
   # assets were liquidated today
   deferred_gains = get_cost(DEFERRED_GAINS, now)
 
-  # Schedule is finished
-  print_underline(43, 0, EOFY)
-  print "\n" > EOFY
-
   # Gains are negative - losses are positive
   # Catch negligible gains
   if (!(((deferred_gains) <= Epsilon) && ((deferred_gains) >= -Epsilon))) {
@@ -4437,14 +4402,7 @@ function income_tax_aud(now, past, benefits,
     deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
     set_cost(DEFERRED, - deferred_tax, now)
 
-    if (((deferred_tax) >  Epsilon))
-      printf "\t%40s %32s\n", "Deferred Tax Liability", print_cash(deferred_tax) > EOFY
-    else if (((deferred_tax) < -Epsilon))
-      printf "\t%40s %32s\n", "Deferred Tax Asset    ", print_cash(deferred_tax) > EOFY
-    else {
-      deferred_tax = 0
-      printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > EOFY
-    }
+
 
     # Get the change this FY
     # If x < 0 EXPENSE
@@ -4738,9 +4696,6 @@ BEGIN {
 
   # Transaction line defaults
   new_line()
-  # #
-  # # Initialize state file information
-  # initialize_state()
 
   # Default Portfolio Name and document URI
   Journal_Title = "NEMO"
@@ -4769,6 +4724,18 @@ BEGIN {
   # Set time format
   set_months()
 
+  # Which gains reports are printed
+  # c Capital Gains
+  # d Deferred Gains
+  # m Market Gains
+  #
+  # Default is "c:d"
+  ((SUBSEP in All_Reports)?(TRUE):(FALSE))
+  ((SUBSEP in Extra_Reports)?(TRUE):(FALSE))
+  if (!Show_Reports)
+    Show_Reports = ("c:d")
+  set_reports(Show_Reports)
+
   # Show detailed summary
   if ("" == Show_Extra)
     Show_Extra = 0
@@ -4777,11 +4744,7 @@ BEGIN {
   if ("" == Show_All)
     Show_All = 0
 
-  # Report file
-  if (!Reports)
-    Reports = "/dev/null"
-
-  # EOFY statements are printed to a specific stream
+  # EOFY statements are not printed until requested
   EOFY = "/dev/null"
 
   # Which account to track
@@ -4920,11 +4883,11 @@ BEGIN {
   assert(Last_Time != (-1), Read_Date_Error)
 
   # Need to initialize FY information
-  if (FY)
-    initialize_fy(FY "-" FY_Date)
-  else { # Turn off EOFY reporting
-    Reports = "/dev/null"
-
+  if (FY) {
+    # Initialize the financial year
+    Stop_Time = read_date(FY "-" FY_Date, 0)
+    Start_Time = ((Stop_Time) + one_year(Stop_Time, -1))
+  } else {
     # Default Start_Time and Stop_Time
     if (!Start_Time)
       Start_Time = Last_Time
@@ -4933,6 +4896,7 @@ BEGIN {
       assert((-1) != Start_Time, "Start_Time " Read_Date_Error)
     }
 
+    # Is a specific stop time set
     if (!Stop_Time)
       Stop_Time = Future
     else {
@@ -4991,20 +4955,6 @@ $1 ~ /(CHECK|SET|SET_BANDS|SET_ENTRY)/ {
 
 
 ## Functions start here
-
-
-# Initialize the financial year
-function initialize_fy(fy_date) {
-  # Month name format
-  Stop_Time = read_date(fy_date, 0)
-  Start_Time = ((Stop_Time) + one_year(Stop_Time, -1))
-
-  # Override
-  if (EOFY == Reports)
-    Reports = "/dev/stdout"
-}
-
-
 # Initialize read/write of state files
 function initialize_state(    x) {
   # Get which variables to write out

@@ -37,6 +37,17 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define MONTH_FORMAT ("%Y %b %d") # // 2010 Jun 10
 @define ISO_FORMAT   ("%F")       # // 2010-Jun-10
 
+# // Default Reports
+@define ALL_REPORTS ("c:d:f:m:q:z")
+@define SHOW_REPORTS ("c:d")
+@define print_capital(x)  ("c" in x)
+@define print_deferred(x) ("d" in x)
+@define print_market(x)   ("m" in x)
+@define print_dividend(x) ("q" in x)
+@define print_fixed(x)   ("f" in x)
+
+
+
 # // Default Asset Prefix for Price Lists
 @define ASSET_PREFIX ("ASSET.CAPITAL.SHARES")
 @define ASSET_SUFFIX ("ASX")

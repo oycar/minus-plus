@@ -703,10 +703,6 @@ function income_tax_aud(now, past, benefits,
   # assets were liquidated today
   deferred_gains = get_cost(DEFERRED_GAINS, now)
 
-  # Schedule is finished
-  print_underline(43, 0, EOFY)
-  print "\n" > EOFY
-
   # Gains are negative - losses are positive
   # Catch negligible gains
   if (!near_zero(deferred_gains)) {
@@ -714,6 +710,7 @@ function income_tax_aud(now, past, benefits,
     deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
     set_cost(DEFERRED, - deferred_tax, now)
 
+@ifeq LOG income_tax
     if (above_zero(deferred_tax))
       printf "\t%40s %32s\n", "Deferred Tax Liability", print_cash(deferred_tax) > EOFY
     else if (below_zero(deferred_tax))
@@ -722,6 +719,7 @@ function income_tax_aud(now, past, benefits,
       deferred_tax = 0
       printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > EOFY
     }
+@endif
 
     # Get the change this FY
     # If x < 0 EXPENSE
