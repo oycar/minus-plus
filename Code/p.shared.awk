@@ -1930,15 +1930,16 @@ function url_encode(string,     c, chars, url, i) {
   split(string, chars, "")
 
   # the encoded string
+  # loop in reverse order
   url = ""
   for (i in chars) {
     c = chars[i]
 
-    # Just append plain vanilla characters
+    # Just prepend plain vanilla characters
 	  if (c ~ /[0-9A-Za-z]/)
-	    url = url c
+	    url = c url
 	  else # Get the hex code
-	    url = url "%" sprintf("%02X", get_char(c))
+	    url = "%" sprintf("%02X", get_char(c)) url
   }
 
   # Tidy up array

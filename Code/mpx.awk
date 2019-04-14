@@ -2112,9 +2112,9 @@ function url_encode(string,     c, chars, url, i) {
 
     # Just append plain vanilla characters
 	  if (c ~ /[0-9A-Za-z]/)
-	    url = url c
+	    url = c url
 	  else # Get the hex code
-	    url = url "%" sprintf("%02X", ((c in URL_Lookup)?( URL_Lookup[c]):( (0))))
+	    url = "%" sprintf("%02X", ((c in URL_Lookup)?( URL_Lookup[c]):( (0)))) url
   }
 
   # Tidy up array
@@ -2363,7 +2363,7 @@ function eofy_actions(now,      past, allocated_profits,
   print_balance_sheet(now, past, 1)
 
   # Allocate second element costs associated with fixed assets - at SOFY
-  allocate_second_element_costs(now)
+  allocate_second_element_costs(((now) + 1))
 }
 
 # Default balance journal is a no-op
@@ -2626,7 +2626,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The gains_stream is the pipe to write the schedule out to
-    if ((("d" ~ /[cC]|[aA]/) && ("d" !~ /[zZ]/)))
+    if ((("f" ~ /[cC]|[aA]/) && ("f" !~ /[zZ]/)))
       gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
     else
       gains_stream = "/dev/null"
@@ -2725,7 +2725,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, gain
                                                           gains, losses) {
 
  # The gains_stream is the pipe to write the schedule out to
- if ((("d" ~ /[dD]|[aA]/) && ("d" !~ /[zZ]/)))
+ if ((("f" ~ /[dD]|[aA]/) && ("f" !~ /[zZ]/)))
    gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
  else
    gains_stream = "/dev/null"
@@ -2773,7 +2773,7 @@ function print_operating_statement(now, past, is_detailed,     write_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The gains_stream is the pipe to write the schedule out to
-  if ((("d" ~ /[oO]|[aA]/) && ("d" !~ /[zZ]/)))
+  if ((("f" ~ /[oO]|[aA]/) && ("f" !~ /[zZ]/)))
     write_stream = EOFY
   else
     write_stream = "/dev/null"
@@ -2931,7 +2931,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  if ((("d" ~ /[bB]|[aA]/) && ("d" !~ /[zZ]/)))
+  if ((("f" ~ /[bB]|[aA]/) && ("f" !~ /[zZ]/)))
     reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
   else
     return
@@ -3057,7 +3057,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    gains_stream) {
   # Show current gains/losses
    # The gains_stream is the pipe to write the schedule out to
-   if ((("d" ~ /[mM]|[aA]/) && ("d" !~ /[zZ]/)))
+   if ((("f" ~ /[mM]|[aA]/) && ("f" !~ /[zZ]/)))
      gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
    else
      return
@@ -3127,13 +3127,152 @@ function allocate_second_element_costs(now,       a, p, second_element) {
     } # End of each fixed asset a
 }
 
+#
+# # This function is is for slightly different times than the other EOFY actions
+# function print_depreciating_holdings(now, past, is_detailed,      reports_stream, a, p, open_key, close_key, parcel_depreciation, account_depreciation, open_cost, total_depreciaiton, sum_open,
+#                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
+#
+#   # The reports_stream is the pipe to write the schedule out to
+#   if (report_fixed)
+#     reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
+#   else
+#     return
+#
+#   # Return if nothing to do
+#   if ("/dev/null" == reports_stream)
+#     return
+#
+#   is_detailed = ("" == is_detailed) ? FALSE : is_detailed
+#   total_depreciation = ""
+#
+#   # Print out the assets in alphabetical order
+#   for (a in Leaf)
+#     if (is_fixed(a) && (is_open(a, now) || is_open(a, past))) {
+#
+#       if ("" == total_depreciation) {
+#         printf "\n" > reports_stream
+#         print Journal_Title > reports_stream
+#         printf "Depreciation Schedule for the Period [%11s, %11s]\n", get_date(past), get_date(now) > reports_stream
+#         total_depreciation = 0 # Total value summed here
+#       }
+#
+#       # The opening value of an asset with multiple parcels cannot be tied to a single time
+#       account_depreciation = sum_open = 0
+#
+#       # Get each parcel
+#       printf "%10s %15s ", Depreciation_Method[Method_Name[a]], get_short_name(a) > reports_stream
+#       for (p = 0; p < Number_Parcels[a]; p ++) {
+#         # When was this parcel  opened?
+#         open_key = Held_From[a][p] # First parcel opened here
+#         if (open_key < past)
+#           open_key = past # This must be earlier than now for this asset to be open and considered
+#
+#         # Is there is a problem if item is sold exactly at same time as depreciation occurs? (no if done carefully)
+#         if (is_sold(a, p, now)) {
+#           close_key = just_before(Held_Until[a][p])
+#         } else
+#           close_key = just_before(now)
+#
+#         # parcel open cost
+#         open_cost = get_parcel_cost(a, p, open_key)
+#         sum_open += open_cost
+#
+#         # Always get the parcel depreciation
+#         parcel_depreciation = get_parcel_tax_adjustment(a, p, I, open_key) - get_parcel_tax_adjustment(a, p, I, close_key)
+#
+#         # Record detailed statement
+#         # Is this a named parcel?
+#         if (is_detailed) {
+#           if (keys_in(Parcel_Tag, a, p))
+#             printf "\n%20s %5d ", Parcel_Tag[a][p], p > reports_stream
+#           else
+#             printf "\n%26d ", p > reports_stream
+#
+#           # Depreciation is the sum of the I tax adjustments
+#           printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s",
+#                     get_date(open_key), get_date(close_key), print_cash(open_cost),
+#                     print_cash(open_cost - delta),
+#                     print_cash(get_parcel_element(a, p, II, close_key)),
+#                     print_cash(get_parcel_cost(a, p, close_key)),
+#                     print_cash(parcel_depreciation) > reports_stream
+#         } # End of is_detailed
+#
+#         #  Just track the total depreciation
+#         account_depreciation   += parcel_depreciation
+#       } # End of each parcel
+#
+#       # Clean up output
+#       if (is_detailed) {
+#         printf "\n" > reports_stream
+#         underline(198, 8, reports_stream)
+#         printf "%26s ", get_short_name(a) > reports_stream
+#       }
+#
+#       # Depreciation is the sum of the tax adjustments
+#       # When was this asset opened?
+#       open_key = Held_From[a][0] # First parcel opened here
+#       if (open_key < past)
+#         open_key = past # This must be less than now for this asset to be open and considered
+#       if (is_closed(a, now))
+#         close_key = just_before(held_to(a, now))
+#       else
+#         close_key = just_before(now)
+#
+#       # For depreciating assets depreciation corresponds to the tax adjustments
+#       # Period depreciation is the difference in the tax adjustments
+#       printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s\n",
+#         get_date(open_key), get_date(close_key), print_cash(sum_open),
+#         print_cash(sum_open - delta),
+#         print_cash(get_cost_element(a, II, close_key)),
+#         print_cash(get_cost(a, close_key)),
+#         print_cash(account_depreciation) > reports_stream
+#
+#       # Track total depreciation too
+#       total_depreciation += account_depreciation
+#     } # End of a depreciating asset
+#
+#   # Is there any depreciation/appreciation due to the sale of depreciating assets?
+#   sale_appreciation = get_cost(SOLD_APPRECIATION, now) - get_cost(SOLD_APPRECIATION, past)
+#   sale_depreciation = get_cost(SOLD_DEPRECIATION, now) - get_cost(SOLD_DEPRECIATION, past)
+#   if (!near_zero(sale_depreciation))
+#     printf "\n\tDepreciation from Sales => %14s\n", print_cash(sale_depreciation) > reports_stream
+#   if (!near_zero(sale_appreciation))
+#     printf "\n\tAppreciation from Sales => %14s\n", print_cash(-sale_appreciation) > reports_stream
+#   total_depreciation += sale_depreciation + sale_appreciation
+#
+#   # Print a nice line
+#   if (!near_zero(total_depreciation)) {
+#     underline(198, 8, reports_stream)
+#     printf "\tPeriod Depreciation     => %14s\n", print_cash(total_depreciation) > reports_stream
+#   }
+# } # End of print depreciating holdings
+#
+# if (!gains_event) {
+#   # Two types of header
+#   if (is_detailed)
+#     printf "\n%12s %10s %9s %11s %10s %16s %15s %14s %14s %15s %9s %20s %15s\n",
+#             "Asset", "Parcel", "Units", "From", "To", "Cost", proceeds_label,
+#             "Reduced", "Adjusted", "Accounting", "Type", "Taxable", "Per Unit" > gains_stream
+#   else if (no_header_printed) {
+#     printf "%12s %12s %12s %15s %14s %14s %15s %9s %20s\n",
+#            "Asset", "Units", "Cost",
+#            proceeds_label, "Reduced", "Adjusted", "Accounting", "Type", "Taxable" > gains_stream
+#     underline(125, 6, gains_stream)
+#   }
+#
+#   # print Name
+#   label = get_short_name(a)
+#   gains_event = TRUE
+#   no_header_printed = FALSE
+# }
+
 
 # This function is is for slightly different times than the other EOFY actions
 function print_depreciating_holdings(now, past, is_detailed,      reports_stream, a, p, open_key, close_key, parcel_depreciation, account_depreciation, open_cost, total_depreciaiton, sum_open,
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  if ((("d" ~ /[fF]|[aA]/) && ("d" !~ /[zZ]/)))
+  if ((("f" ~ /[fF]|[aA]/) && ("f" !~ /[zZ]/)))
     reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
   else
     return
@@ -3152,15 +3291,25 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
       if ("" == total_depreciation) {
         printf "\n" > reports_stream
         print Journal_Title > reports_stream
-        printf "Depreciation Schedule for the Period [%11s, %11s]\n", get_date(past), get_date(now) > reports_stream
+        printf "Depreciation Schedule for the Period [%11s, %11s]\n\n", get_date(past), get_date(now) > reports_stream
         total_depreciation = 0 # Total value summed here
+
+        # Two types of header
+        if (is_detailed)
+          printf "%12s %11s %14s ", "Asset", "Method", "Parcel" > reports_stream
+        else
+          printf "%12s %11s ", "Asset", "Method" > reports_stream
+
+        # The rest of the header
+        printf "%9s %10s %17s %14s %20s %10s %14s\n",
+                  "From", "To", "Opening", "Closing", "Second Element", "Adjusted", "Depreciation" > reports_stream
+        underline(134, 6, reports_stream)
       }
 
       # The opening value of an asset with multiple parcels cannot be tied to a single time
       account_depreciation = sum_open = 0
 
       # Get each parcel
-      printf "%10s %15s ", Depreciation_Method[Method_Name[a]], (Leaf[(a)]) > reports_stream
       for (p = 0; p < Number_Parcels[a]; p ++) {
         # When was this parcel  opened?
         open_key = Held_From[a][p] # First parcel opened here
@@ -3180,33 +3329,26 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
         # Always get the parcel depreciation
         parcel_depreciation = (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( open_key)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0))))) - (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( close_key)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0)))))
 
+        #  Just track the total depreciation
+        account_depreciation   += parcel_depreciation
+
         # Record detailed statement
         # Is this a named parcel?
-        if (is_detailed) {
+        if (is_detailed && Number_Parcels[a] > 1) {
           if ((( a in Parcel_Tag) && ( p in Parcel_Tag[ a])))
-            printf "\n%20s %5d ", Parcel_Tag[a][p], p > reports_stream
+            printf "%25s %12d ", Parcel_Tag[a][p], p > reports_stream
           else
-            printf "\n%26d ", p > reports_stream
+            printf "%38d ", p > reports_stream
 
           # Depreciation is the sum of the I tax adjustments
-          printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s",
+          printf "[%11s, %11s] %14s %14s %14s %14s %14s\n",
                     get_date(open_key), get_date(close_key), print_cash(open_cost),
-                    print_cash(open_cost - delta),
-                    print_cash(get_parcel_element(a, p, II, close_key)),
+                    print_cash(open_cost - parcel_depreciation),
+                    print_cash(get_parcel_element(a, p, II, ((close_key) - 1))),
                     print_cash(get_parcel_cost(a, p, close_key)),
                     print_cash(parcel_depreciation) > reports_stream
         } # End of is_detailed
-
-        #  Just track the total depreciation
-        account_depreciation   += parcel_depreciation
       } # End of each parcel
-
-      # Clean up output
-      if (is_detailed) {
-        printf "\n" > reports_stream
-        underline(198, 8, reports_stream)
-        printf "%26s ", (Leaf[(a)]) > reports_stream
-      }
 
       # Depreciation is the sum of the tax adjustments
       # When was this asset opened?
@@ -3220,10 +3362,11 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
 
       # For depreciating assets depreciation corresponds to the tax adjustments
       # Period depreciation is the difference in the tax adjustments
-      printf "[%11s, %11s] Opening => %14s Closing => %14s Second Element => %14s Adjusted => %14s Depreciation => %14s\n",
+      printf "%15s %-22s ", (Leaf[(a)]), Depreciation_Method[Method_Name[a]] > reports_stream
+      printf "[%11s, %11s] %14s %14s %14s %14s %14s\n",
         get_date(open_key), get_date(close_key), print_cash(sum_open),
-        print_cash(sum_open - delta),
-        print_cash(get_cost_element(a, II, close_key)),
+        print_cash(sum_open - account_depreciation),
+        print_cash(get_cost_element(a, II, ((close_key) - 1))),
         print_cash(get_cost(a, close_key)),
         print_cash(account_depreciation) > reports_stream
 
@@ -3235,17 +3378,19 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
   sale_appreciation = get_cost(SOLD_APPRECIATION, now) - get_cost(SOLD_APPRECIATION, past)
   sale_depreciation = get_cost(SOLD_DEPRECIATION, now) - get_cost(SOLD_DEPRECIATION, past)
   if (!(((sale_depreciation) <= Epsilon) && ((sale_depreciation) >= -Epsilon)))
-    printf "\n\tDepreciation from Sales => %14s\n", print_cash(sale_depreciation) > reports_stream
+    printf  "\n%24s %115s\n", "Depreciation from Sales", print_cash(sale_depreciation) > reports_stream
   if (!(((sale_appreciation) <= Epsilon) && ((sale_appreciation) >= -Epsilon)))
-    printf "\n\tAppreciation from Sales => %14s\n", print_cash(-sale_appreciation) > reports_stream
+    printf  "\n%24s %115s\n", "Appreciation from Sales", print_cash(-sale_appreciation) > reports_stream
   total_depreciation += sale_depreciation + sale_appreciation
 
   # Print a nice line
   if (!(((total_depreciation) <= Epsilon) && ((total_depreciation) >= -Epsilon))) {
-    underline(198, 8, reports_stream)
-    printf "\tPeriod Depreciation     => %14s\n", print_cash(total_depreciation) > reports_stream
+    underline(134, 6, reports_stream)
+    printf "%24s %115s\n", "Period Depreciation", print_cash(total_depreciation) > reports_stream
   }
 } # End of print depreciating holdings
+
+
 
 #
 #
@@ -3263,7 +3408,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  if ((("d" ~ /[qQ]|[aA]/) && ("d" !~ /[zZ]/)))
+  if ((("f" ~ /[qQ]|[aA]/) && ("f" !~ /[zZ]/)))
     dividend_stream = ("" == EOFY) ? "/dev/null" : EOFY
   else
     dividend_stream = "/dev/null"
@@ -3353,8 +3498,9 @@ function print_dividend_qualification(now, past, is_detailed,
     # summary
     underline(95, 6, dividend_stream)
     payment = get_cost("*INCOME.DIVIDEND", past) + get_cost("*INCOME.DISTRIBUTION.CLOSE", past) -               get_cost("*INCOME.DIVIDEND", now) - get_cost("*INCOME.DISTRIBUTION.CLOSE", now)
-    printf "%*s%*s %14s %*.2f %*s\n\n", 6, "", 16, "Qualified Dividends", print_cash(qualified_payment),
-      43, 100.0 * (qualified_payment / payment), 16, print_cash(payment) > dividend_stream
+    if ((((payment) > Epsilon) || ((payment) < -Epsilon)))
+      printf "%*s%*s %14s %*.2f %*s\n\n", 6, "", 16, "Qualified Dividends", print_cash(qualified_payment),
+        43, 100.0 * (qualified_payment / payment), 16, print_cash(payment) > dividend_stream
 
 } # End of function print_dividend_qualification
 
@@ -3828,7 +3974,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, x) {
 
   # Print this out?
-  if ((("d" ~ /[tT]|[aA]/) && ("d" !~ /[zZ]/)))
+  if ((("f" ~ /[tT]|[aA]/) && ("f" !~ /[zZ]/)))
     write_stream = EOFY
   else
     write_stream = "/dev/null"
