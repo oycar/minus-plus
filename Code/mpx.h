@@ -41,7 +41,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define ALL_REPORTS ("a:b:c:d:f:m:o:q:t:z")
 
 # // Default Reports
-@ifeq SHOW_REPORTS 0
+@ifndef SHOW_REPORTS 
 @define   SHOW_REPORTS "bcot"
 @endif # // SHOW_REPORTS
 

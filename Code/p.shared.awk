@@ -1401,45 +1401,6 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
   return sum - get_cash_out(a, p, now)
 }
 
-# # The tax adjustments at time (now)
-# # Note that depreciation is always a tax adjustment
-# function get_cost_adjustment(a, now,   i, sum_adjustments) {
-#   # Initial adjustments
-#   sum_adjustments = 0
-#
-#   # Adjustments for units bought
-#   # Do not apply to equities
-#   if (!is_equity(a)) {
-#     for (i = 0; i < Number_Parcels[a]; i ++) {
-#       if (Held_From[a][i] > now) # All further transactions occured after (now)
-#         break # All done
-#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-#         sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
-#     }
-#   }
-#
-#   return sum_adjustments
-# }
-
-# # Get the tax adjustment for a particular element
-# function get_tax_element_adjustment(a, element, now,      i, sum_adjustments) {
-#   # Initial adjustments
-#   sum_adjustments = 0
-#
-#   # Adjustments for units bought
-#   # Do not apply to equities
-#   if (!is_equity(a)) {
-#     for (i = 0; i < Number_Parcels[a]; i ++) {
-#       if (Held_From[a][i] > now) # All further transactions occured after (now)
-#         break # All done
-#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-#         sum_adjustments += get_parcel_tax_adjustment(a, i, element, now)
-#     }
-#   }
-#
-#   return sum_adjustments
-# }
-
 # Print out transactions
 # Generalize for the case of a single entry transaction
 function print_transaction(now, comments, a, b, u, amount, fields, n_field,     matched) {
@@ -1511,8 +1472,6 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
   # Print statement
   # This could be a zero, single or double entry transaction
   #
-  # # floating point precision
-  # float_precision = ternary("" == float_precision, PRECISION, float_precision)
 
   # First the date
   string = sprintf("%11s", get_date(now))
@@ -2012,7 +1971,7 @@ function string_hash(text,    prime, modulo, h, chars, i) {
 function underline(width, margin, stream) {
  stream = ternary(stream, stream, "/dev/stdout")
  if (margin)
-   printf "%*s", margin, ""
+   printf "%*s", margin, "" > stream
  print_block("_", width, stream)
 }
 

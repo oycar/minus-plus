@@ -117,7 +117,7 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
 
   # Print the gains report
   print Journal_Title > gains_stream
-  printf "%s Report for Period Ending %s\n", gains_type, get_date(yesterday(now))  > gains_stream
+  printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > gains_stream
 
   # Are we printing out a detailed schedule?
   is_detailed = ternary(is_detailed, is_detailed, FALSE)
@@ -164,10 +164,12 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
               printf "\n%12s %10s %9s %11s %10s %16s %15s %14s %14s %15s %9s %20s %15s\n",
                       "Asset", "Parcel", "Units", "From", "To", "Cost", proceeds_label,
                       "Reduced", "Adjusted", "Accounting", "Type", "Taxable", "Per Unit" > gains_stream
-            else if (no_header_printed)
+            else if (no_header_printed) {
               printf "%12s %12s %12s %15s %14s %14s %15s %9s %20s\n",
                      "Asset", "Units", "Cost",
                      proceeds_label, "Reduced", "Adjusted", "Accounting", "Type", "Taxable" > gains_stream
+              underline(125, 6, gains_stream)
+            }
 
             # print Name
             label = get_short_name(a)
@@ -306,12 +308,16 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
 
         # Extra entries
         for (key in Gains_Stack)
-          printf "\n%*s %14s", 116 + 35 * is_detailed, key, print_cash(- Gains_Stack[key]) > gains_stream
+          printf "\n%*s %15s", 116 + 35 * is_detailed, key, print_cash(- Gains_Stack[key]) > gains_stream
 
-        printf "\n" > gains_stream
+        printf "\n\n" > gains_stream
         delete Gains_Stack[key]
       } # End of gains event
     } # End of each asset
+
+  # Final line
+  if (!is_detailed)
+    underline(125, 6, gains_stream)
 
   # Stack the gains & losses
   Gains_Stack[Long_Gains_Key]   = sum_long_gains

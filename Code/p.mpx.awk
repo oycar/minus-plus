@@ -183,19 +183,6 @@ BEGIN {
   # Set time format
   set_months()
 
-  # Which gains reports are printed
-  # c Capital Gains
-  # d Deferred Gains
-  # m Market Gains
-  #
-  # Default is "c:d"
-  make_array(All_Reports)
-  #make_array(Extra_Reports)
-
-  #if (!Show_Reports)
-  #  Show_Reports = SHOW_REPORTS
-  #set_reports(Show_Reports)
-
   # Show detailed summary
   if ("" == Show_Extra)
     Show_Extra = 0
@@ -703,7 +690,7 @@ function read_input_record(   t, n, a, threshold) {
   else if (n == 1) {
     # So far all this can do is initialize an account
     if (t >= Start_Time)
-      printf "## Single Entry Transaction\n"
+      printf "## Single Entry Transaction\n" > "/dev/stderr"
     print_transaction(t, Comments, Account[1], NULL, Write_Units, amount)
   } else {
     # A zero entry line - a null transaction or a comment in the ledger

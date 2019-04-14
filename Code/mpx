@@ -51,7 +51,7 @@ preprocess_only=false
 qualify_window=0
 Show_All=0
 Show_Extra=0
-Show_Reports=0 # Default reports
+Show_Reports="bcot" # Default reports
 
 # Default journal currency and type
 journal_currency="AUD"

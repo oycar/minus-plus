@@ -1651,45 +1651,6 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
   return sum - get_cash_out(a, p, now)
 }
 
-# # The tax adjustments at time (now)
-# # Note that depreciation is always a tax adjustment
-# function get_cost_adjustment(a, now,   i, sum_adjustments) {
-#   # Initial adjustments
-#   sum_adjustments = 0
-#
-#   # Adjustments for units bought
-#   # Do not apply to equities
-#   if (!is_equity(a)) {
-#     for (i = 0; i < Number_Parcels[a]; i ++) {
-#       if (Held_From[a][i] > now) # All further transactions occured after (now)
-#         break # All done
-#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-#         sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
-#     }
-#   }
-#
-#   return sum_adjustments
-# }
-
-# # Get the tax adjustment for a particular element
-# function get_tax_element_adjustment(a, element, now,      i, sum_adjustments) {
-#   # Initial adjustments
-#   sum_adjustments = 0
-#
-#   # Adjustments for units bought
-#   # Do not apply to equities
-#   if (!is_equity(a)) {
-#     for (i = 0; i < Number_Parcels[a]; i ++) {
-#       if (Held_From[a][i] > now) # All further transactions occured after (now)
-#         break # All done
-#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-#         sum_adjustments += get_parcel_tax_adjustment(a, i, element, now)
-#     }
-#   }
-#
-#   return sum_adjustments
-# }
-
 # Print out transactions
 # Generalize for the case of a single entry transaction
 function print_transaction(now, comments, a, b, u, amount, fields, n_field,     matched) {
@@ -1712,8 +1673,6 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
   # Print statement
   # This could be a zero, single or double entry transaction
   #
-  # # floating point precision
-  # float_precision = ternary("" == float_precision, PRECISION, float_precision)
 
   # First the date
   string = sprintf("%11s", get_date(now))
@@ -2188,7 +2147,7 @@ function string_hash(text,    prime, modulo, h, chars, i) {
 function underline(width, margin, stream) {
  stream = ((stream)?( stream):( "/dev/stdout"))
  if (margin)
-   printf "%*s", margin, ""
+   printf "%*s", margin, "" > stream
  if (TRUE) {while ( width-- > 1) printf "%1s", "_" >  stream; print "_" >  stream}
 }
 
@@ -2290,30 +2249,6 @@ function set_months(   i, month_name, mon) {
   }
 
   delete month_name
-}
-
-# set which gains reports to show
-function set_reports(show_reports,   i, array) {
-  split(("a:b:c:d:f:m:o:q:t:z"), array, ":")
-  for (i in array)
-    All_Reports[array[i]] = TRUE
-  delete array
-
-  split(show_reports, array, ":")
-  for (i in array) {
-    array[i] = tolower(substr(array[i], 1, 1))
-    assert((array[i] in All_Reports), "Unknown report code <" array[i] "> should be z (zero extra reports), c (capital gains), d (deferred gains), f (fixed assets), m (market gains) or q (qualified dividends)")
-    if ("z" == array[i]) {
-      delete Extra_Reports
-      Extra_Reports["z"] = TRUE
-      break
-    } else
-      Extra_Reports[array[i]] = TRUE
-  }
-
-  delete array
-  delete All_Reports
-  return
 }
 
 # Get the time stamp m months in the  future
@@ -2465,7 +2400,7 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
 
   # Print the gains report
   print Journal_Title > gains_stream
-  printf "%s Report for Period Ending %s\n", gains_type, get_date(yesterday(now))  > gains_stream
+  printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > gains_stream
 
   # Are we printing out a detailed schedule?
   is_detailed = ((is_detailed)?( is_detailed):( FALSE))
@@ -2512,10 +2447,12 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
               printf "\n%12s %10s %9s %11s %10s %16s %15s %14s %14s %15s %9s %20s %15s\n",
                       "Asset", "Parcel", "Units", "From", "To", "Cost", proceeds_label,
                       "Reduced", "Adjusted", "Accounting", "Type", "Taxable", "Per Unit" > gains_stream
-            else if (no_header_printed)
+            else if (no_header_printed) {
               printf "%12s %12s %12s %15s %14s %14s %15s %9s %20s\n",
                      "Asset", "Units", "Cost",
                      proceeds_label, "Reduced", "Adjusted", "Accounting", "Type", "Taxable" > gains_stream
+              underline(125, 6, gains_stream)
+            }
 
             # print Name
             label = (Leaf[(a)])
@@ -2654,12 +2591,16 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
 
         # Extra entries
         for (key in Gains_Stack)
-          printf "\n%*s %14s", 116 + 35 * is_detailed, key, print_cash(- Gains_Stack[key]) > gains_stream
+          printf "\n%*s %15s", 116 + 35 * is_detailed, key, print_cash(- Gains_Stack[key]) > gains_stream
 
-        printf "\n" > gains_stream
+        printf "\n\n" > gains_stream
         delete Gains_Stack[key]
       } # End of gains event
     } # End of each asset
+
+  # Final line
+  if (!is_detailed)
+    underline(125, 6, gains_stream)
 
   # Stack the gains & losses
   Gains_Stack[Long_Gains_Key]   = sum_long_gains
@@ -2685,7 +2626,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The gains_stream is the pipe to write the schedule out to
-    if ((("cZ" ~ /[cC]|[aA]/) && ("cZ" !~ /[zZ]/)))
+    if ((("d" ~ /[cC]|[aA]/) && ("d" !~ /[zZ]/)))
       gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
     else
       gains_stream = "/dev/null"
@@ -2784,7 +2725,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, gain
                                                           gains, losses) {
 
  # The gains_stream is the pipe to write the schedule out to
- if ((("cZ" ~ /[dD]|[aA]/) && ("cZ" !~ /[zZ]/)))
+ if ((("d" ~ /[dD]|[aA]/) && ("d" !~ /[zZ]/)))
    gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
  else
    gains_stream = "/dev/null"
@@ -2832,7 +2773,7 @@ function print_operating_statement(now, past, is_detailed,     write_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The gains_stream is the pipe to write the schedule out to
-  if ((("cZ" ~ /[oO]|[aA]/) && ("cZ" !~ /[zZ]/)))
+  if ((("d" ~ /[oO]|[aA]/) && ("d" !~ /[zZ]/)))
     write_stream = EOFY
   else
     write_stream = "/dev/null"
@@ -2990,7 +2931,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  if ((("cZ" ~ /[bB]|[aA]/) && ("cZ" !~ /[zZ]/)))
+  if ((("d" ~ /[bB]|[aA]/) && ("d" !~ /[zZ]/)))
     reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
   else
     return
@@ -3116,7 +3057,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    gains_stream) {
   # Show current gains/losses
    # The gains_stream is the pipe to write the schedule out to
-   if ((("cZ" ~ /[mM]|[aA]/) && ("cZ" !~ /[zZ]/)))
+   if ((("d" ~ /[mM]|[aA]/) && ("d" !~ /[zZ]/)))
      gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
    else
      return
@@ -3192,7 +3133,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  if ((("cZ" ~ /[fF]|[aA]/) && ("cZ" !~ /[zZ]/)))
+  if ((("d" ~ /[fF]|[aA]/) && ("d" !~ /[zZ]/)))
     reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
   else
     return
@@ -3322,7 +3263,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  if ((("cZ" ~ /[qQ]|[aA]/) && ("cZ" !~ /[zZ]/)))
+  if ((("d" ~ /[qQ]|[aA]/) && ("d" !~ /[zZ]/)))
     dividend_stream = ("" == EOFY) ? "/dev/null" : EOFY
   else
     dividend_stream = "/dev/null"
@@ -3887,7 +3828,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, x) {
 
   # Print this out?
-  if ((("cZ" ~ /[tT]|[aA]/) && ("cZ" !~ /[zZ]/)))
+  if ((("d" ~ /[tT]|[aA]/) && ("d" !~ /[zZ]/)))
     write_stream = EOFY
   else
     write_stream = "/dev/null"
@@ -4738,19 +4679,6 @@ BEGIN {
   # Set time format
   set_months()
 
-  # Which gains reports are printed
-  # c Capital Gains
-  # d Deferred Gains
-  # m Market Gains
-  #
-  # Default is "c:d"
-  ((SUBSEP in All_Reports)?(TRUE):(FALSE))
-  #make_array(Extra_Reports)
-
-  #if (!Show_Reports)
-  #  Show_Reports = SHOW_REPORTS
-  #set_reports(Show_Reports)
-
   # Show detailed summary
   if ("" == Show_Extra)
     Show_Extra = 0
@@ -5244,7 +5172,7 @@ function read_input_record(   t, n, a, threshold) {
   else if (n == 1) {
     # So far all this can do is initialize an account
     if (t >= Start_Time)
-      printf "## Single Entry Transaction\n"
+      printf "## Single Entry Transaction\n" > "/dev/stderr"
     print_transaction(t, Comments, Account[1], NULL, Write_Units, amount)
   } else {
     # A zero entry line - a null transaction or a comment in the ledger
