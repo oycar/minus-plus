@@ -2008,6 +2008,14 @@ function string_hash(text,    prime, modulo, h, chars, i) {
   return sprintf("%05x", h)
 }
 
+# print underline
+function underline(width, margin, stream) {
+ stream = ternary(stream, stream, "/dev/stdout")
+ if (margin)
+   printf "%*s", margin, ""
+ print_block("_", width, stream)
+}
+
 ### New date parser
 ##
 ## Formats which can be read
@@ -2106,30 +2114,6 @@ function set_months(   i, month_name, mon) {
   }
 
   delete month_name
-}
-
-# set whicg gains reports to show
-function set_reports(show_reports,   i, array) {
-  split(ALL_REPORTS, array, ":")
-  for (i in array)
-    All_Reports[array[i]] = TRUE
-  delete array
-
-  split(show_reports, array, ":")
-  for (i in array) {
-    array[i] = tolower(substr(array[i], 1, 1))
-    assert((array[i] in All_Reports), "Unknown report code <" array[i] "> should be z (zero extra reports), c (capital gains), d (deferred gains), f (fixed assets), m (market gains) or q (qualified dividends)")
-    if ("z" == array[i]) {
-      delete Extra_Reports
-      Extra_Reports["z"] = TRUE
-      break 
-    } else
-      Extra_Reports[array[i]] = TRUE
-  }
-
-  delete array
-  delete All_Reports
-  return
 }
 
 # Get the time stamp m months in the  future

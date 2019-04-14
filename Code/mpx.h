@@ -38,15 +38,21 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define ISO_FORMAT   ("%F")       # // 2010-Jun-10
 
 # // Default Reports
-@define ALL_REPORTS ("c:d:f:m:q:z")
-@define SHOW_REPORTS ("c:d")
-@define print_capital(x)  ("c" in x)
-@define print_deferred(x) ("d" in x)
-@define print_market(x)   ("m" in x)
-@define print_dividend(x) ("q" in x)
-@define print_fixed(x)   ("f" in x)
+@define ALL_REPORTS ("a:b:c:d:f:m:o:q:t:z")
 
+# // Default Reports
+@ifeq SHOW_REPORTS 0
+@define   SHOW_REPORTS "bcot"
+@endif # // SHOW_REPORTS
 
+@define report_balance    ((SHOW_REPORTS ~ /[bB]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
+@define report_capital    ((SHOW_REPORTS ~ /[cC]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
+@define report_deferred   ((SHOW_REPORTS ~ /[dD]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
+@define report_fixed      ((SHOW_REPORTS ~ /[fF]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
+@define report_market     ((SHOW_REPORTS ~ /[mM]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
+@define report_operating  ((SHOW_REPORTS ~ /[oO]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
+@define report_dividend   ((SHOW_REPORTS ~ /[qQ]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
+@define report_tax        ((SHOW_REPORTS ~ /[tT]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
 
 # // Default Asset Prefix for Price Lists
 @define ASSET_PREFIX ("ASSET.CAPITAL.SHARES")
@@ -86,8 +92,6 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 # // Fixed asset
 @define is_fixed(a) ((a) ~ /^ASSET\.FIXED[.:]/)
-
-#//@define is_depreciating(a) ((a) ~ /^ASSET\.FIXED[.:]/)
 @define is_tax(a)  ((a) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)
 @define is_term(a) ((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)
 @define is_current(a) ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/)
@@ -230,7 +234,9 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
     break;\
 }
 
-
+# // Print a block of n identical characters
+@define print_block(c, n, stream) if (TRUE) {while (n-- > 1) printf "%1s", c > stream; print c > stream}
+@define print_line(l, stream) ternary(l, underline(73, 8, stream), underline(47, 8, stream))
 
 # // These two are not very readable
 # // @define get_cash_in(a, i, now) (ternary((now >= Held_From[(a)][(i)]), find_entry(Accounting_Cost[(a)][(i)][I], Held_From[(a)][(i)]), 0))

@@ -190,10 +190,11 @@ BEGIN {
   #
   # Default is "c:d"
   make_array(All_Reports)
-  make_array(Extra_Reports)
-  if (!Show_Reports)
-    Show_Reports = SHOW_REPORTS
-  set_reports(Show_Reports)
+  #make_array(Extra_Reports)
+
+  #if (!Show_Reports)
+  #  Show_Reports = SHOW_REPORTS
+  #set_reports(Show_Reports)
 
   # Show detailed summary
   if ("" == Show_Extra)

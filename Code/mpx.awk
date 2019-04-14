@@ -73,6 +73,10 @@ END {
 # // Default Reports
 
 
+# // Default Reports
+
+
+
 
 
 
@@ -119,8 +123,6 @@ END {
 
 # // Fixed asset
 
-
-#//@define is_depreciating(a) ((a) ~ /^ASSET\.FIXED[.:]/)
 
 
 
@@ -291,6 +293,8 @@ END {
 
 # // Multi-Line Macro
 
+
+# // Print a block of n identical characters
 
 
 
@@ -2180,6 +2184,14 @@ function string_hash(text,    prime, modulo, h, chars, i) {
   return sprintf("%05x", h)
 }
 
+# print underline
+function underline(width, margin, stream) {
+ stream = ((stream)?( stream):( "/dev/stdout"))
+ if (margin)
+   printf "%*s", margin, ""
+ if (TRUE) {while ( width-- > 1) printf "%1s", "_" >  stream; print "_" >  stream}
+}
+
 ### New date parser
 ##
 ## Formats which can be read
@@ -2280,9 +2292,9 @@ function set_months(   i, month_name, mon) {
   delete month_name
 }
 
-# set whicg gains reports to show
+# set which gains reports to show
 function set_reports(show_reports,   i, array) {
-  split(("c:d:f:m:q:z"), array, ":")
+  split(("a:b:c:d:f:m:o:q:t:z"), array, ":")
   for (i in array)
     All_Reports[array[i]] = TRUE
   delete array
@@ -2294,7 +2306,7 @@ function set_reports(show_reports,   i, array) {
     if ("z" == array[i]) {
       delete Extra_Reports
       Extra_Reports["z"] = TRUE
-      break 
+      break
     } else
       Extra_Reports[array[i]] = TRUE
   }
@@ -2605,7 +2617,7 @@ function print_gains(now, past, is_detailed, gains_type, gains_stream, sold_time
       if (gains_event) {
         if (is_detailed) {
           # Detailed format
-          print_underline(157, 0, gains_stream)
+          underline(158, 8, gains_stream)
           printf "%13s %20.3f %41s ",
             label, units_sold,
             print_cash(cost) > gains_stream
@@ -2673,7 +2685,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The gains_stream is the pipe to write the schedule out to
-    if (("c" in Extra_Reports))
+    if ((("cZ" ~ /[cC]|[aA]/) && ("cZ" !~ /[zZ]/)))
       gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
     else
       gains_stream = "/dev/null"
@@ -2686,12 +2698,12 @@ function get_capital_gains(now, past, is_detailed,
 
     # Print the capital gains schedule
     print Journal_Title > gains_stream
-    printf "Capital Gains Report for Period Ending %s\n\n", get_date(yesterday(now))  > gains_stream
+    printf "Capital Gains Report for Period Ending %s\n", get_date(yesterday(now))  > gains_stream
 
     # Get total capital gains
     # Exploit existing sums
     # taxable capital gains are messy
-    print_underline(43, 0, gains_stream)
+    underline(44, 8, gains_stream)
 
     # First the cgt gains & losses
     #
@@ -2730,9 +2742,6 @@ function get_capital_gains(now, past, is_detailed,
 
     # Now consider the losses
     # Need to consider a maximum loss window beyond which losses will not be carried
-    # Also are carried losses treated as LONG or SHORT? FIXME
-    # FIXME
-    # FIXME
     cgt_losses = get_cost(CAPITAL_LOSSES, ((now) - 1)) - get_cost(CAPITAL_LOSSES, (((""))?( ((now) - (""))):( Epoch)))
     if ((""))
       printf "\t%27s => %14s\n", "Losses Carried Forward Since", get_date((((""))?( ((now) - (""))):( Epoch))) > gains_stream
@@ -2761,14 +2770,12 @@ function get_capital_gains(now, past, is_detailed,
     }
 
     # All done
-    print_underline(43, 0, gains_stream)
+    underline(43, 8, gains_stream)
     print "\n" > gains_stream
 
     # Save losses and taxable gains
     set_cost(CAPITAL_LOSSES, cgt_losses, now)
 }
-
-
 
 # Compute the deferred gains
 # And print out a schedule
@@ -2777,7 +2784,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, gain
                                                           gains, losses) {
 
  # The gains_stream is the pipe to write the schedule out to
- if (("d" in Extra_Reports))
+ if ((("cZ" ~ /[dD]|[aA]/) && ("cZ" !~ /[zZ]/)))
    gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
  else
    gains_stream = "/dev/null"
@@ -2790,10 +2797,10 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, gain
 
  # Print the deferred gains report
  print Journal_Title > gains_stream
- printf "Deferred Gains Report for Period Ending %s\n\n", get_date(yesterday(now))  > gains_stream
+ printf "Deferred Gains Report for Period Ending %s\n", get_date(yesterday(now))  > gains_stream
 
  # Print Capital Gains & Losses
- print_underline(43, 0, gains_stream)
+ underline(44, 8, gains_stream)
 
  printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > gains_stream
  printf "\t%27s => %14s\n", "Taxable Deferred Gains",
@@ -2805,12 +2812,18 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, gain
 
  # Get the deferred taxable gains
  get_taxable_gains(now, gains_stream, gains, losses, DEFERRED_GAINS)
+
+  # All done
+  underline(43, 8, gains_stream)
+  print "\n" > gains_stream
+
 } # End of deferred gains
 
 
 
 # Print out operating statement
-function print_operating_statement(now, past, is_detailed,     benefits, losses,
+function print_operating_statement(now, past, is_detailed,     write_stream,
+                                                               benefits, losses,
                                                                gains, market_gains,
                                                                more_past, label, x) {
 
@@ -2818,21 +2831,27 @@ function print_operating_statement(now, past, is_detailed,     benefits, losses,
   more_past = ((past) + one_year(past, -1))
   is_detailed = ("" == is_detailed) ? 1 : 2
 
-  print Journal_Title > EOFY
-  if (is_detailed)
-    printf "Detailed Operating Statement\n" > EOFY
+  # The gains_stream is the pipe to write the schedule out to
+  if ((("cZ" ~ /[oO]|[aA]/) && ("cZ" !~ /[zZ]/)))
+    write_stream = EOFY
   else
-    printf "Operating Statement\n" > EOFY
-  printf "For the period starting %s and ending %s\n", get_date(past), get_date(yesterday(now)) > EOFY
+    write_stream = "/dev/null"
 
-  print_underline(80, 1, EOFY)
-  printf "\n\n" > EOFY
+  printf "\n%s\n", Journal_Title > write_stream
+  if (is_detailed)
+    printf "Detailed Operating Statement\n" > write_stream
+  else
+    printf "Operating Statement\n" > write_stream
+  printf "For the period starting %s and ending %s\n", get_date(past), get_date(yesterday(now)) > write_stream
+  underline(81, 0, write_stream)
+  printf "%53s %26s\n", strftime("%Y", now, UTC), strftime("%Y", past, UTC) > write_stream
+  printf "%53s %26s\n", "$", "$" > write_stream
 
   # We start with the investment income
-  label = sprintf("Income\nInvestment Income %33s %26s\n", strftime("%Y", now, UTC), strftime("%Y", past, UTC))
+  label = sprintf("Income\nInvestment Income\n")
 
   # Exclude contributions
-  label = print_account_class(label, "block_class", "INCOME", "INCOME.CONTRIBUTION", "get_cost", now, past, past, more_past, is_detailed, -1)
+  label = print_account_class(write_stream, label, "block_class", "INCOME", "INCOME.CONTRIBUTION", "get_cost", now, past, past, more_past, is_detailed, -1)
 
   # Obtain the income per year
   benefits[now]  = - (get_cost("*INCOME", now) - (x = get_cost("*INCOME", past)))
@@ -2840,130 +2859,121 @@ function print_operating_statement(now, past, is_detailed,     benefits, losses,
 
   # Now the Contributions
   label = sprintf("\nContributions\n")
-  print_account_class(label, "select_class", "INCOME.CONTRIBUTION", "", "get_cost", now, past, past, more_past, is_detailed, -1)
+  print_account_class(write_stream, label, "select_class", "INCOME.CONTRIBUTION", "", "get_cost", now, past, past, more_past, is_detailed, -1)
 
   # Print a running total
-  print_line(past, EOFY)
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
 
   # Print grand total income
-  printf "\t%22s %23s", "Total Income", print_cash(benefits[now]) > EOFY
-  if (past) {
-    printf " %26s\n", print_cash(benefits[past]) > EOFY
-    print_underline(72, 0, EOFY)
-  } else {
-    printf "\n" > EOFY
-    print_underline(46, 0, EOFY)
-  }
+  printf "\t%22s %23s", "Total Income", print_cash(benefits[now]) > write_stream
+  if (past)
+    printf " %26s\n", print_cash(benefits[past]) > write_stream
+  else
+    printf "\n" > write_stream
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
 
   # the unrealized gains
   label = sprintf("\n\nInvestment Gains\nUnrealized Gains in Market Value\n")
-  print_account_class(label, "select_class", "ASSET.CAPITAL", "", "get_unrealized_gains", now, past, past, more_past, is_detailed, -1) # Block Depreciating Assets
+  print_account_class(write_stream, label, "select_class", "ASSET.CAPITAL", "", "get_unrealized_gains", now, past, past, more_past, is_detailed, -1) # Block Depreciating Assets
 
   # Obtain the market gains per year
   market_gains[now]  = - (get_cost(MARKET_CHANGES, now) - (x = get_cost(MARKET_CHANGES, past)))
   market_gains[past] = - (x - get_cost(MARKET_CHANGES, more_past))
 
   # Print the total unrealized gains
-  print_line(past, EOFY)
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
 
   # Print any unrealized gains
   if (((market_gains[now]) >  Epsilon) || ((market_gains[past]) >  Epsilon)) {
-    printf "\t%22s %23s", "Total Market Gains", print_cash((((market_gains[now]) >   Epsilon)?( (market_gains[now])):(  ""))) > EOFY
+    printf "\t%22s %23s", "Total Market Gains", print_cash((((market_gains[now]) >   Epsilon)?( (market_gains[now])):(  ""))) > write_stream
     if (past)
-      printf " %26s\n", print_cash((((market_gains[past]) >   Epsilon)?( (market_gains[past])):(  ""))) > EOFY
+      printf " %26s\n", print_cash((((market_gains[past]) >   Epsilon)?( (market_gains[past])):(  ""))) > write_stream
     else
-      printf "\n" > EOFY
+      printf "\n" > write_stream
     benefits[now]  += (((market_gains[now]) >   Epsilon)?( (market_gains[now])):(  0))
     benefits[past] += (((market_gains[past]) >   Epsilon)?( (market_gains[past])):(  0))
   }
 
   # Print a grand total
-  print_line(past, EOFY)
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
 
   # Print grand total income
-  printf "\t%22s %23s", "Total of All Income", print_cash(benefits[now]) > EOFY
-  if (past) {
-    printf " %26s\n", print_cash(benefits[past]) > EOFY
-    print_underline(72, 0, EOFY)
-  } else {
-    printf "\n" > EOFY
-    print_underline(46, 0, EOFY)
-  }
-  printf "\n" > EOFY
+  printf "\t%22s %23s", "Total of All Income", print_cash(benefits[now]) > write_stream
+  if (past)
+    printf " %26s\n", print_cash(benefits[past]) > write_stream
+  else
+    printf "\n" > write_stream
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
+  printf "\n" > write_stream
 
   # Now print expenses... (exclude tax payments)
   label = sprintf("Expenses\nGeneral Expenses\n")
-  label = print_account_class(label, "block_class", "EXPENSE", "EXPENSE.UNREALIZED", "get_cost", now, past, past, more_past, is_detailed) > EOFY
+  label = print_account_class(write_stream, label, "block_class", "EXPENSE", "EXPENSE.UNREALIZED", "get_cost", now, past, past, more_past, is_detailed)
 
   # Need to correct for market gains captured as expenses
   losses[now]  = market_gains[now]  + get_cost("*EXPENSE", now) - (x = get_cost("*EXPENSE", past))
   losses[past] = market_gains[past] + x - get_cost("*EXPENSE", more_past)
 
   # Print a total
-  print_line(past, EOFY)
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
 
   # Print grand total income
-  printf "\t%22s %23s", "Total Expenses", print_cash(losses[now]) > EOFY
-  if (past) {
-    printf " %26s\n", print_cash(losses[past]) > EOFY
-    print_underline(72, 0, EOFY)
-  } else {
-    printf "\n" > EOFY
-    print_underline(46, 0, EOFY)
-  }
-  printf "\n\n" > EOFY
+  printf "\t%22s %23s", "Total Expenses", print_cash(losses[now]) > write_stream
+  if (past)
+    printf " %26s\n", print_cash(losses[past]) > write_stream
+  else
+    printf "\n" > write_stream
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
+  printf "\n\n" > write_stream
 
   # Print any unrealized losses
   if (((market_gains[now]) < -Epsilon) || ((market_gains[past]) < -Epsilon)) {
-    printf "\t%22s %23s", "Total Market Losses", print_cash((((market_gains[now]) < - Epsilon)?( (market_gains[now])):(  ""))) > EOFY
+    printf "\t%22s %23s", "Total Market Losses", print_cash((((market_gains[now]) < - Epsilon)?( (market_gains[now])):(  ""))) > write_stream
     if (past)
-      printf " %26s\n", print_cash((((market_gains[past]) < - Epsilon)?( (market_gains[past])):(  ""))) > EOFY
+      printf " %26s\n", print_cash((((market_gains[past]) < - Epsilon)?( (market_gains[past])):(  ""))) > write_stream
     else
-      printf "\n" > EOFY
+      printf "\n" > write_stream
     losses[now]  -= (((market_gains[now]) < - Epsilon)?( (market_gains[now])):(  0))
     losses[past] -= (((market_gains[past]) < - Epsilon)?( (market_gains[past])):(  0))
   }
+
   # Print a total
-  print_line(past, EOFY)
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
 
   # Print grand total expenses
-  printf "\t%22s %23s", "Total of All Expenses", print_cash(losses[now]) > EOFY
-  if (past) {
-    printf " %26s\n", print_cash(losses[past]) > EOFY
-    print_underline(72, 0, EOFY)
-  } else {
-    printf "\n" > EOFY
-    print_underline(46, 0, EOFY)
-  }
-  printf "\n\n" > EOFY
+  printf "\t%22s %23s", "Total of All Expenses", print_cash(losses[now]) > write_stream
+  if (past)
+    printf " %26s\n", print_cash(losses[past]) > write_stream
+  else
+    printf "\n" > write_stream
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
+  printf "\n\n" > write_stream
 
   # Print Before Tax benefits
   benefits[now]  -= losses[now]
   benefits[past] -= losses[past]
-  printf "\t%27s %18s", "Benefits Accrued Before Tax", print_cash(benefits[now]) > EOFY
-  if (past) {
-    printf " %26s\n", print_cash(benefits[past]) > EOFY
-    print_underline(72, 0, EOFY)
-  } else {
-    printf "\n" > EOFY
-    print_underline(46, 0, EOFY)
-  }
-  printf "\n\n" > EOFY
+  printf "\t%27s %18s", "Benefits Accrued Before Tax", print_cash(benefits[now]) > write_stream
+  if (past)
+    printf " %26s\n", print_cash(benefits[past]) > write_stream
+  else
+    printf "\n" > write_stream
+  ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
+  printf "\n\n" > write_stream
 
   # If detailed print tax credits
   label = sprintf("Appendix\n\nTax Offsets\n")
-  label = print_account_class(label, "select_class", "SPECIAL.OFFSET", "", "get_cost", now, past, past, more_past, is_detailed, -1) > EOFY
+  label = print_account_class(write_stream, label, "select_class", "SPECIAL.OFFSET", "", "get_cost", now, past, past, more_past, is_detailed, -1) > write_stream
 
   # Print a nice line
   if (!label) {
-    print_underline(72, 0, EOFY)
+    ((past)?( underline(73, 8,  write_stream)):( underline(47, 8,  write_stream)))
     x = get_cost("*SPECIAL.OFFSET", past)
     printf "\t%24s%22s %26s\n\n", "Total Tax Offsets",
               print_cash(x - get_cost("*SPECIAL.OFFSET", now)),
-              print_cash(get_cost("*SPECIAL.OFFSET", more_past) - x) > EOFY
+              print_cash(get_cost("*SPECIAL.OFFSET", more_past) - x) > write_stream
   }
 
-  printf "\n\n\n" > EOFY
+  printf "\n\n\n" > write_stream
 
   # Only need current benefits
   x = benefits[now]
@@ -2980,7 +2990,10 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
+  if ((("cZ" ~ /[bB]|[aA]/) && ("cZ" !~ /[zZ]/)))
+    reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
+  else
+    return
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -2995,52 +3008,52 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   printf "\n%s\n", Journal_Title > reports_stream
   printf "Statement of Financial Position\n" > reports_stream
   printf "For the period starting %s and ending %s\n", get_date(past), get_date(yesterday(now)) > reports_stream
-  print_underline(80, 1, reports_stream)
+  underline(81, 0, reports_stream)
   printf "%53s %26s\n", strftime("%Y", now, UTC), strftime("%Y", past, UTC) > reports_stream
   printf "%53s %26s\n", "$", "$" > reports_stream
 
   # We start with the current assets (cash)
   label = sprintf("Current Assets\n")
-  label = print_account_class(label, "select_class", "ASSET.CURRENT", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  label = print_account_class(reports_stream, label, "select_class", "ASSET.CURRENT", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
 
   # Term assets are current if they mature within one year
   current_assets[now]  = get_cost("*ASSET.CURRENT", now)
   current_assets[past] = get_cost("*ASSET.CURRENT", past)
 
   # Print a nice line
-  print_underline(72, 0, reports_stream)
+  underline(73, 8, reports_stream)
   printf "\t%24s %21s %26s\n\n", "Total Current Assets",
           print_cash(current_assets[now]), print_cash(current_assets[past]) > reports_stream
 
   # Now the non-current assets
   label = sprintf("Non-Current Assets\n")
-  label = print_account_class(label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  label = print_account_class(reports_stream, label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
 
   # Here we need to adjust for accounting gains & losses
   assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
   assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
 
   # Print a nice line
-  print_underline(72, 0, reports_stream)
+  underline(73, 8, reports_stream)
   printf "\t%24s %21s %26s\n\n", "Total Non–Current Assets", print_cash(assets[now] - current_assets[now]), print_cash(assets[past] - current_assets[past]) > reports_stream
 
   # Print Total Assets
-  print_underline(72, 0, reports_stream)
+  underline(73, 8, reports_stream)
   printf "\t%24s %21s %26s\n\n", "Total Assets", print_cash(assets[now]), print_cash(assets[past]) > reports_stream
 
   # Treat tax payments/refunds as liabilities
   label = sprintf("Tax Liabilities\n")
-  label = print_account_class(label, "select_class", "LIABILITY.TAX", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+  label = print_account_class(reports_stream, label, "select_class", "LIABILITY.TAX", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
 
   # We start with the current liabilities
   label = sprintf("Current Liabilities\n")
-  label = print_account_class(label, "select_class", "LIABILITY.CURRENT", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+  label = print_account_class(reports_stream, label, "select_class", "LIABILITY.CURRENT", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
   current_liabilities[now]   = -(get_cost("*LIABILITY.CURRENT", now ) + get_cost("*LIABILITY.TAX", now))
   current_liabilities[past]  = -(get_cost("*LIABILITY.CURRENT", past) + get_cost("*LIABILITY.TAX", past))
 
   # Print a nice line
   if (!label) {
-    print_underline(72, 0, reports_stream)
+    underline(73, 8, reports_stream)
     printf "\t%24s%21s %26s\n\n", "Total Current Liabilities",
               print_cash(current_liabilities[now]), print_cash(current_liabilities[past]) > reports_stream
   }
@@ -3052,29 +3065,29 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   class_list["LIABILITY.CURRENT"] = TRUE
   class_list["LIABILITY.MEMBER"] = TRUE
   class_list["LIABILITY.TAX"] = TRUE
-  label = print_account_class(label, "block_class_list", "LIABILITY", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed, -1, 2)
+  label = print_account_class(reports_stream, label, "block_class_list", "LIABILITY", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed, -1, 2)
   liabilities[now]  = - get_cost("*LIABILITY", now)
   liabilities[past] = - get_cost("*LIABILITY", past)
   delete class_list
 
   # Print Member Liabilities
-  label = print_account_class(label, "select_class", "LIABILITY.MEMBER", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+  label = print_account_class(reports_stream, label, "select_class", "LIABILITY.MEMBER", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
 
   # Print a nice line
   if (!label) {
-    print_underline(72, 0, reports_stream)
+    underline(73, 8, reports_stream)
     printf "\t%27s %18s %26s\n", "Total Long Term Liabilities",
       print_cash(liabilities[now] - current_liabilities[now]), print_cash(liabilities[past] - current_liabilities[past]) > reports_stream
   }
 
-  print_underline(72, 0, reports_stream)
-  print_underline(72, 0, reports_stream)
+  underline(73, 8, reports_stream)
+  underline(73, 8, reports_stream)
   printf "\t%27s %18s %26s\n\n", "Total Liabilities",
     print_cash(liabilities[now]), print_cash(liabilities[past]) > reports_stream
 
   # Now find total Equity
   label = sprintf("Share Equity\n")
-  label = print_account_class(label, "select_class", "EQUITY", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+  label = print_account_class(reports_stream, label, "select_class", "EQUITY", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
 
   # the equity
   equity[now]  = - get_cost("*EQUITY", now)
@@ -3082,16 +3095,16 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 
   # Print a nice line
   if (!label) {
-    print_underline(72, 0, reports_stream)
+    underline(73, 8, reports_stream)
     printf "\t%24s %21s %26s\n\n", "Total Equity",
                 print_cash(equity[now]), print_cash(equity[past]) > reports_stream
   }
 
   # Print Accumulated Profits (INCOME - EXPENSES) == (ASSETS - LIABILITY - EQUITY)
-  print_underline(72, 0, reports_stream)
+  underline(73, 8, reports_stream)
   printf "\t%24s %21s %26s\n", "Accumulated Profits",
     print_cash(assets[now] - liabilities[now] - equity[now]), print_cash(assets[past] - liabilities[past] - equity[past]) > reports_stream
-  print_underline(72, 0, reports_stream)
+  underline(73, 8, reports_stream)
 
   # Tidy up
   delete assets
@@ -3103,7 +3116,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    gains_stream) {
   # Show current gains/losses
    # The gains_stream is the pipe to write the schedule out to
-   if (("m" in Extra_Reports))
+   if ((("cZ" ~ /[mM]|[aA]/) && ("cZ" !~ /[zZ]/)))
      gains_stream = ("" == EOFY) ? "/dev/null" : EOFY
    else
      return
@@ -3179,7 +3192,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  if (("f" in Extra_Reports))
+  if ((("cZ" ~ /[fF]|[aA]/) && ("cZ" !~ /[zZ]/)))
     reports_stream = ("" == EOFY) ? "/dev/null" : EOFY
   else
     return
@@ -3250,7 +3263,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
       # Clean up output
       if (is_detailed) {
         printf "\n" > reports_stream
-        print_underline(197, 0, reports_stream)
+        underline(198, 8, reports_stream)
         printf "%26s ", (Leaf[(a)]) > reports_stream
       }
 
@@ -3288,7 +3301,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
 
   # Print a nice line
   if (!(((total_depreciation) <= Epsilon) && ((total_depreciation) >= -Epsilon))) {
-    print_underline(197, 0, reports_stream)
+    underline(198, 8, reports_stream)
     printf "\tPeriod Depreciation     => %14s\n", print_cash(total_depreciation) > reports_stream
   }
 } # End of print depreciating holdings
@@ -3304,11 +3317,12 @@ function print_dividend_qualification(now, past, is_detailed,
                                          a, underlying_asset, credit_account,
                                          qualifying_date,
                                          qualified_units, total_units, qualified_fraction, q,
+                                         qualified_payment,
                                          key, next_key, payment,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  if (("q" in Extra_Reports))
+  if ((("cZ" ~ /[qQ]|[aA]/) && ("cZ" !~ /[zZ]/)))
     dividend_stream = ("" == EOFY) ? "/dev/null" : EOFY
   else
     dividend_stream = "/dev/null"
@@ -3324,11 +3338,14 @@ function print_dividend_qualification(now, past, is_detailed,
   # A header
   print_header = TRUE
 
+  # Sum  the qualified payments
+  qualified_payment = 0
+
   # Get each dividend/distribution
   # Start with dividends - this could be abstracted out later to include distributions
   # First key
   for (a in Leaf)
-    if (((a) ~ ("^" ( "INCOME.DIVIDEND") "[.:]")) || ((a) ~ ("^" ( "INCOME.DISTRIBUTION.CLOSELY_HELD") "[.:]"))) { # Only closely held distributions are considered
+    if (((a) ~ ("^" ( "INCOME.DIVIDEND") "[.:]")) || ((a) ~ ("^" ( "INCOME.DISTRIBUTION.CLOSE") "[.:]"))) { # Only closely held distributions are considered
 
       # Get each payment in the target period
       key = (find_key(Cost_Basis[a],  now))
@@ -3336,7 +3353,10 @@ function print_dividend_qualification(now, past, is_detailed,
       while (key > past) {
         # A heading
         if (print_header) {
-          printf "\n\n%22s\n", "Dividends" > dividend_stream
+          printf "\n%12s\n", "Dividends" > dividend_stream
+          printf "%12s %13s %14s %14s %14s %14s %13s\n",
+                  "Asset", "Ex-Div Date", "Eligible Units", "Payment Date", "Qualified", "% Qualified", "Payment"  > dividend_stream
+          underline(95, 6, dividend_stream)
           print_header = FALSE
         }
 
@@ -3375,7 +3395,11 @@ function print_dividend_qualification(now, past, is_detailed,
           qualified_fraction = 1.0
 
         # The output - show ex-dividend date not qualifying date
-        printf "\t%22s %11s %11s %14s %7.5f\n", Leaf[underlying_asset], get_date(key), get_date(qualifying_date + (86400)), print_cash(payment), qualified_fraction > dividend_stream
+        printf "%13s %12s %12.3f %16s %14.3f %12.2f %16s\n", Leaf[underlying_asset], get_date(tomorrow(qualifying_date)), total_units,
+                get_date(key), qualified_units, 100.0 * qualified_fraction, print_cash(payment) > dividend_stream
+
+        # Sum qualified payment
+        qualified_payment += qualified_fraction * payment
 
         # Make the appropriate changes for the current tax jurisdiction
         @Dividend_Qualification_Function(a, underlying_asset, key, 1.0 - qualified_fraction)
@@ -3384,6 +3408,13 @@ function print_dividend_qualification(now, past, is_detailed,
         key = next_key
       } # End of while each key in the window
     } # End of if a dividend
+
+    # summary
+    underline(95, 6, dividend_stream)
+    payment = get_cost("*INCOME.DIVIDEND", past) + get_cost("*INCOME.DISTRIBUTION.CLOSE", past) -               get_cost("*INCOME.DIVIDEND", now) - get_cost("*INCOME.DISTRIBUTION.CLOSE", now)
+    printf "%*s%*s %14s %*.2f %*s\n\n", 6, "", 16, "Qualified Dividends", print_cash(qualified_payment),
+      43, 100.0 * (qualified_payment / payment), 16, print_cash(payment) > dividend_stream
+
 } # End of function print_dividend_qualification
 
 ## Helper functions
@@ -3393,12 +3424,12 @@ function print_dividend_qualification(now, past, is_detailed,
 # But it is still carrying a lot of remnant complications
 # Replace class_name, blocked_class with a
 # selector function
-function print_account_class(heading, selector, class_name, blocked_class, income_function, now, now_past, past, past_past, print_all, sign,
+function print_account_class(stream, heading, selector, class_name, blocked_class, income_function, now, now_past, past, past_past, print_all, sign,
   subclass, last_subclass,
   x, account_income, account_sum, did_print) {
 
   # Bail out when nothing to print
-  if ("/dev/null" == EOFY)
+  if ("/dev/null" == stream)
     return
 
   # Printing: print_all => 2  ALL
@@ -3426,15 +3457,11 @@ function print_account_class(heading, selector, class_name, blocked_class, incom
       if (last_subclass != subclass) {
         # If at least one entry found print a summary
         if (did_print) {
-          if (print_all > 1) {
-            if (past)
-              print_underline(72, 0, EOFY)
-            else
-              print_underline(46, 0, EOFY)
-          }
+          if (print_all > 1)
+            ((past)?( underline(73, 8,  stream)):( underline(47, 8,  stream)))
           if (print_all)
             print_subclass_sum(last_subclass, account_sum[now],
-                                              account_sum[past])
+                                              account_sum[past], stream)
         }
 
         # Initialize the subclass sums
@@ -3465,23 +3492,23 @@ function print_account_class(heading, selector, class_name, blocked_class, incom
         # Only print the heading if there was a non-zero entry
         if (0 == did_print) {
           if ("" != heading) {
-            printf heading > EOFY
+            printf heading > stream
 
             # Only print out once
             heading = ""
           }
           if (print_all > 1)
-            printf "%22s\n", subclass > EOFY
+            printf "%22s\n", subclass > stream
 
           # The heading has been printed out
           did_print = 1
         }
 
         if (print_all > 1) {
-          printf "\t%24s %21s", (Leaf[(x)]), print_cash(account_income[now]) > EOFY
+          printf "\t%24s %21s", (Leaf[(x)]), print_cash(account_income[now]) > stream
           if (past)
-            printf " %26s", print_cash(account_income[past]) > EOFY
-          printf "\n"> EOFY
+            printf " %26s", print_cash(account_income[past]) > stream
+          printf "\n"> stream
         }
       }
     }
@@ -3491,24 +3518,24 @@ function print_account_class(heading, selector, class_name, blocked_class, incom
   if (did_print) {
     if (print_all > 1) {
       if (past)
-        print_underline(72, 0, EOFY)
+        underline(73, 8, stream)
       else
-        print_underline(46, 0, EOFY)
+        underline(47, 8, stream)
     }
     if (print_all)
-      print_subclass_sum(subclass, account_sum[now], account_sum[past])
+      print_subclass_sum(subclass, account_sum[now], account_sum[past], stream)
   }
 
   # return heading
   return heading
 }
 
-function print_subclass_sum(name, sum_now, sum_past) {
-  printf "\t%24s %21s", substr(name, 1, 1) tolower(substr(name, 2)), print_cash(sum_now) > EOFY
+function print_subclass_sum(name, sum_now, sum_past, stream) {
+  printf "\t%24s %21s", substr(name, 1, 1) tolower(substr(name, 2)), print_cash(sum_now) > stream
   if (sum_past)
-    printf " %26s\n", print_cash(sum_past) > EOFY
+    printf " %26s\n", print_cash(sum_past) > stream
   else
-    printf "\n" > EOFY
+    printf "\n" > stream
 }
 
 # The selector functions are filters for controlling
@@ -3538,27 +3565,7 @@ function block_class_list(a, class_name, blocked_class_list,      x) {
   return ((a) ~ ("^" ( class_name) "[.:]"))
 }
 
-# A not so simple "print_line"
-# FIXME
-#
-function print_line(long, stream) {
-  if (long)
-    print_underline(72, 0, stream)
-  else
-    print_underline(46, 0, stream)
-}
-
-function print_underline(l, notab, fd,    i) {
-  notab = !notab ? 0 : 1
-  fd = ("" == fd) ? "/dev/stdout" : fd
-  if (!notab)
-    printf  "\t" > fd
-  for (i = 0; i <= l; i++)
-    printf "_" > fd
-  printf "\n" > fd
-}
-
-
+# Shared code for applying losses to taxable gains
 function get_taxable_gains(now, gains_stream,
                            long_gains, long_losses, tax_long,
                            short_gains, short_losses, tax_short,
@@ -3566,11 +3573,11 @@ function get_taxable_gains(now, gains_stream,
 
   # This function computes the taxable gains
   # It works for partioned long & short gains
-  # And also for deferred gains when all such gains are
+  # And also for deferred gains when all such gains are long
   losses = ((losses)?( losses):( 0))
 
   # Summarize starting point
-  print_underline(43, 0, gains_stream)
+  underline(44, 8, gains_stream)
   printf "\nAfter Application of Any Losses\n" > gains_stream
 
   # Apply the losses - most favourable order is to apply them to other gains first
@@ -3863,6 +3870,7 @@ function initialize_tax_aud() {
 # Tax Jurisdiction AUS
 function income_tax_aud(now, past, benefits,
 
+                                        write_stream,
                                         taxable_gains,
                                         market_changes,
                                         accounting_gains, accounting_losses,
@@ -3878,33 +3886,39 @@ function income_tax_aud(now, past, benefits,
                                         taxable_income,
                                         medicare_levy, extra_levy, x) {
 
+  # Print this out?
+  if ((("cZ" ~ /[tT]|[aA]/) && ("cZ" !~ /[zZ]/)))
+    write_stream = EOFY
+  else
+    write_stream = "/dev/null"
+
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
 
   # Let's go
-  printf "%s\n", Journal_Title > EOFY
-  printf "Statement of Taxable Income\n" > EOFY
+  printf "%s\n", Journal_Title > write_stream
+  printf "Statement of Taxable Income\n" > write_stream
 
-  printf "For the year ending %s\n", get_date(yesterday(now)) > EOFY
-  print_underline(80, 1, EOFY)
-  printf "%80s\n", strftime("%Y", now, UTC) > EOFY
-  printf "%80s\n", "$" > EOFY
+  printf "For the year ending %s\n", get_date(yesterday(now)) > write_stream
+  underline(81, 0, write_stream)
+  printf "%80s\n", strftime("%Y", now, UTC) > write_stream
+  printf "%80s\n", "$" > write_stream
 
   # First entry
-  printf "%22s %38s\n", "Benefits Accrued as a Result of Operations", print_cash(benefits) > EOFY
+  printf "%22s %38s\n", "Benefits Accrued as a Result of Operations", print_cash(benefits) > write_stream
 
   # Additions
-  printf "ADD\n" > EOFY
+  printf "ADD\n" > write_stream
 
   # Start with market losses
   other_income = (((market_changes) >   Epsilon)?( (market_changes)):(  0))
   if (!(((other_income) <= Epsilon) && ((other_income) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Unrealized Losses", print_cash(other_income) > EOFY
+    printf "\t%40s %32s\n", "Unrealized Losses", print_cash(other_income) > write_stream
 
   # Accounting losses are added - as are taxable gains
   accounting_losses = get_cost("*EXPENSE.LOSSES", now) - get_cost("*EXPENSE.LOSSES", past)
   if (!(((accounting_losses) <= Epsilon) && ((accounting_losses) >= -Epsilon))) {
-    printf "\t%40s %32s\n", "Capital Losses", print_cash(accounting_losses) > EOFY
+    printf "\t%40s %32s\n", "Capital Losses", print_cash(accounting_losses) > write_stream
     other_income += accounting_losses
   }
 
@@ -3917,7 +3931,7 @@ function income_tax_aud(now, past, benefits,
   #    EXPENSE.DISTRIBUTION (TRUST)
   other_expenses = get_cost("*EXPENSE.NON-DEDUCTIBLE", now) - get_cost("*EXPENSE.NON-DEDUCTIBLE", past)
   if (!(((other_expenses) <= Epsilon) && ((other_expenses) >= -Epsilon))) {
-    printf "\t%40s %32s\n", "Other Non Deductible Expenses", print_cash(other_expenses) > EOFY
+    printf "\t%40s %32s\n", "Other Non Deductible Expenses", print_cash(other_expenses) > write_stream
     other_income += other_expenses
   }
 
@@ -3929,7 +3943,7 @@ function income_tax_aud(now, past, benefits,
   else {
     # Gains are a negative number
     other_income -= taxable_gains
-    printf "\t%40s %32s\n", "Taxable Capital Gains", print_cash(-taxable_gains) > EOFY
+    printf "\t%40s %32s\n", "Taxable Capital Gains", print_cash(-taxable_gains) > write_stream
   }
 
   # Save the taxable gains
@@ -3942,26 +3956,26 @@ function income_tax_aud(now, past, benefits,
   franking_offsets = - (get_cost("*SPECIAL.OFFSET.FRANKING", now) - get_cost("*SPECIAL.OFFSET.FRANKING", past))
   if (!(((franking_offsets) <= Epsilon) && ((franking_offsets) >= -Epsilon))) {
     other_income += franking_offsets
-    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > EOFY
+    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > write_stream
   }
 
   if (!(((other_income) <= Epsilon) && ((other_income) >= -Epsilon))){
-    print_underline(80, 1, EOFY)
-    printf "\t%40s %32s\n\n", "Other Income", print_cash(other_income) > EOFY
+    underline(81, 0, write_stream)
+    printf "\t%40s %32s\n\n", "Other Income", print_cash(other_income) > write_stream
   }
 
   # Reductions
-  printf "LESS\n" > EOFY
+  printf "LESS\n" > write_stream
 
   # Expenses
   exempt_income = -(get_cost("*INCOME.EXEMPT", now) - get_cost("*INCOME.EXEMPT", past))
   if (exempt_income > Epsilon)
-    printf "\t%40s %32s\n", "Exempt Income", print_cash(exempt_income) > EOFY
+    printf "\t%40s %32s\n", "Exempt Income", print_cash(exempt_income) > write_stream
 
   # Market and Accounting Capital Gains
   other_expenses = - (((market_changes) < - Epsilon)?( (market_changes)):(  0))
   if (other_expenses > Epsilon)
-    printf "\t%40s %32s\n", "Unrealized Gains", print_cash(other_expenses) > EOFY
+    printf "\t%40s %32s\n", "Unrealized Gains", print_cash(other_expenses) > write_stream
 
   # Tax exempt income
   other_expenses += exempt_income
@@ -3969,7 +3983,7 @@ function income_tax_aud(now, past, benefits,
   # Accounting losses are added - as are taxable gains
   accounting_gains = -(get_cost("*INCOME.GAINS", now) - get_cost("*INCOME.GAINS", past))
   if (!(((accounting_gains) <= Epsilon) && ((accounting_gains) >= -Epsilon))) {
-    printf "\t%40s %32s\n", "Capital Gains", print_cash(accounting_gains) > EOFY
+    printf "\t%40s %32s\n", "Capital Gains", print_cash(accounting_gains) > write_stream
     other_expenses += accounting_gains
   }
 
@@ -3977,7 +3991,7 @@ function income_tax_aud(now, past, benefits,
   # Should look at CONTRIBUTION minus the one taxed subclass because maybe more than one tax-free subclass?
   contributions = -(get_cost("*INCOME.CONTRIBUTION.TAX-FREE", now) - get_cost("*INCOME.CONTRIBUTION.TAX-FREE", past))
   if (!(((contributions) <= Epsilon) && ((contributions) >= -Epsilon))) {
-    printf "\t%40s %32s\n", "Non Taxable Contributions", print_cash(contributions) > EOFY
+    printf "\t%40s %32s\n", "Non Taxable Contributions", print_cash(contributions) > write_stream
     other_expenses += contributions
   }
 
@@ -3989,26 +4003,26 @@ function income_tax_aud(now, past, benefits,
 
   # Always apply allowance at this point to catch explicit allocations to LIC
   if (!(((lic_deductions) <= Epsilon) && ((lic_deductions) >= -Epsilon))) {
-    printf "\t%40s %32s\n", "LIC Deduction", print_cash(lic_deductions) > EOFY
+    printf "\t%40s %32s\n", "LIC Deduction", print_cash(lic_deductions) > write_stream
     other_expenses += lic_deductions
   }
 
   # Summarize other expenses
   if (!(((other_expenses) <= Epsilon) && ((other_expenses) >= -Epsilon))) {
-    print_underline(80, 1, EOFY)
-    printf "\t%40s %32s\n\n", "Other Expenses", print_cash(other_expenses) > EOFY
+    underline(81, 0, write_stream)
+    printf "\t%40s %32s\n\n", "Other Expenses", print_cash(other_expenses) > write_stream
   }
 
   taxable_income = benefits + other_income - other_expenses
-  print_underline(80, 1, EOFY)
-  printf "%48s %32s\n\n", "TAXABLE INCOME OR LOSS", print_cash(taxable_income) > EOFY
+  underline(81, 0, write_stream)
+  printf "%48s %32s\n\n", "TAXABLE INCOME OR LOSS", print_cash(taxable_income) > write_stream
 
   # Record this quantity
   set_cost(TAXABLE_INCOME, taxable_income, now)
 
   # Keep the income tax on the taxable income - the actual amount owed may change due to tax offsets etc
   income_tax = tax_owed = get_tax(now, Tax_Bands, taxable_income) # Just need total tax
-  printf "%48s %32s\n", "Income Tax on Taxable Income or Loss ", print_cash(tax_owed) > EOFY
+  printf "%48s %32s\n", "Income Tax on Taxable Income or Loss ", print_cash(tax_owed) > write_stream
 
   # Record this quantity
   set_cost(INCOME_TAX, income_tax, now)
@@ -4038,7 +4052,7 @@ function income_tax_aud(now, past, benefits,
   #    Franking-Deficit   (F-TAX)
 
   # Tax adjustments
-  printf "Less\n" > EOFY
+  printf "Less\n" > write_stream
 
   ## Franking deficit needs to be checked here
   franking_balance = 0
@@ -4056,11 +4070,11 @@ function income_tax_aud(now, past, benefits,
     if (((franking_balance) < -Epsilon)) {
       # This is a condition for franking deficit tax - that the franking balance
       # is zero; in fact it is not a sufficient condition; since a refund
-      # within three months of the EOFY will also trigger it
-      printf "\t%40s %32s\n", "Franking Balance is Overdrawn", print_cash(franking_balance) > EOFY
+      # within three months of the write_stream will also trigger it
+      printf "\t%40s %32s\n", "Franking Balance is Overdrawn", print_cash(franking_balance) > write_stream
 
       # Compute the franking deficit tax due
-      printf "\t%40s %32s\n", "Franking Deficit Tax Due", print_cash(- franking_balance) > EOFY
+      printf "\t%40s %32s\n", "Franking Deficit Tax Due", print_cash(- franking_balance) > write_stream
 
       # Save the franking deficit tax as a future tax offset
       #
@@ -4090,7 +4104,7 @@ function income_tax_aud(now, past, benefits,
 
   # Report the Imputation and Foreign Offsets
   if (!(((franking_offsets) <= Epsilon) && ((franking_offsets) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > EOFY
+    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > write_stream
 
   # Foreign offsets
   # Are no-refund-no-carry
@@ -4115,12 +4129,12 @@ function income_tax_aud(now, past, benefits,
       if (extra_tax < foreign_offsets)
         foreign_offsets = max(((__MPX_H_TEMP__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Foreign_Offset_Limit[0]):( 0)))), extra_tax)
 
-      printf "\t%40s\n", "Foreign Offset Limit Applied" > EOFY
+      printf "\t%40s\n", "Foreign Offset Limit Applied" > write_stream
     } else
       extra_tax = 0
 
     # The offsets
-    printf "\t%40s %32s\n\n", "Foreign Offsets", print_cash(foreign_offsets) > EOFY
+    printf "\t%40s %32s\n\n", "Foreign Offsets", print_cash(foreign_offsets) > write_stream
 
   } else
     foreign_offsets = 0
@@ -4132,12 +4146,12 @@ function income_tax_aud(now, past, benefits,
 
     # This is an Australian no-carry offset computed from the taxable income
     if (!(((x) <= Epsilon) && ((x) >= -Epsilon)))
-      printf "\t%40s %32s\n", "Low Income Tax Offset", print_cash(x) > EOFY
+      printf "\t%40s %32s\n", "Low Income Tax Offset", print_cash(x) > write_stream
 
     # Get the other no_carry offsets
     no_carry_offsets = -(get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
     if (!(((no_carry_offsets) <= Epsilon) && ((no_carry_offsets) >= -Epsilon)))
-      printf "\t%40s %32s\n", "Other No-Carry Offsets", print_cash(no_carry_offsets) > EOFY
+      printf "\t%40s %32s\n", "Other No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
 
     # No need to adjust cost - since it will not be retained
     no_carry_offsets += x
@@ -4150,20 +4164,20 @@ function income_tax_aud(now, past, benefits,
 
   # The no-carry offset
   if (!(((no_carry_offsets) <= Epsilon) && ((no_carry_offsets) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Total No-Carry Offsets", print_cash(no_carry_offsets) > EOFY
+    printf "\t%40s %32s\n", "Total No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
 
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = - get_cost(CARRY_OFFSETS, now)
   if (!(((carry_offsets) <= Epsilon) && ((carry_offsets) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Total Carry Offsets", print_cash(carry_offsets) > EOFY
-  printf "\n" > EOFY
+    printf "\t%40s %32s\n", "Total Carry Offsets", print_cash(carry_offsets) > write_stream
+  printf "\n" > write_stream
 
   # The refundable offset (Class E)
   refundable_offsets = - get_cost(REFUNDABLE_OFFSETS, now)
   if (!(((refundable_offsets) <= Epsilon) && ((refundable_offsets) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Total Refundable Offsets", print_cash(refundable_offsets) > EOFY
-  printf "\n" > EOFY
+    printf "\t%40s %32s\n", "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
+  printf "\n" > write_stream
 
   # Franking offsets are (currently) refundable for SMSF and individuals
   if ((Journal_Type ~ /^SMSF$/) || (Journal_Type ~ /^IND$/)) {
@@ -4187,13 +4201,13 @@ function income_tax_aud(now, past, benefits,
         carry_offsets -= (tax_owed - no_carry_offsets)
 
       # information
-      printf "\t%40s %32s>\n", "<Non-Refundable Offsets Used", print_cash(tax_owed - franking_offsets) > EOFY
+      printf "\t%40s %32s>\n", "<Non-Refundable Offsets Used", print_cash(tax_owed - franking_offsets) > write_stream
       tax_owed = 0
     } else { # All the no_refund offsets were used
       tax_owed -= no_refund_offsets
       carry_offsets = 0
       if (((no_refund_offsets - franking_offsets) >  Epsilon))
-        printf "\t%40s %32s>\n", "<Non-Refundable Offsets Used", print_cash(no_refund_offsets - franking_offsets) > EOFY
+        printf "\t%40s %32s>\n", "<Non-Refundable Offsets Used", print_cash(no_refund_offsets - franking_offsets) > write_stream
     }
 
     # OK now if the tax_owed is less than the amount of franking offsets
@@ -4201,16 +4215,16 @@ function income_tax_aud(now, past, benefits,
     if (tax_owed < franking_offsets) {
       franking_offsets -= tax_owed
 
-      printf "\t%40s %32s>\n", "<Franking Offsets Used", print_cash(tax_owed) > EOFY
+      printf "\t%40s %32s>\n", "<Franking Offsets Used", print_cash(tax_owed) > write_stream
       # Report remaining  franking offsets
       if (((franking_offsets) >  Epsilon))
-        printf "\t%40s %32s>\n", "<Franking Offsets Remaining", print_cash(franking_offsets) > EOFY
+        printf "\t%40s %32s>\n", "<Franking Offsets Remaining", print_cash(franking_offsets) > write_stream
 
       tax_owed = 0
     } else {
       tax_owed -= franking_offsets
       if (((franking_offsets) >  Epsilon))
-        printf "\t%40s %32s>\n", "<All Franking Offsets Used", print_cash(franking_offsets) > EOFY
+        printf "\t%40s %32s>\n", "<All Franking Offsets Used", print_cash(franking_offsets) > write_stream
       franking_offsets = 0
     }
 
@@ -4221,7 +4235,7 @@ function income_tax_aud(now, past, benefits,
   # Now apply refundable offsets - but note if used these will not generate a tax loss
   if (((refundable_offsets) >  Epsilon)) {
     tax_owed -= refundable_offsets
-    printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > EOFY
+    printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > write_stream
 
   }
 
@@ -4233,11 +4247,11 @@ function income_tax_aud(now, past, benefits,
         franking_deficit_offsets -= tax_owed
 
       # information
-      printf "\t%40s %32s>\n", "<Franking Deficit Tax Offsets Used", print_cash(tax_owed - franking_deficit_offsets) > EOFY
+      printf "\t%40s %32s>\n", "<Franking Deficit Tax Offsets Used", print_cash(tax_owed - franking_deficit_offsets) > write_stream
       tax_owed = 0
     } else { # All the franking deficit offsets were used
       tax_owed -= franking_deficit_offsets
-      printf "\t%40s %32s>\n", "<Franking Deficit Tax Offsets Used", print_cash(franking_deficit_offsets) > EOFY
+      printf "\t%40s %32s>\n", "<Franking Deficit Tax Offsets Used", print_cash(franking_deficit_offsets) > write_stream
       franking_deficit_offsets = 0
     }
   }
@@ -4293,8 +4307,8 @@ function income_tax_aud(now, past, benefits,
 
 
   # Print the tax owed
-  print_underline(80, 1, EOFY)
-  printf "%48s %32s\n\n", "CURRENT TAX OR REFUND", print_cash(tax_owed) > EOFY
+  underline(81, 0, write_stream)
+  printf "%48s %32s\n\n", "CURRENT TAX OR REFUND", print_cash(tax_owed) > write_stream
 
   #
   # Tax Residuals
@@ -4318,24 +4332,24 @@ function income_tax_aud(now, past, benefits,
 
   # If this is SMSF the levy is required
   if ((Journal_Type ~ /^SMSF$/))
-    printf "\t%40s %32s\n", "Supervisory Levy", print_cash(((__MPX_H_TEMP__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( ATO_Levy[0]):( 0))))) > EOFY
+    printf "\t%40s %32s\n", "Supervisory Levy", print_cash(((__MPX_H_TEMP__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( ATO_Levy[0]):( 0))))) > write_stream
 
   # Medicare levy (if any)
   if (!(((medicare_levy) <= Epsilon) && ((medicare_levy) >= -Epsilon))) {
-    printf "\t%40s %32s\n", "Medicare Levy", print_cash(medicare_levy) > EOFY
+    printf "\t%40s %32s\n", "Medicare Levy", print_cash(medicare_levy) > write_stream
     tax_owed += medicare_levy
   }
 
   if (!(((tax_paid) <= Epsilon) && ((tax_paid) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Income Tax Distributions Paid", print_cash(tax_paid) > EOFY
+    printf "\t%40s %32s\n", "Income Tax Distributions Paid", print_cash(tax_paid) > write_stream
   if (!(((tax_with) <= Epsilon) && ((tax_with) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Income Tax Withheld", print_cash(tax_with) > EOFY
+    printf "\t%40s %32s\n", "Income Tax Withheld", print_cash(tax_with) > write_stream
 
   # Compute income tax due
   tax_due = tax_owed - (tax_paid + tax_with)
   set_cost(TAX, - tax_due, now)
-  print_underline(80, 1, EOFY)
-  printf "%48s %32s\n\n\n", "AMOUNT DUE OR REFUNDABLE", print_cash(((__MPX_H_TEMP__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( ATO_Levy[0]):( 0)))) + tax_due) > EOFY
+  underline(81, 0, write_stream)
+  printf "%48s %32s\n\n\n", "AMOUNT DUE OR REFUNDABLE", print_cash(((__MPX_H_TEMP__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( ATO_Levy[0]):( 0)))) + tax_due) > write_stream
 
   # Clean up balance sheet - watch out for unbalanced transactions
   # Save contribution tax accounted for
@@ -4350,19 +4364,19 @@ function income_tax_aud(now, past, benefits,
   # These really are for time now - already computed
   capital_losses = get_cost(CAPITAL_LOSSES, now)
   if (!(((capital_losses) <= Epsilon) && ((capital_losses) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > EOFY
+    printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
   # The change in tax losses
   if (!(((tax_losses - old_losses) <= Epsilon) && ((tax_losses - old_losses) >= -Epsilon))) {
     if (tax_losses > old_losses)
-      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > EOFY
+      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > write_stream
     else
-      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(old_losses - tax_losses) > EOFY
+      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(old_losses - tax_losses) > write_stream
   }
 
   # The carried tax losses
   if (!(((tax_losses) <= Epsilon) && ((tax_losses) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > EOFY
+    printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > write_stream
   else
     tax_losses = 0
 
@@ -4371,19 +4385,19 @@ function income_tax_aud(now, past, benefits,
 
   # Franking
   if (!(((franking_balance) <= Epsilon) && ((franking_balance) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Franking Balance Carried Forward", print_cash(franking_balance) > EOFY
+    printf "\t%40s %32s\n", "Franking Balance Carried Forward", print_cash(franking_balance) > write_stream
 
   # Franking Deficit
   # Save the franking deficit offsets
   if (!(((franking_deficit_offsets) <= Epsilon) && ((franking_deficit_offsets) >= -Epsilon)))
-    printf "%48s %32s\n\n", "Franking Deficit Offsets Carried Forward", print_cash(franking_deficit_offsets) > EOFY
+    printf "%48s %32s\n\n", "Franking Deficit Offsets Carried Forward", print_cash(franking_deficit_offsets) > write_stream
   else
     franking_deficit_offsets = 0
   set_cost(FRANKING_DEFICIT, -franking_deficit_offsets, now)
 
   # Update carry forward offsets
   if (!(((carry_offsets) <= Epsilon) && ((carry_offsets) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Non-Refundable Offsets Carried Forwards", print_cash(carry_offsets) > EOFY
+    printf "\t%40s %32s\n", "Non-Refundable Offsets Carried Forwards", print_cash(carry_offsets) > write_stream
   else
     carry_offsets = 0
   set_cost(CARRY_OFFSETS, -carry_offsets, now)
@@ -4731,10 +4745,11 @@ BEGIN {
   #
   # Default is "c:d"
   ((SUBSEP in All_Reports)?(TRUE):(FALSE))
-  ((SUBSEP in Extra_Reports)?(TRUE):(FALSE))
-  if (!Show_Reports)
-    Show_Reports = ("c:d")
-  set_reports(Show_Reports)
+  #make_array(Extra_Reports)
+
+  #if (!Show_Reports)
+  #  Show_Reports = SHOW_REPORTS
+  #set_reports(Show_Reports)
 
   # Show detailed summary
   if ("" == Show_Extra)

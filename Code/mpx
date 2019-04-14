@@ -51,11 +51,10 @@ preprocess_only=false
 qualify_window=0
 Show_All=0
 Show_Extra=0
-Show_Reports="z" # Default reports
+Show_Reports=0 # Default reports
 
 # Default journal currency and type
 journal_currency="AUD"
-journal_type="PTY"
 
 # A useful alias for an awk aware preprocessor
 # This uses gpp
@@ -169,7 +168,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   #
   # Preprocess (if its available...)
   if command -v app >/dev/null 2>&1 ; then
-    app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+    app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" -D SHOW_REPORTS=\"${Show_Reports}\" p.mpx.awk > ${MPXDIR}/mpx.awk
   else
     echo >&2 "mpx warning: No preprocessor gpp found - using prebuilt mpx script."
   fi
@@ -177,7 +176,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   if [ "$preprocess_only" == "false" ]; then
     # Go back to original directory
     cd "${current_directory}"
-    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v FY=${financial_year} -v Show_Account=${account_name} -v Show_All=${Show_All} -v Show_Extra=${Show_Extra} -v Show_Reports="${Show_Reports}" -v Qualification_Window=${qualify_window} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
+    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v FY=${financial_year} -v Show_Account=${account_name} -v Show_All=${Show_All} -v Show_Extra=${Show_Extra} -v Qualification_Window=${qualify_window} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
   fi
 
 exit 0;

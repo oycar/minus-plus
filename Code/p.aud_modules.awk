@@ -139,6 +139,7 @@ function initialize_tax_aud() {
 # Tax Jurisdiction AUS
 function income_tax_aud(now, past, benefits,
 
+                                        write_stream,
                                         taxable_gains,
                                         market_changes,
                                         accounting_gains, accounting_losses,
@@ -154,33 +155,39 @@ function income_tax_aud(now, past, benefits,
                                         taxable_income,
                                         medicare_levy, extra_levy, x) {
 
+  # Print this out?
+  if (report_tax)
+    write_stream = EOFY
+  else
+    write_stream = "/dev/null"
+
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
 
   # Let's go
-  printf "%s\n", Journal_Title > EOFY
-  printf "Statement of Taxable Income\n" > EOFY
+  printf "%s\n", Journal_Title > write_stream
+  printf "Statement of Taxable Income\n" > write_stream
 
-  printf "For the year ending %s\n", get_date(yesterday(now)) > EOFY
-  print_underline(80, 1, EOFY)
-  printf "%80s\n", strftime("%Y", now, UTC) > EOFY
-  printf "%80s\n", "$" > EOFY
+  printf "For the year ending %s\n", get_date(yesterday(now)) > write_stream
+  underline(81, 0, write_stream)
+  printf "%80s\n", strftime("%Y", now, UTC) > write_stream
+  printf "%80s\n", "$" > write_stream
 
   # First entry
-  printf "%22s %38s\n", "Benefits Accrued as a Result of Operations", print_cash(benefits) > EOFY
+  printf "%22s %38s\n", "Benefits Accrued as a Result of Operations", print_cash(benefits) > write_stream
 
   # Additions
-  printf "ADD\n" > EOFY
+  printf "ADD\n" > write_stream
 
   # Start with market losses
   other_income = yield_positive(market_changes, 0)
   if (!near_zero(other_income))
-    printf "\t%40s %32s\n", "Unrealized Losses", print_cash(other_income) > EOFY
+    printf "\t%40s %32s\n", "Unrealized Losses", print_cash(other_income) > write_stream
 
   # Accounting losses are added - as are taxable gains
   accounting_losses = get_cost("*EXPENSE.LOSSES", now) - get_cost("*EXPENSE.LOSSES", past)
   if (!near_zero(accounting_losses)) {
-    printf "\t%40s %32s\n", "Capital Losses", print_cash(accounting_losses) > EOFY
+    printf "\t%40s %32s\n", "Capital Losses", print_cash(accounting_losses) > write_stream
     other_income += accounting_losses
   }
 
@@ -193,7 +200,7 @@ function income_tax_aud(now, past, benefits,
   #    EXPENSE.DISTRIBUTION (TRUST)
   other_expenses = get_cost("*EXPENSE.NON-DEDUCTIBLE", now) - get_cost("*EXPENSE.NON-DEDUCTIBLE", past)
   if (!near_zero(other_expenses)) {
-    printf "\t%40s %32s\n", "Other Non Deductible Expenses", print_cash(other_expenses) > EOFY
+    printf "\t%40s %32s\n", "Other Non Deductible Expenses", print_cash(other_expenses) > write_stream
     other_income += other_expenses
   }
 
@@ -205,7 +212,7 @@ function income_tax_aud(now, past, benefits,
   else {
     # Gains are a negative number
     other_income -= taxable_gains
-    printf "\t%40s %32s\n", "Taxable Capital Gains", print_cash(-taxable_gains) > EOFY
+    printf "\t%40s %32s\n", "Taxable Capital Gains", print_cash(-taxable_gains) > write_stream
   }
 
   # Save the taxable gains
@@ -218,26 +225,26 @@ function income_tax_aud(now, past, benefits,
   franking_offsets = - (get_cost("*SPECIAL.OFFSET.FRANKING", now) - get_cost("*SPECIAL.OFFSET.FRANKING", past))
   if (!near_zero(franking_offsets)) {
     other_income += franking_offsets
-    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > EOFY
+    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > write_stream
   }
 
   if (!near_zero(other_income)){
-    print_underline(80, 1, EOFY)
-    printf "\t%40s %32s\n\n", "Other Income", print_cash(other_income) > EOFY
+    underline(81, 0, write_stream)
+    printf "\t%40s %32s\n\n", "Other Income", print_cash(other_income) > write_stream
   }
 
   # Reductions
-  printf "LESS\n" > EOFY
+  printf "LESS\n" > write_stream
 
   # Expenses
   exempt_income = -(get_cost("*INCOME.EXEMPT", now) - get_cost("*INCOME.EXEMPT", past))
   if (exempt_income > Epsilon)
-    printf "\t%40s %32s\n", "Exempt Income", print_cash(exempt_income) > EOFY
+    printf "\t%40s %32s\n", "Exempt Income", print_cash(exempt_income) > write_stream
 
   # Market and Accounting Capital Gains
   other_expenses = - yield_negative(market_changes, 0)
   if (other_expenses > Epsilon)
-    printf "\t%40s %32s\n", "Unrealized Gains", print_cash(other_expenses) > EOFY
+    printf "\t%40s %32s\n", "Unrealized Gains", print_cash(other_expenses) > write_stream
 
   # Tax exempt income
   other_expenses += exempt_income
@@ -245,7 +252,7 @@ function income_tax_aud(now, past, benefits,
   # Accounting losses are added - as are taxable gains
   accounting_gains = -(get_cost("*INCOME.GAINS", now) - get_cost("*INCOME.GAINS", past))
   if (!near_zero(accounting_gains)) {
-    printf "\t%40s %32s\n", "Capital Gains", print_cash(accounting_gains) > EOFY
+    printf "\t%40s %32s\n", "Capital Gains", print_cash(accounting_gains) > write_stream
     other_expenses += accounting_gains
   }
 
@@ -253,7 +260,7 @@ function income_tax_aud(now, past, benefits,
   # Should look at CONTRIBUTION minus the one taxed subclass because maybe more than one tax-free subclass?
   contributions = -(get_cost("*INCOME.CONTRIBUTION.TAX-FREE", now) - get_cost("*INCOME.CONTRIBUTION.TAX-FREE", past))
   if (!near_zero(contributions)) {
-    printf "\t%40s %32s\n", "Non Taxable Contributions", print_cash(contributions) > EOFY
+    printf "\t%40s %32s\n", "Non Taxable Contributions", print_cash(contributions) > write_stream
     other_expenses += contributions
   }
 
@@ -265,26 +272,26 @@ function income_tax_aud(now, past, benefits,
 
   # Always apply allowance at this point to catch explicit allocations to LIC
   if (!near_zero(lic_deductions)) {
-    printf "\t%40s %32s\n", "LIC Deduction", print_cash(lic_deductions) > EOFY
+    printf "\t%40s %32s\n", "LIC Deduction", print_cash(lic_deductions) > write_stream
     other_expenses += lic_deductions
   }
 
   # Summarize other expenses
   if (!near_zero(other_expenses)) {
-    print_underline(80, 1, EOFY)
-    printf "\t%40s %32s\n\n", "Other Expenses", print_cash(other_expenses) > EOFY
+    underline(81, 0, write_stream)
+    printf "\t%40s %32s\n\n", "Other Expenses", print_cash(other_expenses) > write_stream
   }
 
   taxable_income = benefits + other_income - other_expenses
-  print_underline(80, 1, EOFY)
-  printf "%48s %32s\n\n", "TAXABLE INCOME OR LOSS", print_cash(taxable_income) > EOFY
+  underline(81, 0, write_stream)
+  printf "%48s %32s\n\n", "TAXABLE INCOME OR LOSS", print_cash(taxable_income) > write_stream
 
   # Record this quantity
   set_cost(TAXABLE_INCOME, taxable_income, now)
 
   # Keep the income tax on the taxable income - the actual amount owed may change due to tax offsets etc
   income_tax = tax_owed = get_tax(now, Tax_Bands, taxable_income) # Just need total tax
-  printf "%48s %32s\n", "Income Tax on Taxable Income or Loss ", print_cash(tax_owed) > EOFY
+  printf "%48s %32s\n", "Income Tax on Taxable Income or Loss ", print_cash(tax_owed) > write_stream
 
   # Record this quantity
   set_cost(INCOME_TAX, income_tax, now)
@@ -314,7 +321,7 @@ function income_tax_aud(now, past, benefits,
   #    Franking-Deficit   (F-TAX)
 
   # Tax adjustments
-  printf "Less\n" > EOFY
+  printf "Less\n" > write_stream
 
   ## Franking deficit needs to be checked here
   franking_balance = 0
@@ -328,18 +335,18 @@ function income_tax_aud(now, past, benefits,
     franking_deficit_offsets = - get_cost(FRANKING_DEFICIT, now)
 @ifeq LOG income_tax
     if (!near_zero(franking_deficit_offsets))
-      printf "%48s %32s\n\n", "Franking Deficit Offsets", print_cash(franking_deficit_offsets) > EOFY
+      printf "%48s %32s\n\n", "Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
 @endif
 
     # Need to check for franking deficit tax here
     if (below_zero(franking_balance)) {
       # This is a condition for franking deficit tax - that the franking balance
       # is zero; in fact it is not a sufficient condition; since a refund
-      # within three months of the EOFY will also trigger it
-      printf "\t%40s %32s\n", "Franking Balance is Overdrawn", print_cash(franking_balance) > EOFY
+      # within three months of the write_stream will also trigger it
+      printf "\t%40s %32s\n", "Franking Balance is Overdrawn", print_cash(franking_balance) > write_stream
 
       # Compute the franking deficit tax due
-      printf "\t%40s %32s\n", "Franking Deficit Tax Due", print_cash(- franking_balance) > EOFY
+      printf "\t%40s %32s\n", "Franking Deficit Tax Due", print_cash(- franking_balance) > write_stream
 
       # Save the franking deficit tax as a future tax offset
       #
@@ -352,19 +359,19 @@ function income_tax_aud(now, past, benefits,
       # -f > 0.10 * (-x)
       # 0.1 * (x) - f > 0
 @ifeq LOG income_tax
-      printf "Threshold %s Balance %s\n",  print_cash(x), print_cash(- franking_balance)> EOFY
+      printf "Threshold %s Balance %s\n",  print_cash(x), print_cash(- franking_balance)> write_stream
 @endif
       if (above_zero(x - franking_balance)) {
         franking_deficit_offsets -= Franking_Deficit_Reduction * franking_balance
 @ifeq LOG income_tax
-        printf "%48s\n", "Franking Deficit Offset Reduction Applied" > EOFY
+        printf "%48s\n", "Franking Deficit Offset Reduction Applied" > write_stream
 @endif
       } else
         franking_deficit_offsets -= franking_balance
 
 @ifeq LOG income_tax
       if (!near_zero(franking_deficit_offsets))
-        printf "%48s %32s\n\n", "New Franking Deficit Offsets", print_cash(franking_deficit_offsets) > EOFY
+        printf "%48s %32s\n\n", "New Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
 @endif
 
       # Don't adjust tax due - this is a separate liability
@@ -376,7 +383,7 @@ function income_tax_aud(now, past, benefits,
 
   # Report the Imputation and Foreign Offsets
   if (!near_zero(franking_offsets))
-    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > EOFY
+    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > write_stream
 
   # Foreign offsets
   # Are no-refund-no-carry
@@ -401,16 +408,16 @@ function income_tax_aud(now, past, benefits,
       if (extra_tax < foreign_offsets)
         foreign_offsets = max(find_entry(Foreign_Offset_Limit, now), extra_tax)
 
-      printf "\t%40s\n", "Foreign Offset Limit Applied" > EOFY
+      printf "\t%40s\n", "Foreign Offset Limit Applied" > write_stream
     } else
       extra_tax = 0
 
     # The offsets
-    printf "\t%40s %32s\n\n", "Foreign Offsets", print_cash(foreign_offsets) > EOFY
+    printf "\t%40s %32s\n\n", "Foreign Offsets", print_cash(foreign_offsets) > write_stream
 @ifeq LOG income_tax
-    printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(find_entry(Foreign_Offset_Limit, now)) > EOFY
+    printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(find_entry(Foreign_Offset_Limit, now)) > write_stream
     if (extra_tax > 0)
-      printf "\t%40s %32s\n\n", "Extra Tax Paid on Foreign Earnings", print_cash(extra_tax) > EOFY
+      printf "\t%40s %32s\n\n", "Extra Tax Paid on Foreign Earnings", print_cash(extra_tax) > write_stream
 @endif
   } else
     foreign_offsets = 0
@@ -422,12 +429,12 @@ function income_tax_aud(now, past, benefits,
 
     # This is an Australian no-carry offset computed from the taxable income
     if (!near_zero(x))
-      printf "\t%40s %32s\n", "Low Income Tax Offset", print_cash(x) > EOFY
+      printf "\t%40s %32s\n", "Low Income Tax Offset", print_cash(x) > write_stream
 
     # Get the other no_carry offsets
     no_carry_offsets = -(get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
     if (!near_zero(no_carry_offsets))
-      printf "\t%40s %32s\n", "Other No-Carry Offsets", print_cash(no_carry_offsets) > EOFY
+      printf "\t%40s %32s\n", "Other No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
 
     # No need to adjust cost - since it will not be retained
     no_carry_offsets += x
@@ -440,20 +447,20 @@ function income_tax_aud(now, past, benefits,
 
   # The no-carry offset
   if (!near_zero(no_carry_offsets))
-    printf "\t%40s %32s\n", "Total No-Carry Offsets", print_cash(no_carry_offsets) > EOFY
+    printf "\t%40s %32s\n", "Total No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
 
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = - get_cost(CARRY_OFFSETS, now)
   if (!near_zero(carry_offsets))
-    printf "\t%40s %32s\n", "Total Carry Offsets", print_cash(carry_offsets) > EOFY
-  printf "\n" > EOFY
+    printf "\t%40s %32s\n", "Total Carry Offsets", print_cash(carry_offsets) > write_stream
+  printf "\n" > write_stream
 
   # The refundable offset (Class E)
   refundable_offsets = - get_cost(REFUNDABLE_OFFSETS, now)
   if (!near_zero(refundable_offsets))
-    printf "\t%40s %32s\n", "Total Refundable Offsets", print_cash(refundable_offsets) > EOFY
-  printf "\n" > EOFY
+    printf "\t%40s %32s\n", "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
+  printf "\n" > write_stream
 
   # Franking offsets are (currently) refundable for SMSF and individuals
   if (is_smsf || is_individual) {
@@ -477,13 +484,13 @@ function income_tax_aud(now, past, benefits,
         carry_offsets -= (tax_owed - no_carry_offsets)
 
       # information
-      printf "\t%40s %32s>\n", "<Non-Refundable Offsets Used", print_cash(tax_owed - franking_offsets) > EOFY
+      printf "\t%40s %32s>\n", "<Non-Refundable Offsets Used", print_cash(tax_owed - franking_offsets) > write_stream
       tax_owed = 0
     } else { # All the no_refund offsets were used
       tax_owed -= no_refund_offsets
       carry_offsets = 0
       if (above_zero(no_refund_offsets - franking_offsets))
-        printf "\t%40s %32s>\n", "<Non-Refundable Offsets Used", print_cash(no_refund_offsets - franking_offsets) > EOFY
+        printf "\t%40s %32s>\n", "<Non-Refundable Offsets Used", print_cash(no_refund_offsets - franking_offsets) > write_stream
     }
 
     # OK now if the tax_owed is less than the amount of franking offsets
@@ -491,31 +498,31 @@ function income_tax_aud(now, past, benefits,
     if (tax_owed < franking_offsets) {
       franking_offsets -= tax_owed
 
-      printf "\t%40s %32s>\n", "<Franking Offsets Used", print_cash(tax_owed) > EOFY
+      printf "\t%40s %32s>\n", "<Franking Offsets Used", print_cash(tax_owed) > write_stream
       # Report remaining  franking offsets
       if (above_zero(franking_offsets))
-        printf "\t%40s %32s>\n", "<Franking Offsets Remaining", print_cash(franking_offsets) > EOFY
+        printf "\t%40s %32s>\n", "<Franking Offsets Remaining", print_cash(franking_offsets) > write_stream
 
       tax_owed = 0
     } else {
       tax_owed -= franking_offsets
       if (above_zero(franking_offsets))
-        printf "\t%40s %32s>\n", "<All Franking Offsets Used", print_cash(franking_offsets) > EOFY
+        printf "\t%40s %32s>\n", "<All Franking Offsets Used", print_cash(franking_offsets) > write_stream
       franking_offsets = 0
     }
 
     # Report tax owed
 @ifeq LOG income_tax
-    printf "%48s %32s\n\n", "Income Tax After applying Non-Refundable Offsets", print_cash(tax_owed) > EOFY
+    printf "%48s %32s\n\n", "Income Tax After applying Non-Refundable Offsets", print_cash(tax_owed) > write_stream
 @endif
   } # End of if any attempt to apply non-refundable assets
 
   # Now apply refundable offsets - but note if used these will not generate a tax loss
   if (above_zero(refundable_offsets)) {
     tax_owed -= refundable_offsets
-    printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > EOFY
+    printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > write_stream
 @ifeq LOG income_tax
-    printf "%48s %32s\n\n", "Income Tax After applying Refundable Offsets", print_cash(tax_owed) > EOFY
+    printf "%48s %32s\n\n", "Income Tax After applying Refundable Offsets", print_cash(tax_owed) > write_stream
 @endif
   }
 
@@ -527,11 +534,11 @@ function income_tax_aud(now, past, benefits,
         franking_deficit_offsets -= tax_owed
 
       # information
-      printf "\t%40s %32s>\n", "<Franking Deficit Tax Offsets Used", print_cash(tax_owed - franking_deficit_offsets) > EOFY
+      printf "\t%40s %32s>\n", "<Franking Deficit Tax Offsets Used", print_cash(tax_owed - franking_deficit_offsets) > write_stream
       tax_owed = 0
     } else { # All the franking deficit offsets were used
       tax_owed -= franking_deficit_offsets
-      printf "\t%40s %32s>\n", "<Franking Deficit Tax Offsets Used", print_cash(franking_deficit_offsets) > EOFY
+      printf "\t%40s %32s>\n", "<Franking Deficit Tax Offsets Used", print_cash(franking_deficit_offsets) > write_stream
       franking_deficit_offsets = 0
     }
   }
@@ -543,7 +550,7 @@ function income_tax_aud(now, past, benefits,
   tax_losses = old_losses = get_cost(TAX_LOSSES, past)
 @ifeq LOG income_tax
   if (above_zero(tax_losses))
-    printf "\t%40s %32s\n", "Carried Tax Losses", print_cash(tax_losses) > EOFY
+    printf "\t%40s %32s\n", "Carried Tax Losses", print_cash(tax_losses) > write_stream
 @endif
 
   #
@@ -558,7 +565,7 @@ function income_tax_aud(now, past, benefits,
       x = get_tax(now, Tax_Bands, tax_losses + taxable_income) - income_tax
 
 @ifeq LOG income_tax
-      printf "\t%40s %32s\n\n", "Income Tax on Carried Tax Losses", print_cash(x) > EOFY
+      printf "\t%40s %32s\n\n", "Income Tax on Carried Tax Losses", print_cash(x) > write_stream
 @endif
     } else # No losses available
       x = 0
@@ -570,7 +577,7 @@ function income_tax_aud(now, past, benefits,
       # Which will reduce tax_owed to zero;
       tax_losses = get_taxable_income(now, x - tax_owed)
 @ifeq LOG income_tax
-      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(old_losses - tax_losses) > EOFY
+      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(old_losses - tax_losses) > write_stream
 @endif
       tax_owed = 0
     } else {
@@ -579,7 +586,7 @@ function income_tax_aud(now, past, benefits,
 
       # So this reduces tax losses to zero
 @ifeq LOG income_tax
-      printf "\t%40s %32s\n", "All Tax Losses Extinguished", print_cash(tax_losses) > EOFY
+      printf "\t%40s %32s\n", "All Tax Losses Extinguished", print_cash(tax_losses) > write_stream
 @endif
       tax_losses = 0
     }
@@ -590,19 +597,19 @@ function income_tax_aud(now, past, benefits,
 
     tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
 @ifeq LOG income_tax
-    printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > EOFY
+    printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > write_stream
 @endif
   }
 
   # The carried tax losses
 @ifeq LOG income_tax
   if (above_zero(tax_losses))
-    printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > EOFY
+    printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > write_stream
 @endif
 
   # Print the tax owed
-  print_underline(80, 1, EOFY)
-  printf "%48s %32s\n\n", "CURRENT TAX OR REFUND", print_cash(tax_owed) > EOFY
+  underline(81, 0, write_stream)
+  printf "%48s %32s\n\n", "CURRENT TAX OR REFUND", print_cash(tax_owed) > write_stream
 
   #
   # Tax Residuals
@@ -626,24 +633,24 @@ function income_tax_aud(now, past, benefits,
 
   # If this is SMSF the levy is required
   if (is_smsf)
-    printf "\t%40s %32s\n", "Supervisory Levy", print_cash(find_entry(ATO_Levy, now)) > EOFY
+    printf "\t%40s %32s\n", "Supervisory Levy", print_cash(find_entry(ATO_Levy, now)) > write_stream
 
   # Medicare levy (if any)
   if (!near_zero(medicare_levy)) {
-    printf "\t%40s %32s\n", "Medicare Levy", print_cash(medicare_levy) > EOFY
+    printf "\t%40s %32s\n", "Medicare Levy", print_cash(medicare_levy) > write_stream
     tax_owed += medicare_levy
   }
 
   if (!near_zero(tax_paid))
-    printf "\t%40s %32s\n", "Income Tax Distributions Paid", print_cash(tax_paid) > EOFY
+    printf "\t%40s %32s\n", "Income Tax Distributions Paid", print_cash(tax_paid) > write_stream
   if (!near_zero(tax_with))
-    printf "\t%40s %32s\n", "Income Tax Withheld", print_cash(tax_with) > EOFY
+    printf "\t%40s %32s\n", "Income Tax Withheld", print_cash(tax_with) > write_stream
 
   # Compute income tax due
   tax_due = tax_owed - (tax_paid + tax_with)
   set_cost(TAX, - tax_due, now)
-  print_underline(80, 1, EOFY)
-  printf "%48s %32s\n\n\n", "AMOUNT DUE OR REFUNDABLE", print_cash(find_entry(ATO_Levy, now) + tax_due) > EOFY
+  underline(81, 0, write_stream)
+  printf "%48s %32s\n\n\n", "AMOUNT DUE OR REFUNDABLE", print_cash(find_entry(ATO_Levy, now) + tax_due) > write_stream
 
   # Clean up balance sheet - watch out for unbalanced transactions
   # Save contribution tax accounted for
@@ -658,19 +665,19 @@ function income_tax_aud(now, past, benefits,
   # These really are for time now - already computed
   capital_losses = get_cost(CAPITAL_LOSSES, now)
   if (!near_zero(capital_losses))
-    printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > EOFY
+    printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
   # The change in tax losses
   if (!near_zero(tax_losses - old_losses)) {
     if (tax_losses > old_losses)
-      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > EOFY
+      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > write_stream
     else
-      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(old_losses - tax_losses) > EOFY
+      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(old_losses - tax_losses) > write_stream
   }
 
   # The carried tax losses
   if (!near_zero(tax_losses))
-    printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > EOFY
+    printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > write_stream
   else
     tax_losses = 0
 
@@ -679,19 +686,19 @@ function income_tax_aud(now, past, benefits,
 
   # Franking
   if (!near_zero(franking_balance))
-    printf "\t%40s %32s\n", "Franking Balance Carried Forward", print_cash(franking_balance) > EOFY
+    printf "\t%40s %32s\n", "Franking Balance Carried Forward", print_cash(franking_balance) > write_stream
 
   # Franking Deficit
   # Save the franking deficit offsets
   if (!near_zero(franking_deficit_offsets))
-    printf "%48s %32s\n\n", "Franking Deficit Offsets Carried Forward", print_cash(franking_deficit_offsets) > EOFY
+    printf "%48s %32s\n\n", "Franking Deficit Offsets Carried Forward", print_cash(franking_deficit_offsets) > write_stream
   else
     franking_deficit_offsets = 0
   set_cost(FRANKING_DEFICIT, -franking_deficit_offsets, now)
 
   # Update carry forward offsets
   if (!near_zero(carry_offsets))
-    printf "\t%40s %32s\n", "Non-Refundable Offsets Carried Forwards", print_cash(carry_offsets) > EOFY
+    printf "\t%40s %32s\n", "Non-Refundable Offsets Carried Forwards", print_cash(carry_offsets) > write_stream
   else
     carry_offsets = 0
   set_cost(CARRY_OFFSETS, -carry_offsets, now)
@@ -712,12 +719,12 @@ function income_tax_aud(now, past, benefits,
 
 @ifeq LOG income_tax
     if (above_zero(deferred_tax))
-      printf "\t%40s %32s\n", "Deferred Tax Liability", print_cash(deferred_tax) > EOFY
+      printf "\t%40s %32s\n", "Deferred Tax Liability", print_cash(deferred_tax) > write_stream
     else if (below_zero(deferred_tax))
-      printf "\t%40s %32s\n", "Deferred Tax Asset    ", print_cash(deferred_tax) > EOFY
+      printf "\t%40s %32s\n", "Deferred Tax Asset    ", print_cash(deferred_tax) > write_stream
     else {
       deferred_tax = 0
-      printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > EOFY
+      printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > write_stream
     }
 @endif
 
