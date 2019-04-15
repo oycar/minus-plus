@@ -13,6 +13,11 @@
 @undef EXPORT_FORMAT
 @endif
 
+# // Output Streams
+@define STDOUT "/dev/stdout"
+@define STDERR "/dev/stderr"
+@define DEVNULL "/dev/null"
+
 # //
 @define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count \
 Lifetime Long_Name Maturity_Date Method_Name Number_Parcels \
@@ -41,18 +46,18 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define ALL_REPORTS ("a:b:c:d:f:m:o:q:t:z")
 
 # // Default Reports
-@ifndef SHOW_REPORTS 
+@ifndef SHOW_REPORTS
 @define   SHOW_REPORTS "bcot"
 @endif # // SHOW_REPORTS
 
-@define report_balance    ((SHOW_REPORTS ~ /[bB]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
-@define report_capital    ((SHOW_REPORTS ~ /[cC]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
-@define report_deferred   ((SHOW_REPORTS ~ /[dD]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
-@define report_fixed      ((SHOW_REPORTS ~ /[fF]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
-@define report_market     ((SHOW_REPORTS ~ /[mM]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
-@define report_operating  ((SHOW_REPORTS ~ /[oO]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
-@define report_dividend   ((SHOW_REPORTS ~ /[qQ]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
-@define report_tax        ((SHOW_REPORTS ~ /[tT]|[aA]/) && (SHOW_REPORTS !~ /[zZ]/))
+@define report_balance(s)   ternary(SHOW_REPORTS ~ /[bB]|[aA]|^[zZ]/, s, DEVNULL)
+@define report_capital(s)   ternary(SHOW_REPORTS ~ /[cC]|[aA]|^[zZ]/, s, DEVNULL)
+@define report_deferred(s)  ternary(SHOW_REPORTS ~ /[dD]|[aA]|^[zZ]/, s, DEVNULL)
+@define report_fixed(s)     ternary(SHOW_REPORTS ~ /[fF]|[aA]|^[zZ]/, s, DEVNULL)
+@define report_market(s)    ternary(SHOW_REPORTS ~ /[mM]|[aA]|^[zZ]/, s, DEVNULL)
+@define report_operating(s) ternary(SHOW_REPORTS ~ /[oO]|[aA]|^[zZ]/, s, DEVNULL)
+@define report_dividend(s)  ternary(SHOW_REPORTS ~ /[qQ]|[aA]|^[zZ]/, s, DEVNULL)
+@define report_tax(s)       ternary(SHOW_REPORTS ~ /[tT]|[aA]|^[zZ]/, s, DEVNULL)
 
 # // Default Asset Prefix for Price Lists
 @define ASSET_PREFIX ("ASSET.CAPITAL.SHARES")

@@ -153,13 +153,10 @@ function income_tax_aud(now, past, benefits,
                                         franking_offsets, foreign_offsets, franking_balance,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
                                         taxable_income,
-                                        medicare_levy, extra_levy, x) {
+                                        medicare_levy, extra_levy, x, header) {
 
   # Print this out?
-  if (report_tax)
-    write_stream = EOFY
-  else
-    write_stream = "/dev/null"
+  write_stream = report_tax(EOFY)
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -177,18 +174,22 @@ function income_tax_aud(now, past, benefits,
   printf "%22s %38s\n", "Benefits Accrued as a Result of Operations", print_cash(benefits) > write_stream
 
   # Additions
-  printf "ADD\n" > write_stream
+  # printf "ADD\n" > write_stream
+  header = "ADD\n"
 
   # Start with market losses
   other_income = yield_positive(market_changes, 0)
-  if (!near_zero(other_income))
-    printf "\t%40s %32s\n", "Unrealized Losses", print_cash(other_income) > write_stream
+  if (!near_zero(other_income)) {
+    printf "%s\t%40s %32s\n", "Unrealized Losses", header, print_cash(other_income) > write_stream
+    header = ""
+  }
 
   # Accounting losses are added - as are taxable gains
   accounting_losses = get_cost("*EXPENSE.LOSSES", now) - get_cost("*EXPENSE.LOSSES", past)
   if (!near_zero(accounting_losses)) {
-    printf "\t%40s %32s\n", "Capital Losses", print_cash(accounting_losses) > write_stream
+    printf "%s\t%40s %32s\n", header, "Capital Losses", print_cash(accounting_losses) > write_stream
     other_income += accounting_losses
+    header = ""
   }
 
   # Non deductible EXPENSES
@@ -200,8 +201,9 @@ function income_tax_aud(now, past, benefits,
   #    EXPENSE.DISTRIBUTION (TRUST)
   other_expenses = get_cost("*EXPENSE.NON-DEDUCTIBLE", now) - get_cost("*EXPENSE.NON-DEDUCTIBLE", past)
   if (!near_zero(other_expenses)) {
-    printf "\t%40s %32s\n", "Other Non Deductible Expenses", print_cash(other_expenses) > write_stream
+    printf "%s\t%40s %32s\n", header, "Other Non Deductible Expenses", print_cash(other_expenses) > write_stream
     other_income += other_expenses
+    header = ""
   }
 
   # taxable capital gains
@@ -212,7 +214,8 @@ function income_tax_aud(now, past, benefits,
   else {
     # Gains are a negative number
     other_income -= taxable_gains
-    printf "\t%40s %32s\n", "Taxable Capital Gains", print_cash(-taxable_gains) > write_stream
+    printf "%s\t%40s %32s\n", header, "Taxable Capital Gains", print_cash(-taxable_gains) > write_stream
+    header = ""
   }
 
   # Save the taxable gains
@@ -225,26 +228,33 @@ function income_tax_aud(now, past, benefits,
   franking_offsets = - (get_cost("*SPECIAL.OFFSET.FRANKING", now) - get_cost("*SPECIAL.OFFSET.FRANKING", past))
   if (!near_zero(franking_offsets)) {
     other_income += franking_offsets
-    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > write_stream
+    printf "%s\t%40s %32s\n", header, "Franking Offsets", print_cash(franking_offsets) > write_stream
+    header = ""
   }
 
   if (!near_zero(other_income)){
     underline(81, 0, write_stream)
-    printf "\t%40s %32s\n\n", "Other Income", print_cash(other_income) > write_stream
+    printf "%s\t%40s %32s\n\n", header, "Other Income", print_cash(other_income) > write_stream
+    header = ""
   }
 
   # Reductions
-  printf "LESS\n" > write_stream
+  #printf "LESS\n" > write_stream
+  header = "LESS\n"
 
   # Expenses
   exempt_income = -(get_cost("*INCOME.EXEMPT", now) - get_cost("*INCOME.EXEMPT", past))
-  if (exempt_income > Epsilon)
-    printf "\t%40s %32s\n", "Exempt Income", print_cash(exempt_income) > write_stream
+  if (exempt_income > Epsilon) {
+    printf "%s\t%40s %32s\n", header, "Exempt Income", print_cash(exempt_income) > write_stream
+    header = ""
+  }
 
   # Market and Accounting Capital Gains
   other_expenses = - yield_negative(market_changes, 0)
-  if (other_expenses > Epsilon)
-    printf "\t%40s %32s\n", "Unrealized Gains", print_cash(other_expenses) > write_stream
+  if (other_expenses > Epsilon) {
+    printf "%s\t%40s %32s\n", header, "Unrealized Gains", print_cash(other_expenses) > write_stream
+    header = ""
+  }
 
   # Tax exempt income
   other_expenses += exempt_income
@@ -252,16 +262,18 @@ function income_tax_aud(now, past, benefits,
   # Accounting losses are added - as are taxable gains
   accounting_gains = -(get_cost("*INCOME.GAINS", now) - get_cost("*INCOME.GAINS", past))
   if (!near_zero(accounting_gains)) {
-    printf "\t%40s %32s\n", "Capital Gains", print_cash(accounting_gains) > write_stream
+    printf "%s\t%40s %32s\n", header, "Capital Gains", print_cash(accounting_gains) > write_stream
     other_expenses += accounting_gains
+    header = ""
   }
 
   # And the non-concessional contributions
   # Should look at CONTRIBUTION minus the one taxed subclass because maybe more than one tax-free subclass?
   contributions = -(get_cost("*INCOME.CONTRIBUTION.TAX-FREE", now) - get_cost("*INCOME.CONTRIBUTION.TAX-FREE", past))
   if (!near_zero(contributions)) {
-    printf "\t%40s %32s\n", "Non Taxable Contributions", print_cash(contributions) > write_stream
+    printf "%s\t%40s %32s\n", header, "Non Taxable Contributions", print_cash(contributions) > write_stream
     other_expenses += contributions
+    header = ""
   }
 
   # Finally LIC Deductions (if eligible)
@@ -272,18 +284,21 @@ function income_tax_aud(now, past, benefits,
 
   # Always apply allowance at this point to catch explicit allocations to LIC
   if (!near_zero(lic_deductions)) {
-    printf "\t%40s %32s\n", "LIC Deduction", print_cash(lic_deductions) > write_stream
+    printf "%s\t%40s %32s\n", header,"LIC Deduction", print_cash(lic_deductions) > write_stream
     other_expenses += lic_deductions
+    header = ""
   }
 
   # Summarize other expenses
   if (!near_zero(other_expenses)) {
     underline(81, 0, write_stream)
-    printf "\t%40s %32s\n\n", "Other Expenses", print_cash(other_expenses) > write_stream
+    printf "%s\t%40s %32s\n\n", header, "Other Expenses", print_cash(other_expenses) > write_stream
+    header = ""
   }
 
   taxable_income = benefits + other_income - other_expenses
   underline(81, 0, write_stream)
+  header = ""
   printf "%48s %32s\n\n", "TAXABLE INCOME OR LOSS", print_cash(taxable_income) > write_stream
 
   # Record this quantity
@@ -321,7 +336,8 @@ function income_tax_aud(now, past, benefits,
   #    Franking-Deficit   (F-TAX)
 
   # Tax adjustments
-  printf "Less\n" > write_stream
+  #printf "Less\n" > write_stream
+  header = "Less\n"
 
   ## Franking deficit needs to be checked here
   franking_balance = 0
@@ -382,8 +398,10 @@ function income_tax_aud(now, past, benefits,
   }
 
   # Report the Imputation and Foreign Offsets
-  if (!near_zero(franking_offsets))
-    printf "\t%40s %32s\n", "Franking Offsets", print_cash(franking_offsets) > write_stream
+  if (!near_zero(franking_offsets)) {
+    printf "%s\t%40s %32s\n", header, "Franking Offsets", print_cash(franking_offsets) > write_stream
+    header = ""
+  }
 
   # Foreign offsets
   # Are no-refund-no-carry
@@ -413,7 +431,8 @@ function income_tax_aud(now, past, benefits,
       extra_tax = 0
 
     # The offsets
-    printf "\t%40s %32s\n\n", "Foreign Offsets", print_cash(foreign_offsets) > write_stream
+    printf "%s\t%40s %32s\n\n", header, "Foreign Offsets", print_cash(foreign_offsets) > write_stream
+    header = ""
 @ifeq LOG income_tax
     printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(find_entry(Foreign_Offset_Limit, now)) > write_stream
     if (extra_tax > 0)
@@ -428,13 +447,17 @@ function income_tax_aud(now, past, benefits,
     x = get_tax(now, Low_Income_Offset, taxable_income)
 
     # This is an Australian no-carry offset computed from the taxable income
-    if (!near_zero(x))
-      printf "\t%40s %32s\n", "Low Income Tax Offset", print_cash(x) > write_stream
+    if (!near_zero(x)) {
+      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(x) > write_stream
+      header = ""
+    }
 
     # Get the other no_carry offsets
     no_carry_offsets = -(get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
-    if (!near_zero(no_carry_offsets))
-      printf "\t%40s %32s\n", "Other No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
+    if (!near_zero(no_carry_offsets)) {
+      printf "%s\t%40s %32s\n", header, "Other No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
+      header = ""
+    }
 
     # No need to adjust cost - since it will not be retained
     no_carry_offsets += x
@@ -452,14 +475,18 @@ function income_tax_aud(now, past, benefits,
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = - get_cost(CARRY_OFFSETS, now)
-  if (!near_zero(carry_offsets))
-    printf "\t%40s %32s\n", "Total Carry Offsets", print_cash(carry_offsets) > write_stream
+  if (!near_zero(carry_offsets)) {
+    printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
+    header = ""
+  }
   printf "\n" > write_stream
 
   # The refundable offset (Class E)
   refundable_offsets = - get_cost(REFUNDABLE_OFFSETS, now)
-  if (!near_zero(refundable_offsets))
-    printf "\t%40s %32s\n", "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
+  if (!near_zero(refundable_offsets)) {
+    printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
+    header = ""
+  }
   printf "\n" > write_stream
 
   # Franking offsets are (currently) refundable for SMSF and individuals
@@ -608,9 +635,11 @@ function income_tax_aud(now, past, benefits,
 @endif
 
   # Print the tax owed
-  underline(81, 0, write_stream)
-  printf "%48s %32s\n\n", "CURRENT TAX OR REFUND", print_cash(tax_owed) > write_stream
-
+  if (!header) {
+    underline(81, 0, write_stream)
+    printf "%48s %32s\n\n", "CURRENT TAX OR REFUND", print_cash(tax_owed) > write_stream
+  }
+  
   #
   # Tax Residuals
   #
@@ -770,12 +799,12 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
       # The adjustment
       unqualified *= imputation_credits
 @ifeq LOG dividend_qualification
-      printf "Underlying Asset %s\n", Leaf[underlying_asset] > "/dev/stderr"
-      printf "\tTax Credits %s[%s]      => %s\n", Leaf[Tax_Credits[underlying_asset]], get_date(now), print_cash(- imputation_credits) > "/dev/stderr"
-      printf "\tUnqualified Tax Credits => %s\n", print_cash(- unqualified) > "/dev/stderr"
-      printf "\tTotal Tax Credits       => %s\n", print_cash(- get_cost(Tax_Credits[underlying_asset], now)) > "/dev/stderr"
-      printf "\tFranking Balance        => %s\n", print_cash(get_cost(FRANKING, now)) > "/dev/stderr"
-      printf "\tTotal Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, now)) > "/dev/stderr"
+      printf "Underlying Asset %s\n", Leaf[underlying_asset] > STDERR
+      printf "\tTax Credits %s[%s]      => %s\n", Leaf[Tax_Credits[underlying_asset]], get_date(now), print_cash(- imputation_credits) > STDERR
+      printf "\tUnqualified Tax Credits => %s\n", print_cash(- unqualified) > STDERR
+      printf "\tTotal Tax Credits       => %s\n", print_cash(- get_cost(Tax_Credits[underlying_asset], now)) > STDERR
+      printf "\tFranking Balance        => %s\n", print_cash(get_cost(FRANKING, now)) > STDERR
+      printf "\tTotal Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, now)) > STDERR
 @endif
 
       # Now sum the unqualified credits in this account
@@ -786,8 +815,8 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
       set_cost(FRANKING, get_cost(FRANKING, now) + unqualified, just_after(now))
 
 @ifeq LOG dividend_qualification
-      printf "\tNew Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, just_after(now))) > "/dev/stderr"
-      printf "\tnew Franking Balance  => %s\n", print_cash(get_cost(FRANKING, just_after(now))) > "/dev/stderr"
+      printf "\tNew Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, just_after(now))) > STDERR
+      printf "\tnew Franking Balance  => %s\n", print_cash(get_cost(FRANKING, just_after(now))) > STDERR
 @endif
     } # No credits at time now
   } # No tax credits for this account

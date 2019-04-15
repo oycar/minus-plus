@@ -79,6 +79,7 @@ function initialize_tax_usd() {
 # This is only the basis of the calculation
 function income_tax_usd(now, past, benefits,
 
+                                        reports_stream,
                                         taxable_gains,
                                         market_changes,
                                         gains_tax,
@@ -93,6 +94,9 @@ function income_tax_usd(now, past, benefits,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
                                         taxable_income,
                                         x) {
+
+  # Print this out?
+  reports_stream = report_tax(EOFY)
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
