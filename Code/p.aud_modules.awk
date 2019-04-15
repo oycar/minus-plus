@@ -174,13 +174,12 @@ function income_tax_aud(now, past, benefits,
   printf "%22s %38s\n", "Benefits Accrued as a Result of Operations", print_cash(benefits) > write_stream
 
   # Additions
-  # printf "ADD\n" > write_stream
   header = "ADD\n"
 
   # Start with market losses
   other_income = yield_positive(market_changes, 0)
   if (!near_zero(other_income)) {
-    printf "%s\t%40s %32s\n", "Unrealized Losses", header, print_cash(other_income) > write_stream
+    printf "%s\t%40s %32s\n", header, "Unrealized Losses", print_cash(other_income) > write_stream
     header = ""
   }
 
@@ -239,7 +238,6 @@ function income_tax_aud(now, past, benefits,
   }
 
   # Reductions
-  #printf "LESS\n" > write_stream
   header = "LESS\n"
 
   # Expenses
@@ -336,8 +334,7 @@ function income_tax_aud(now, past, benefits,
   #    Franking-Deficit   (F-TAX)
 
   # Tax adjustments
-  #printf "Less\n" > write_stream
-  header = "Less\n"
+  header = "LESS\n"
 
   ## Franking deficit needs to be checked here
   franking_balance = 0
@@ -619,9 +616,14 @@ function income_tax_aud(now, past, benefits,
     }
 
   # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
-#  } else if (above_zero(franking_offsets)) { # Increase losses
-  } else if (below_zero(tax_owed + refundable_offsets)) { # Increase losses
-
+  } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
+    # To be clear refundable offsets can generate a tax refund
+    # so tax_owed < 0 BUT this will be repaid so will not
+    # generate a tax loss
+    #
+    # On the other hand remaining franking offsets will generate tax loss
+    # Even when tax_owed == 0
+    # so do catch  the case of  tax_owed < Epsilon
     tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
 @ifeq LOG income_tax
     printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > write_stream
@@ -639,7 +641,7 @@ function income_tax_aud(now, past, benefits,
     underline(81, 0, write_stream)
     printf "%48s %32s\n\n", "CURRENT TAX OR REFUND", print_cash(tax_owed) > write_stream
   }
-  
+
   #
   # Tax Residuals
   #

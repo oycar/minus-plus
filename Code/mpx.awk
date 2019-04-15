@@ -2626,7 +2626,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("ct" ~ /[cC]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("q" ~ /[cC]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2722,7 +2722,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("ct" ~ /[dD]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("q" ~ /[dD]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2767,7 +2767,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("ct" ~ /[oO]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("q" ~ /[oO]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2922,7 +2922,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("ct" ~ /[bB]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("q" ~ /[bB]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3045,7 +3045,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("ct" ~ /[mM]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("q" ~ /[mM]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3118,7 +3118,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("ct" ~ /[fF]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("q" ~ /[fF]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3249,7 +3249,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("ct" ~ /[qQ]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("q" ~ /[qQ]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3808,7 +3808,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, x, header) {
 
   # Print this out?
-  write_stream = (("ct" ~ /[tT]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("q" ~ /[tT]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -3826,13 +3826,12 @@ function income_tax_aud(now, past, benefits,
   printf "%22s %38s\n", "Benefits Accrued as a Result of Operations", print_cash(benefits) > write_stream
 
   # Additions
-  # printf "ADD\n" > write_stream
   header = "ADD\n"
 
   # Start with market losses
   other_income = (((market_changes) >   Epsilon)?( (market_changes)):(  0))
   if (!(((other_income) <= Epsilon) && ((other_income) >= -Epsilon))) {
-    printf "%s\t%40s %32s\n", "Unrealized Losses", header, print_cash(other_income) > write_stream
+    printf "%s\t%40s %32s\n", header, "Unrealized Losses", print_cash(other_income) > write_stream
     header = ""
   }
 
@@ -3891,7 +3890,6 @@ function income_tax_aud(now, past, benefits,
   }
 
   # Reductions
-  #printf "LESS\n" > write_stream
   header = "LESS\n"
 
   # Expenses
@@ -3988,8 +3986,7 @@ function income_tax_aud(now, past, benefits,
   #    Franking-Deficit   (F-TAX)
 
   # Tax adjustments
-  #printf "Less\n" > write_stream
-  header = "Less\n"
+  header = "LESS\n"
 
   ## Franking deficit needs to be checked here
   franking_balance = 0
@@ -4244,9 +4241,14 @@ function income_tax_aud(now, past, benefits,
     }
 
   # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
-#  } else if (above_zero(franking_offsets)) { # Increase losses
-  } else if (((tax_owed + refundable_offsets) < -Epsilon)) { # Increase losses
-
+  } else if (!((tax_owed + refundable_offsets) >  Epsilon)) { # Increase losses
+    # To be clear refundable offsets can generate a tax refund
+    # so tax_owed < 0 BUT this will be repaid so will not
+    # generate a tax loss
+    #
+    # On the other hand remaining franking offsets will generate tax loss
+    # Even when tax_owed == 0
+    # so do catch  the case of  tax_owed < Epsilon
     tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
 
   }
@@ -4259,7 +4261,7 @@ function income_tax_aud(now, past, benefits,
     underline(81, 0, write_stream)
     printf "%48s %32s\n\n", "CURRENT TAX OR REFUND", print_cash(tax_owed) > write_stream
   }
-  
+
   #
   # Tax Residuals
   #
