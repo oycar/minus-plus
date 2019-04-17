@@ -13,6 +13,10 @@
 @undef EXPORT_FORMAT
 @endif
 
+# // Logic conventions
+@define  TRUE   (1)
+@define  FALSE  (0)
+
 # // Output Streams
 @define STDOUT "/dev/stdout"
 @define STDERR "/dev/stderr"
@@ -34,9 +38,16 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define HOUR (12)
 @define CLOSING (16)
 @define DATE_ERROR (-1)
+@define BEFORE_EPOCH (-2)
 @define PRECISION (2)
 @define MAX_PRECISION (6)
 @define CLASS_INDEX (1)
+
+# // Default Import Values
+@define KEY_FIELD  (1)
+@define VALUE_FIELD (2)
+@define KEY_DATE @eval (TRUE)
+@define VALUE_DATE @eval (FALSE)
 
 # // Output Date Formats
 @define MONTH_FORMAT ("%Y %b %d") # // 2010 Jun 10

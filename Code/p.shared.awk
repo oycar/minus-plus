@@ -20,76 +20,76 @@
 # Include header
 @include "mpx.h"
 
-# This function actually reads the CBA formatted record
-# It is very minimal
-function read_price(  a, p, t, x, symbol, date_string) {
-  # Check syntax
-  assert(7 == NF, "Illegal price record syntax <" $0 ">")
+# # This function actually reads the CBA formatted record
+# # It is very minimal
+# function read_price(  a, p, t, x, symbol, date_string) {
+#   # Check syntax
+#   assert(7 == NF, "Illegal price record syntax <" $0 ">")
+#
+#   # closing price
+#   p = $6
+#   if (near_zero(p))
+#     next # Nothing to do
+#
+#   # The symbol has to be expanded
+#   # the symbol needs a prefix and suffix , usually ASSET.CAPITAL.SHARES and ASX
+#   # but an entry like these can override them, eg
+#   # <<, Asset_Prefix, ASSET.CAPITAL.LONDON,>>
+#   # <<, Asset_Suffix, FTSE,>>
+#   #
+#   symbol = Asset_Prefix ":" $1 "." Asset_Suffix
+#
+#   # Ok
+#   a = initialize_account(symbol)
+#   t = read_date(YYMMDD_date($2), CLOSING) # Set the CLOSING price
+#
+#   # A legal date?
+#   assert(DATE_ERROR != t, Read_Date_Error)
+#
+#   # Logging
+# @ifeq LOG read_price
+#   if (t in Price[a])
+#     printf "DUP " > STDERR
+#   else
+#     printf "    " > STDERR
+#   printf "%32s[%s] => %12.4f\n", a, get_date(t), p > STDERR
+# @endif
+#
+#   # Set the price
+#   set_entry(Price[a], p, t)
+#
+#   # Done
+# }
 
-  # closing price
-  p = $6
-  if (near_zero(p))
-    next # Nothing to do
-
-  # The symbol has to be expanded
-  # the symbol needs a prefix and suffix , usually ASSET.CAPITAL.SHARES and ASX
-  # but an entry like these can override them, eg
-  # <<, Asset_Prefix, ASSET.CAPITAL.LONDON,>>
-  # <<, Asset_Suffix, FTSE,>>
-  #
-  symbol = Asset_Prefix ":" $1 "." Asset_Suffix
-
-  # Ok
-  a = initialize_account(symbol)
-  t = read_date(YYMMDD_date($2), CLOSING) # Set the CLOSING price
-
-  # A legal date?
-  assert(DATE_ERROR != t, Read_Date_Error)
-
-  # Logging
-@ifeq LOG read_price
-  if (t in Price[a])
-    printf "DUP " > STDERR
-  else
-    printf "    " > STDERR
-  printf "%32s[%s] => %12.4f\n", a, get_date(t), p > STDERR
-@endif
-
-  # Set the price
-  set_entry(Price[a], p, t)
-
-  # Done
-}
-
-# This function actually reads the CBA formatted record
-# It is very minimal
-# Syntax of record is
-# $1 => Qualifying_Date, $2 => Dividend amount in cents (ignored), $3 => Record Date (ignored), $4 => Payment_Date (used), $5 => Dividend_Type (ignored), $6... (ignored)
-# 07/03/2019,77.3232,08/03/2019,26/03/2019,I,-,
-function read_qualifying_dates(  a, q_date, p_date) {
-  # Get the account
-  a = initialize_account(Asset_Prefix ":" Symbol)
-
-  # Ok
-  q_date = read_date($1) # Default hour - qualifying date
-
-  # A legal date?
-  if (q_date < Epoch)
-    return
-
-  # Now the payment date
-  p_date = read_date($4) # Default hour - payment date
-  assert(p_date > q_date, "Qualifying date <" $1 "> must always precede payment date <" $4 ">")
-  # Logging
-@ifeq LOG read_qualifying_dates
-  printf "\t%s, %s\n", get_date(q_date), get_date(p_date) > STDERR
-@endif
-
-  # Set the ex dividend date
-  set_entry(Payment_Date[a], p_date, q_date)
-
-  # Done
-}
+# # This function actually reads the CBA formatted record
+# # It is very minimal
+# # Syntax of record is
+# # $1 => Qualifying_Date, $2 => Dividend amount in cents (ignored), $3 => Record Date (ignored), $4 => Payment_Date (used), $5 => Dividend_Type (ignored), $6... (ignored)
+# # 07/03/2019,77.3232,08/03/2019,26/03/2019,I,-,
+# function read_qualifying_dates(  a, q_date, p_date) {
+#   # Get the account
+#   a = initialize_account(Asset_Prefix ":" Symbol)
+#
+#   # Ok
+#   q_date = read_date($1) # Default hour - qualifying date
+#
+#   # A legal date?
+#   if (q_date < Epoch)
+#     return
+#
+#   # Now the payment date
+#   p_date = read_date($4) # Default hour - payment date
+#   assert(p_date > q_date, "Qualifying date <" $1 "> must always precede payment date <" $4 ">")
+#   # Logging
+# @ifeq LOG read_qualifying_dates
+#   printf "\t%s, %s\n", get_date(q_date), get_date(p_date) > STDERR
+# @endif
+#
+#   # Set the ex dividend date
+#   set_entry(Payment_Date[a], p_date, q_date)
+#
+#   # Done
+# }
 
 # get the most relevant ex-dividend date
 function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) {
@@ -2036,7 +2036,7 @@ function read_date(date_string, hour,
     # If still before the EPOCH this is an error
     if (year < EPOCH_START) {
       Read_Date_Error = "Date <" date_string "> is before epoch start <" get_date(Epoch) ">"
-      return DATE_ERROR
+      return BEFORE_EPOCH
     }
   } else {
     Read_Date_Error = "Can't parse date <" date_string "> wrong number of fields"

@@ -81,13 +81,8 @@ BEGIN {
     DATE_FORMAT = MONTH_FORMAT
   LONG_FORMAT = (DATE_FORMAT " %H::%M::%S")
 
-  # Logic conventions
-  TRUE  = 1
-  FALSE = 0
-
-  # Price Record is Off
-  Price_Record = FALSE
-  Q_Record = FALSE
+  # Import Record is Off
+  Import_Record = FALSE
   Filter_Data = ""
 
   # Suppress rounding errors
@@ -164,12 +159,20 @@ BEGIN {
   # Default currency
   Journal_Currency = JOURNAL_CURRENCY
 
+  # Importing CSV files
   # Default Price Record Class
   Asset_Prefix = ASSET_PREFIX
-  Asset_Suffix = ASSET_SUFFIX
 
-  # A Symbol
-  Symbol = ""
+  # A short name
+  Asset_Symbol = ""
+
+  # Default import fields
+  Key_Field    = KEY_FIELD
+  Value_Field  = VALUE_FIELD
+  Key_Date     = KEY_DATE
+  Value_Date   = VALUE_DATE
+  Import_Zero  = FALSE
+  Import_Time  = HOUR
 
   # Set special accounts
   set_special_accounts()
@@ -244,72 +247,222 @@ BEGIN {
   next
 }
 
-# Special price records can be imported in CBA style metastock format
+# # Special price records can be imported in CBA style metastock format
+# ##
+# /^PP/ {
+#   # Format is
+#   # PP
+#   # BST,171124,.895,.895,.895,.895,0
+#   # BST,171127,0,0,0,0,0
+#   # BST,171128,.9,.9,.9,.9,35000
+#   # PP
+#   #
+#   # which is
+#   # <SYMBOL>, DATE, OPEN, HIGH, LOW, CLOSE, VOLUME
+#   #
+#   Price_Record = !Price_Record
+#
+#   # If this is the end of the price record reset the Asset_Prefix to the default value
+#   if (!Price_Record) {
+#     Asset_Prefix = ASSET_PREFIX
+#     Asset_Suffix = ASSET_SUFFIX
+#   } else # If Price_Record is ever set make sure to filter out of range entries
+#     if (Filter_Data !~ /Price/)
+#       Filter_Data = Filter_Data " Price "
+#   next
+# }
+#
+# 1 == Price_Record {
+#   read_price()
+#   next
+# }
+#
+# # Another special case (temporary?) is to import ex-dividend dates
+# ##
+# /^QQ/ {
+#   # Format is
+#   # <<,Code,BHP.ASX,>>
+#   # QQ
+#   # 07/03/2019,77.3232,08/03/2019,26/03/2019,I,-,
+#   # 10/01/2019,141.2742,11/01/2019,30/01/2019,S,-,
+#   # 06/09/2018,88.5453,07/09/2018,25/09/2018,F,-,
+#   # 08/03/2018,70.5852,09/03/2018,27/03/2018,I,-,
+#   # QQ
+#   #
+#   # which is
+#   # EX-DATE, IGNORE...
+#   #
+#   Q_Record = !Q_Record
+#
+#   # If Q_Record is ever set make sure to filter out of range entries
+#   if (Q_Record) {
+#     if (Filter_Data !~ /Payment_Date/)
+#       Filter_Data = Filter_Data " Payment_Date "
+# @ifeq LOG read_qualifying_dates
+#     printf "Get Ex-Dividend Dates\n" > STDERR
+#     if (Symbol)
+#       printf "\t%s\n", Symbol > STDERR
+# @endif
+#   }
+#
+#   next
+# }
+#
+# 1 == Q_Record {
+#   read_qualifying_dates()
+#   next
+# }
+
+# Import CSV data
+# This imports an array
+# Array[Key] => Value
+# Need the following variables
+# array_name
+# key_field
+# value_field
+#
 ##
-/^PP/ {
-  # Format is
-  # PP
-  # BST,171124,.895,.895,.895,.895,0
-  # BST,171127,0,0,0,0,0
-  # BST,171128,.9,.9,.9,.9,35000
-  # PP
+/^CSV/ {
   #
-  # which is
-  # <SYMBOL>, DATE, OPEN, HIGH, LOW, CLOSE, VOLUME
-  #
-  Price_Record = !Price_Record
+  Import_Record = !Import_Record
+  if (Import_Record) {
+    # Filter data
+    # Currently importing Import_Array
+    if (!index(Filter_Data, Import_Array_Name))
+      # Make sure this array will be filtered
+      Filter_Data = Filter_Data " " Import_Array_Name
 
-  # If this is the end of the price record reset the Asset_Prefix to the default value
-  if (!Price_Record) {
-    Asset_Prefix = ASSET_PREFIX
-    Asset_Suffix = ASSET_SUFFIX
-  } else # If Price_Record is ever set make sure to filter out of range entries
-    if (Filter_Data !~ /Price/)
-      Filter_Data = Filter_Data " Price "
-  next
-}
-
-1 == Price_Record {
-  read_price()
-  next
-}
-
-# Another special case (temporary?) is to import ex-dividend dates
-##
-/^QQ/ {
-  # Format is
-  # <<,Code,BHP.ASX,>>
-  # QQ
-  # 07/03/2019,77.3232,08/03/2019,26/03/2019,I,-,
-  # 10/01/2019,141.2742,11/01/2019,30/01/2019,S,-,
-  # 06/09/2018,88.5453,07/09/2018,25/09/2018,F,-,
-  # 08/03/2018,70.5852,09/03/2018,27/03/2018,I,-,
-  # QQ
-  #
-  # which is
-  # EX-DATE, IGNORE...
-  #
-  Q_Record = !Q_Record
-
-  # If Q_Record is ever set make sure to filter out of range entries
-  if (Q_Record) {
-    if (Filter_Data !~ /Payment_Date/)
-      Filter_Data = Filter_Data " Payment_Date "
-@ifeq LOG read_qualifying_dates
-    printf "Get Ex-Dividend Dates\n" > STDERR
-    if (Symbol)
-      printf "\t%s\n", Symbol > STDERR
+@ifeq LOG import_record
+    printf "Import %s\n",  Import_Array_Name > STDERR
+    printf "Filter %s\n",  Filter_Data > STDERR
+    if (Asset_Symbol)
+      printf "\t%s\n", Asset_Symbol > STDERR
 @endif
+
+    # Prices are given a special import time
+    if ("Price" == Import_Array_Name) {
+      Import_Time = CLOSING
+      Import_Zero = FALSE
+    } else
+      Import_Time = HOUR
+  } else
+    # End of block
+    # Reset asset default prefix
+    Asset_Prefix = ASSET_PREFIX
+
+  # End of if importing
+
+  next
+}
+
+
+1 == Import_Record {
+  import_csv_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
+  next
+}
+
+
+
+##
+## Imports CSV format
+## <<,Account_Code, XYZ.ABC,>>
+## <<,Key_Field, X,>>
+## <<,Value_Field, Y,>>
+## <<,Key_Date, 1,>>
+## <<,Import_Array_Name, XXX,>>
+##
+## So for CBA price Data
+## <<,Key_Field,1,>>
+## <<,Value_Field,5>>
+## <<,Date_Field, "1:0">>
+##
+## Yields
+## XXX[read_date($1)] => $5
+##
+## CSV
+## field-1, field-2, ..., field-NF
+## ...
+## CSV
+
+##
+##
+# This reads an array from csv data
+function import_csv_data(array, symbol, name,
+                         a, key, value) {
+
+
+  # Check syntax
+  assert(Key_Field <= NF && Date_Field <= NF, "Illegal import record syntax <" $0 ">")
+
+  # Ok
+  a = initialize_account(symbol)
+
+  # Get the key
+  if (Key_Date) {
+    key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
+    assert(DATE_ERROR != key, Read_Date_Error)
+
+    # Skip dates before the epoch
+    if (BEFORE_EPOCH == key)
+      return
+  } else
+    key = trim($Key_Field)
+
+  # Get the value
+  if (Value_Date) {
+    value = read_date(trim($Value_Field))
+    assert(DATE_ERROR != value, Read_Date_Error)
+
+    # Skip dates before the epoch
+    if (BEFORE_EPOCH == value)
+      return
+  } else {
+    value = trim($Value_Field)
+    if (!Import_Zero && near_zero(value))
+      return # Don't import zero values
   }
 
-  next
+  # Logging
+@ifeq LOG import_record
+  printf "%s %16s[%11s] => %14s\n", name, Leaf[a], ternary(Key_Date, get_date(key), key), ternary(Value_Date, get_date(value), print_cash(value, 4)) > STDERR
+@endif
+
+  # Set the price
+  set_entry(array[a], value, key)
+
+  # Done
 }
 
-1 == Q_Record {
-  read_qualifying_dates()
-  next
-}
 
+# # This function actually reads the CBA formatted record
+# # It is very minimal
+# # Syntax of record is
+# # $1 => Qualifying_Date, $2 => Dividend amount in cents (ignored), $3 => Record Date (ignored), $4 => Payment_Date (used), $5 => Dividend_Type (ignored), $6... (ignored)
+# # 07/03/2019,77.3232,08/03/2019,26/03/2019,I,-,
+# function read_qualifying_dates(  a, q_date, p_date) {
+#   # Get the account
+#   a = initialize_account(Asset_Prefix ":" Symbol)
+#
+#   # Ok
+#   q_date = read_date($1) # Default hour - qualifying date
+#
+#   # A legal date?
+#   if (q_date < Epoch)
+#     return
+#
+#   # Now the payment date
+#   p_date = read_date($4) # Default hour - payment date
+#   assert(p_date > q_date, "Qualifying date <" $1 "> must always precede payment date <" $4 ">")
+#   # Logging
+# @ifeq LOG read_qualifying_dates
+#   printf "\t%s, %s\n", get_date(q_date), get_date(p_date) > STDERR
+# @endif
+#
+#   # Set the ex dividend date
+#   set_entry(Payment_Date[a], p_date, q_date)
+#
+#   # Done
+# }
 
 /START_JOURNAL/ {
   if (NF > 1) {
@@ -1546,7 +1699,7 @@ END {
     "Inconsistent snapshot file:\n\tExpected Version => " Current_Version " Found Version => " MPX_Version)
 
   # Delete empty accounts
-  # Filter out data entries that were added by PP or QQ records
+  # Filter out data entries that were added by import CSV records
   # that do not overlap with the the holding period
   filter_data(Last_Time)
 
@@ -1590,7 +1743,7 @@ END {
 # Filter Data
 #
 # Filter out irrelevant data - data that is out-of-range
-# can arise from reading p&q records
+# can arise from importing records
 #
 function filter_data(now,      array_names, name) {
   # Which data arrays are to be filtered
@@ -1663,8 +1816,14 @@ function filter_array(now, data_array, name,
           data_array[a][key] = stack[key]
         delete stack
 
-      } else # Never held!
+      } else {
+        # Never held!
+@ifeq LOG filter_data
+        printf "%12s Never Held!\n", Leaf[a] > STDERR
+@endif
         unlink_account(a)
+      }
+
 
     # End of each asset a
 }
@@ -1945,7 +2104,6 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     printf "\tEOFY => %s\n",  get_date(FY_Time, LONG_FORMAT)> STDERR
 @endif
     if (now > FY_Time) {
-      #t = yesterday(FY_Time, HOUR)
       t = just_before(FY_Time)
       catch_up_depreciation = depreciate_now(ac, t)
       if (!near_zero(catch_up_depreciation)) {
