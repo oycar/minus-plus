@@ -342,77 +342,6 @@ END {
 
 
 
-# # This function actually reads the CBA formatted record
-# # It is very minimal
-# function read_price(  a, p, t, x, symbol, date_string) {
-#   # Check syntax
-#   assert(7 == NF, "Illegal price record syntax <" $0 ">")
-#
-#   # closing price
-#   p = $6
-#   if (near_zero(p))
-#     next # Nothing to do
-#
-#   # The symbol has to be expanded
-#   # the symbol needs a prefix and suffix , usually ASSET.CAPITAL.SHARES and ASX
-#   # but an entry like these can override them, eg
-#   # <<, Asset_Prefix, ASSET.CAPITAL.LONDON,>>
-#   # <<, Asset_Suffix, FTSE,>>
-#   #
-#   symbol = Asset_Prefix ":" $1 "." Asset_Suffix
-#
-#   # Ok
-#   a = initialize_account(symbol)
-#   t = read_date(YYMMDD_date($2), CLOSING) # Set the CLOSING price
-#
-#   # A legal date?
-#   assert(DATE_ERROR != t, Read_Date_Error)
-#
-#   # Logging
-# @ifeq LOG read_price
-#   if (t in Price[a])
-#     printf "DUP " > STDERR
-#   else
-#     printf "    " > STDERR
-#   printf "%32s[%s] => %12.4f\n", a, get_date(t), p > STDERR
-# @endif
-#
-#   # Set the price
-#   set_entry(Price[a], p, t)
-#
-#   # Done
-# }
-
-# # This function actually reads the CBA formatted record
-# # It is very minimal
-# # Syntax of record is
-# # $1 => Qualifying_Date, $2 => Dividend amount in cents (ignored), $3 => Record Date (ignored), $4 => Payment_Date (used), $5 => Dividend_Type (ignored), $6... (ignored)
-# # 07/03/2019,77.3232,08/03/2019,26/03/2019,I,-,
-# function read_qualifying_dates(  a, q_date, p_date) {
-#   # Get the account
-#   a = initialize_account(Asset_Prefix ":" Symbol)
-#
-#   # Ok
-#   q_date = read_date($1) # Default hour - qualifying date
-#
-#   # A legal date?
-#   if (q_date < Epoch)
-#     return
-#
-#   # Now the payment date
-#   p_date = read_date($4) # Default hour - payment date
-#   assert(p_date > q_date, "Qualifying date <" $1 "> must always precede payment date <" $4 ">")
-#   # Logging
-# @ifeq LOG read_qualifying_dates
-#   printf "\t%s, %s\n", get_date(q_date), get_date(p_date) > STDERR
-# @endif
-#
-#   # Set the ex dividend date
-#   set_entry(Payment_Date[a], p_date, q_date)
-#
-#   # Done
-# }
-
 # get the most relevant ex-dividend date
 function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) {
 
@@ -2654,7 +2583,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("c" ~ /[cC]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("F" ~ /[cC]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2750,7 +2679,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("c" ~ /[dD]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("F" ~ /[dD]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2795,7 +2724,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("c" ~ /[oO]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("F" ~ /[oO]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2950,7 +2879,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("c" ~ /[bB]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("F" ~ /[bB]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3073,7 +3002,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("c" ~ /[mM]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("F" ~ /[mM]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3146,7 +3075,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("c" ~ /[fF]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("F" ~ /[fF]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3277,7 +3206,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("c" ~ /[qQ]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("F" ~ /[qQ]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3326,7 +3255,7 @@ function print_dividend_qualification(now, past, is_detailed,
         qualifying_date = ((yesterday(get_exdividend_date(underlying_asset, key), (12))) + 1)
 
         # If this date is valid now compute the proportion of the dividend is qualified
-        assert(qualifying_date > 0, sprintf("%s: %s <%s>",  Leaf[a], Read_Date_Error, get_date(key)))
+        assert(qualifying_date > (-1), sprintf("%s: %s <%s>",  Leaf[a], Read_Date_Error, get_date(key)))
 
         # These are the units that were qualified on the qualifying date
         qualified_units = ((Qualification_Window)?(  ((__MPX_H_TEMP__ = find_key(Qualified_Units[underlying_asset],   qualifying_date))?( Qualified_Units[underlying_asset][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Qualified_Units[underlying_asset][0]):( 0))))):( ((__MPX_H_TEMP__ = find_key(Total_Units[underlying_asset],    qualifying_date))?( Total_Units[underlying_asset][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[underlying_asset][0]):( 0))))))
@@ -3836,7 +3765,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, x, header) {
 
   # Print this out?
-  write_stream = (("c" ~ /[tT]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("F" ~ /[tT]|[aA]|^[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4946,7 +4875,7 @@ function import_csv_data(array, symbol, name,
   }
 
   # Can only call this once and check a legal timestamp
-  assert(Last_Time != (-1), Read_Date_Error)
+  assert(Last_Time > (-1), Read_Date_Error)
 
   # Need to initialize FY information
   if (FY) {
@@ -4959,7 +4888,7 @@ function import_csv_data(array, symbol, name,
       Start_Time = Last_Time
     else {
       Start_Time = read_date(Start_Time)
-      assert((-1) != Start_Time, "Start_Time " Read_Date_Error)
+      assert((-1) < Start_Time, "Start_Time " Read_Date_Error)
     }
 
     # Is a specific stop time set
@@ -4967,7 +4896,7 @@ function import_csv_data(array, symbol, name,
       Stop_Time = Future
     else {
       Stop_Time = read_date(Stop_Time)
-      assert((-1) != Stop_Time, "Stop_Time " Read_Date_Error)
+      assert((-1) < Stop_Time, "Stop_Time " Read_Date_Error)
     }
   }
 
@@ -5239,7 +5168,7 @@ function read_input_record(   t, n, a, threshold) {
   t = read_date($1)
 
   # t should be positive
-  assert(t != (-1), Read_Date_Error)
+  assert(t > (-1), Read_Date_Error)
 
   # If this is a new time check if it is a new FY
   if (t > Last_Time) {

@@ -34,8 +34,9 @@ MPXDIR=~/Cloudstation/Projects/Minus-Plus/Code
 
 # Usage
 USAGE="Usage: $(basename $0) [-a: show-account-transactions] [-c: journal-currency] [-e export-format] [-f: financial-year] [-i mpx-information-and-copyright-notice]\
- [-l: log-function] [-p: write-price-file] [-q: dividend-qualification-window] [-r: print-extra-report] [-s show-all-transactions]\
- [-v write-variable-1,write_variable-2,...] [-w: write-state-file] [-x show-extra-detail] [-z preprocess_only] <data-import-file> <state-file> <journal-file>"
+ [-l: log-function] [-p: write-price-file] [-q: dividend-qualification-window] [-s show-all-transactions]\
+ [-v write-variable-1,write_variable-2,...] [-w: write-state-file] [-x show-extra-detail] [-z preprocess_only]\
+ [-ABCDFMOQTZ extra-report-toggles] <data-import-file> <state-file> <journal-file>"
 
 # This is a simple front end for mpx
 # it handles arguments and runs the preprocessor
@@ -51,7 +52,7 @@ preprocess_only=false
 qualify_window=0
 Show_All=0
 Show_Extra=0
-Show_Reports="bcot" # Default reports
+Show_Reports="" # Default reports
 
 # Default journal currency and type
 journal_currency="AUD"
@@ -62,7 +63,7 @@ shopt -s expand_aliases
 alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
 
 # logging is an array
-while getopts ":a:c:ef:F:il:p:q:r:sv:w:xz" opt; do
+while getopts ":a:c:ef:il:p:q:sv:w:xzABCDFMOQTZ" opt; do
     case $opt in
 
     a)
@@ -117,9 +118,18 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
       qualify_window=$OPTARG
       ;;
 
-    r) # Show reports
-      Show_Reports=$OPTARG
-    ;;
+    # Skinning a cat another way
+    A) Show_Reports+="A";;
+    B) Show_Reports+="B";;
+    C) Show_Reports+="C";;
+    D) Show_Reports+="D";;
+    F) Show_Reports+="F";;
+    M) Show_Reports+="M";;
+    O) Show_Reports+="O";;
+    Q) Show_Reports+="Q";;
+    T) Show_Reports+="T";;
+    Z) Show_Reports+="Z";;
+
 
     s) # show all transactions
       Show_All=true
@@ -168,7 +178,11 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   #
   # Preprocess (if its available...)
   if command -v app >/dev/null 2>&1 ; then
-    app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" -D SHOW_REPORTS=\"${Show_Reports}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+    if [ -z ${Show_Reports} ] ; then
+      app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+    else
+      app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" -D SHOW_REPORTS=\"${Show_Reports}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+    fi
   else
     echo >&2 "mpx warning: No preprocessor gpp found - using prebuilt mpx script."
   fi

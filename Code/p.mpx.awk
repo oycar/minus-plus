@@ -420,7 +420,7 @@ function import_csv_data(array, symbol, name,
   }
 
   # Can only call this once and check a legal timestamp
-  assert(Last_Time != DATE_ERROR, Read_Date_Error)
+  assert(Last_Time > DATE_ERROR, Read_Date_Error)
 
   # Need to initialize FY information
   if (FY) {
@@ -433,7 +433,7 @@ function import_csv_data(array, symbol, name,
       Start_Time = Last_Time
     else {
       Start_Time = read_date(Start_Time)
-      assert(DATE_ERROR != Start_Time, "Start_Time " Read_Date_Error)
+      assert(DATE_ERROR < Start_Time, "Start_Time " Read_Date_Error)
     }
 
     # Is a specific stop time set
@@ -441,7 +441,7 @@ function import_csv_data(array, symbol, name,
       Stop_Time = Future
     else {
       Stop_Time = read_date(Stop_Time)
-      assert(DATE_ERROR != Stop_Time, "Stop_Time " Read_Date_Error)
+      assert(DATE_ERROR < Stop_Time, "Stop_Time " Read_Date_Error)
     }
   }
 
@@ -721,7 +721,7 @@ function read_input_record(   t, n, a, threshold) {
   t = read_date($1)
 
   # t should be positive
-  assert(t != DATE_ERROR, Read_Date_Error)
+  assert(t > DATE_ERROR, Read_Date_Error)
 
   # If this is a new time check if it is a new FY
   if (t > Last_Time) {

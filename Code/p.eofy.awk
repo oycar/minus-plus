@@ -1031,7 +1031,7 @@ function print_dividend_qualification(now, past, is_detailed,
         qualifying_date = just_after(yesterday(get_exdividend_date(underlying_asset, key), HOUR))
 
         # If this date is valid now compute the proportion of the dividend is qualified
-        assert(qualifying_date > 0, sprintf("%s: %s <%s>",  Leaf[a], Read_Date_Error, get_date(key)))
+        assert(qualifying_date > DATE_ERROR, sprintf("%s: %s <%s>",  Leaf[a], Read_Date_Error, get_date(key)))
 
         # These are the units that were qualified on the qualifying date
         qualified_units = get_qualified_units(underlying_asset, qualifying_date)
