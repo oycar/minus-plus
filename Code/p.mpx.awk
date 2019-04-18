@@ -247,73 +247,7 @@ BEGIN {
   next
 }
 
-# # Special price records can be imported in CBA style metastock format
-# ##
-# /^PP/ {
-#   # Format is
-#   # PP
-#   # BST,171124,.895,.895,.895,.895,0
-#   # BST,171127,0,0,0,0,0
-#   # BST,171128,.9,.9,.9,.9,35000
-#   # PP
-#   #
-#   # which is
-#   # <SYMBOL>, DATE, OPEN, HIGH, LOW, CLOSE, VOLUME
-#   #
-#   Price_Record = !Price_Record
-#
-#   # If this is the end of the price record reset the Asset_Prefix to the default value
-#   if (!Price_Record) {
-#     Asset_Prefix = ASSET_PREFIX
-#     Asset_Suffix = ASSET_SUFFIX
-#   } else # If Price_Record is ever set make sure to filter out of range entries
-#     if (Filter_Data !~ /Price/)
-#       Filter_Data = Filter_Data " Price "
-#   next
-# }
-#
-# 1 == Price_Record {
-#   read_price()
-#   next
-# }
-#
-# # Another special case (temporary?) is to import ex-dividend dates
-# ##
-# /^QQ/ {
-#   # Format is
-#   # <<,Code,BHP.ASX,>>
-#   # QQ
-#   # 07/03/2019,77.3232,08/03/2019,26/03/2019,I,-,
-#   # 10/01/2019,141.2742,11/01/2019,30/01/2019,S,-,
-#   # 06/09/2018,88.5453,07/09/2018,25/09/2018,F,-,
-#   # 08/03/2018,70.5852,09/03/2018,27/03/2018,I,-,
-#   # QQ
-#   #
-#   # which is
-#   # EX-DATE, IGNORE...
-#   #
-#   Q_Record = !Q_Record
-#
-#   # If Q_Record is ever set make sure to filter out of range entries
-#   if (Q_Record) {
-#     if (Filter_Data !~ /Payment_Date/)
-#       Filter_Data = Filter_Data " Payment_Date "
-# @ifeq LOG read_qualifying_dates
-#     printf "Get Ex-Dividend Dates\n" > STDERR
-#     if (Symbol)
-#       printf "\t%s\n", Symbol > STDERR
-# @endif
-#   }
-#
-#   next
-# }
-#
-# 1 == Q_Record {
-#   read_qualifying_dates()
-#   next
-# }
-
-# Import CSV data
+# Import data
 # This imports an array
 # Array[Key] => Value
 # Need the following variables
@@ -322,7 +256,7 @@ BEGIN {
 # value_field
 #
 ##
-/^CSV/ {
+/^QQ/  {
   #
   Import_Record = !Import_Record
   if (Import_Record) {

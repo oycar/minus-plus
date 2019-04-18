@@ -99,8 +99,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                                                             key,
                                                             description,
                                                             parcel_gains, adjusted_gains,
-                                                            held_time,
-                                                            label, no_header_printed, proceeds_label,
+                                                            held_time, price_key,
+                                                            label, no_header_printed, to_label, proceeds_label,
 
                                                             long_gains, short_gains,
                                                             long_losses, short_losses,
@@ -130,6 +130,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
   # The proceeds label
   proceeds_label = ternary(is_realized_flag, "Proceeds", "  Value ")
+  to_label       = ternary(is_realized_flag, "  To  ", "Latest")
 
   # No header printed
   no_header_printed = TRUE
@@ -147,8 +148,10 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       units_sold = 0
 
       # The price
-      if (!is_realized_flag)
-        current_price = find_entry(Price[a], now)
+      if (!is_realized_flag) {
+        last_key = find_key(Price[a], now)
+        current_price = find_entry(Price[a], last_key)
+      }
 
       # Need to select parcels by sold date
       for (p = 0; p < Number_Parcels[a]; p++ ) {
@@ -161,14 +164,14 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           if (!gains_event) {
             # Two types of header
             if (is_detailed)
-              printf "\n%12s %10s %9s %11s %10s %16s %15s %14s %14s %15s %9s %20s %15s\n",
-                      "Asset", "Parcel", "Units", "From", "To", "Cost", proceeds_label,
+              printf "\n%12s %10s %8s %13s %11s   %12s %11s %14s %13s %14s %15s %9s %18s %15s\n",
+                      "Asset", "Parcel", "Units", "Cost", "From", to_label, "Price", proceeds_label,
                       "Reduced", "Adjusted", "Accounting", "Type", "Taxable", "Per Unit" > reports_stream
             else if (no_header_printed) {
-              printf "%12s %12s %12s %15s %14s %14s %15s %9s %20s\n",
-                     "Asset", "Units", "Cost",
+              printf "%12s %11s %13s %11s   %12s %11s %14s %13s %14s %15s %9s %18s\n",
+                     "Asset", "Units", "Cost", "From", to_label, "Price",
                      proceeds_label, "Reduced", "Adjusted", "Accounting", "Type", "Taxable" > reports_stream
-              underline(125, 6, reports_stream)
+              underline(162, 6, reports_stream)
             }
 
             # print Name
@@ -180,9 +183,10 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           # Keep track
           units = Units_Held[a][p]
           units_sold += units
-          if (is_realized_flag)
+          if (is_realized_flag) {
             held_time = get_held_time(Held_Until[a][p], Held_From[a][p])
-          else
+            last_key = Held_Until[a][p]
+          } else
             held_time = get_held_time(sold_time, Held_From[a][p])
 
           reduced_cost  += get_parcel_cost(a, p, now)
@@ -190,9 +194,10 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
           # cash in and out
           parcel_cost     =   get_cash_in(a, p, now)
-          if (is_realized_flag)
+          if (is_realized_flag) {
             parcel_proceeds = - get_cash_out(a, p, now)
-          else
+            current_price = parcel_proceeds / units
+          } else
             parcel_proceeds = current_price * Units_Held[a][p]
 
           cost           += parcel_cost
@@ -250,9 +255,10 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           # Print out the parcel information
           if (is_detailed) {
             # If printing out in detail
-            printf "%13s %7d %12.3f [%11s, %11s] %14s %14s %14s %14s %14s %14s %15s %15s\n",
-              label, p, units, get_date(Held_From[a][p]), get_date(Held_From[a][p] + held_time),
-                 print_cash(parcel_cost),
+            printf "%13s %7d %12.3f %14s %11s   %10s %10s %14s %14s %14s %14s %14s %14s %14s\n",
+              label, p, units, print_cash(parcel_cost), get_date(Held_From[a][p]),
+                 get_date(last_key),
+                 print_cash(current_price),
                  print_cash(parcel_proceeds),
                  print_cash(get_parcel_cost(a, p, now)),
                  print_cash(get_parcel_cost(a, p, now, TRUE)),
@@ -271,12 +277,14 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       if (gains_event) {
         if (is_detailed)
           # Detailed format
-          underline(158, 8, reports_stream)
+          underline(170, 6, reports_stream)
 
         # The output starts here
-        printf "%13s %*.3f %*s %14s %14s %14s ",
-               label, (12 + 8 * is_detailed), units_sold, (14 + 27 * is_detailed),
-               print_cash(cost), print_cash(proceeds),
+        printf "%13s %*.3f %15s %7s   %10s %10s %14s %14s %14s ",
+               label, (11 + 8 * is_detailed), units_sold, print_cash(cost),
+               get_date(Held_From[a][0]),
+               get_date(last_key),
+               print_cash(current_price), print_cash(proceeds),
                print_cash(reduced_cost), print_cash(adjusted_cost) > reports_stream
 
         # Stack the gains & losses
@@ -293,7 +301,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
         for (key in Gains_Stack)
           break
         if (key) {
-          printf "%14s %14s %15s",
+          printf "%14s %14s %14s",
             print_cash(proceeds - reduced_cost),
             key, print_cash(- Gains_Stack[key]) > reports_stream
           delete Gains_Stack[key]
@@ -302,16 +310,17 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
         # Extra entries
         for (key in Gains_Stack)
-          printf "\n%*s %15s", 116 + 35 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
+          printf "\n%*s %15s", 153 + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
 
-        printf "\n\n" > reports_stream
+        printf "\n" > reports_stream
         delete Gains_Stack[key]
       } # End of gains event
     } # End of each asset
 
   # Final line
   if (!is_detailed)
-    underline(125, 6, reports_stream)
+    underline(162, 6, reports_stream)
+  printf "\n" > reports_stream
 
   # Stack the gains & losses
   Gains_Stack[Long_Gains_Key]   = sum_long_gains
