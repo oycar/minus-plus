@@ -62,7 +62,7 @@ journal_currency="AUD"
 shopt -s expand_aliases
 alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
 
-# logging is an array
+# Interpret options 
 while getopts ":a:c:ef:il:p:q:sv:w:xzABCDFMOQTZ" opt; do
     case $opt in
 

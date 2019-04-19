@@ -61,14 +61,14 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define   SHOW_REPORTS "bcot"
 @endif # // SHOW_REPORTS
 
-@define report_balance(s)   ternary(SHOW_REPORTS ~ /[bB]|[aA]|^[zZ]/, s, DEVNULL)
-@define report_capital(s)   ternary(SHOW_REPORTS ~ /[cC]|[aA]|^[zZ]/, s, DEVNULL)
-@define report_deferred(s)  ternary(SHOW_REPORTS ~ /[dD]|[aA]|^[zZ]/, s, DEVNULL)
-@define report_fixed(s)     ternary(SHOW_REPORTS ~ /[fF]|[aA]|^[zZ]/, s, DEVNULL)
-@define report_market(s)    ternary(SHOW_REPORTS ~ /[mM]|[aA]|^[zZ]/, s, DEVNULL)
-@define report_operating(s) ternary(SHOW_REPORTS ~ /[oO]|[aA]|^[zZ]/, s, DEVNULL)
-@define report_dividend(s)  ternary(SHOW_REPORTS ~ /[qQ]|[aA]|^[zZ]/, s, DEVNULL)
-@define report_tax(s)       ternary(SHOW_REPORTS ~ /[tT]|[aA]|^[zZ]/, s, DEVNULL)
+@define report_balance(s)   ternary(SHOW_REPORTS ~ /[bB]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_capital(s)   ternary(SHOW_REPORTS ~ /[cC]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_deferred(s)  ternary(SHOW_REPORTS ~ /[dD]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_fixed(s)     ternary(SHOW_REPORTS ~ /[fF]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_market(s)    ternary(SHOW_REPORTS ~ /[mM]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_operating(s) ternary(SHOW_REPORTS ~ /[oO]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_dividend(s)  ternary(SHOW_REPORTS ~ /[qQ]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_tax(s)       ternary(SHOW_REPORTS ~ /[tT]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
 
 # // Default Asset Prefix for Price Lists
 @define ASSET_PREFIX ("ASSET.CAPITAL.SHARES")

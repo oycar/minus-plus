@@ -256,7 +256,7 @@ BEGIN {
 # value_field
 #
 ##
-/^QQ/  {
+/^%%/  {
   #
   Import_Record = !Import_Record
   if (Import_Record) {
@@ -289,12 +289,10 @@ BEGIN {
   next
 }
 
-
 1 == Import_Record {
   import_csv_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
   next
 }
-
 
 
 ##
@@ -308,15 +306,14 @@ BEGIN {
 ## So for CBA price Data
 ## <<,Key_Field,1,>>
 ## <<,Value_Field,5>>
-## <<,Date_Field, "1:0">>
 ##
 ## Yields
 ## XXX[read_date($1)] => $5
 ##
-## CSV
+## %%
 ## field-1, field-2, ..., field-NF
 ## ...
-## CSV
+## %%
 
 ##
 ##
@@ -326,7 +323,7 @@ function import_csv_data(array, symbol, name,
 
 
   # Check syntax
-  assert(Key_Field <= NF && Date_Field <= NF, "Illegal import record syntax <" $0 ">")
+  assert(Key_Field <= NF && Value_Field <= NF, "Illegal import record syntax <" $0 ">")
 
   # Ok
   a = initialize_account(symbol)
@@ -367,36 +364,6 @@ function import_csv_data(array, symbol, name,
   # Done
 }
 
-
-# # This function actually reads the CBA formatted record
-# # It is very minimal
-# # Syntax of record is
-# # $1 => Qualifying_Date, $2 => Dividend amount in cents (ignored), $3 => Record Date (ignored), $4 => Payment_Date (used), $5 => Dividend_Type (ignored), $6... (ignored)
-# # 07/03/2019,77.3232,08/03/2019,26/03/2019,I,-,
-# function read_qualifying_dates(  a, q_date, p_date) {
-#   # Get the account
-#   a = initialize_account(Asset_Prefix ":" Symbol)
-#
-#   # Ok
-#   q_date = read_date($1) # Default hour - qualifying date
-#
-#   # A legal date?
-#   if (q_date < Epoch)
-#     return
-#
-#   # Now the payment date
-#   p_date = read_date($4) # Default hour - payment date
-#   assert(p_date > q_date, "Qualifying date <" $1 "> must always precede payment date <" $4 ">")
-#   # Logging
-# @ifeq LOG read_qualifying_dates
-#   printf "\t%s, %s\n", get_date(q_date), get_date(p_date) > STDERR
-# @endif
-#
-#   # Set the ex dividend date
-#   set_entry(Payment_Date[a], p_date, q_date)
-#
-#   # Done
-# }
 
 /START_JOURNAL/ {
   if (NF > 1) {
