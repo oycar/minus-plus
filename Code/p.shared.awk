@@ -21,7 +21,7 @@
 @include "mpx.h"
 
 # get the most relevant ex-dividend date
-function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) {
+function get_exdividend_date(a, now,   value, key, discrepancy) {
 
   # We start at the time "now" in the accounts
   # Which should be equal to or shortly after the
@@ -30,30 +30,26 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
   # search back to find the earlier entries
   # since Payment_Date[ex_dividend_date] => now-ish
   if (a in Payment_Date) {
-    # Get the most recent key - this is an ex-dividend date
-    exdividend_key = find_key(Payment_Date[a], now)
 
-    # The payment date that corresponds to this key
-    value = Payment_Date[a][exdividend_key]
+    # Get the most recent payment date
+    value = find_entry(Payment_Date[a], now)
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
     if (value > now) {
       Read_Date_Error = "Payment date is later than current date"
       return DATE_ERROR
-    }
-    else if (near_zero(discrepancy))
-      return exdividend_key
+    } else if (near_zero(discrepancy))
+      return found_key
 
     # Some times dividends are paid out of order, for example
     # a special or buyback dividend might have an extra
     # long qualification period - so look ahead more dividends
     # until the discrepancy increases
     #
-    key = exdividend_key
+    key = found_key
     while (key) {
-      key = find_key(Payment_Date[a], just_before(key))
-      value = Payment_Date[a][key]
+      value = find_entry(Payment_Date[a], just_before(key))
       if ((now - value) > discrepancy)
         # A worse match
         break
@@ -61,19 +57,20 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
       # A better match
       discrepancy = now - value
       if (near_zero(discrepancy))
-        return key
+        return found_key
 
       # Save  this match
-      exdividend_key = key
+      key = found_key
     }
 
-    # Best match was exdividend_key
+    # Best match was key
     if (discrepancy > ONE_WEEK) {
       Read_Date_Error = "Failed to find a payment date within one week of current date"
       return DATE_ERROR
     }
 
-    return exdividend_key
+    # Return it
+    return key
   }
 
   # Failed to find a qualification date

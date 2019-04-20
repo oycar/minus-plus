@@ -97,6 +97,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 @define add_field(s, field) ternary("" == s, field, ternary("" == field, s, (s ", " field)))
 @define find_entry(array, now) ternary(__MPX_KEY__ = find_key(array, now), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
+@define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
 #
 # // Useful shorthands for various kinds of accounts
@@ -136,7 +137,6 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 
 # //
-@define find_entry(array, now) ternary(__MPX_H_TEMP__ = find_key(array, now), array[__MPX_H_TEMP__], ternary(0 == __MPX_H_TEMP__, array[0], 0))
 @define is_star(a) ((a) ~ /^*/)
 @define is_individual (Journal_Type ~ /^IND$/)
 @define is_smsf (Journal_Type ~ /^SMSF$/)

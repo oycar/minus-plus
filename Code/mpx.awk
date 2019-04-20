@@ -129,6 +129,7 @@ END {
 
 
 
+
 #
 # // Useful shorthands for various kinds of accounts
 
@@ -167,7 +168,6 @@ END {
 
 
 # //
-
 
 
 
@@ -343,7 +343,7 @@ END {
 
 
 # get the most relevant ex-dividend date
-function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) {
+function get_exdividend_date(a, now,   value, key, discrepancy) {
 
   # We start at the time "now" in the accounts
   # Which should be equal to or shortly after the
@@ -352,30 +352,26 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
   # search back to find the earlier entries
   # since Payment_Date[ex_dividend_date] => now-ish
   if (a in Payment_Date) {
-    # Get the most recent key - this is an ex-dividend date
-    exdividend_key = find_key(Payment_Date[a], now)
 
-    # The payment date that corresponds to this key
-    value = Payment_Date[a][exdividend_key]
+    # Get the most recent payment date
+    value = ((__MPX_KEY__ = find_key(Payment_Date[a],  now))?( Payment_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Payment_Date[a][0]):( 0))))
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
     if (value > now) {
       Read_Date_Error = "Payment date is later than current date"
       return (-1)
-    }
-    else if ((((discrepancy) <= Epsilon) && ((discrepancy) >= -Epsilon)))
-      return exdividend_key
+    } else if ((((discrepancy) <= Epsilon) && ((discrepancy) >= -Epsilon)))
+      return (__MPX_KEY__)
 
     # Some times dividends are paid out of order, for example
     # a special or buyback dividend might have an extra
     # long qualification period - so look ahead more dividends
     # until the discrepancy increases
     #
-    key = exdividend_key
+    key = (__MPX_KEY__)
     while (key) {
-      key = find_key(Payment_Date[a], ((key) - 1))
-      value = Payment_Date[a][key]
+      value = ((__MPX_KEY__ = find_key(Payment_Date[a],  ((key) - 1)))?( Payment_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Payment_Date[a][0]):( 0))))
       if ((now - value) > discrepancy)
         # A worse match
         break
@@ -383,19 +379,20 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
       # A better match
       discrepancy = now - value
       if ((((discrepancy) <= Epsilon) && ((discrepancy) >= -Epsilon)))
-        return key
+        return (__MPX_KEY__)
 
       # Save  this match
-      exdividend_key = key
+      key = (__MPX_KEY__)
     }
 
-    # Best match was exdividend_key
+    # Best match was key
     if (discrepancy > 604800) {
       Read_Date_Error = "Failed to find a payment date within one week of current date"
       return (-1)
     }
 
-    return exdividend_key
+    # Return it
+    return key
   }
 
   # Failed to find a qualification date
@@ -1336,7 +1333,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
     if (flag = ((a) ~ /^ASSET\.FIXED[.:]/))
       adjustment = x / get_cost(a, now)
     else
-      adjustment = x / ((__MPX_H_TEMP__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[a][0]):( 0))))
+      adjustment = x / ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
 
     # Debugging
 
@@ -1463,7 +1460,7 @@ function get_cost(a, now,     i, sum_cost) {
     }
     return sum_cost
   } else if (a in Cost_Basis) # Cash-like
-    return ((__MPX_H_TEMP__ = find_key(Cost_Basis[a],  now))?( Cost_Basis[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Cost_Basis[a][0]):( 0))))
+    return ((__MPX_KEY__ = find_key(Cost_Basis[a],  now))?( Cost_Basis[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Cost_Basis[a][0]):( 0))))
 
   return 0
 }
@@ -1507,7 +1504,7 @@ function sum_market_gains(now,     sum, a) {
   for (a in Leaf)
     if (((a) ~ /^ASSET\.CAPITAL[.:]/) && is_open(a, now))
       # The asset must be active
-      sum += get_cost(a, now) - ((__MPX_H_TEMP__ = find_key(Price[a],  now))?( Price[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Price[a][0]):( 0)))) * ((__MPX_H_TEMP__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[a][0]):( 0))))
+      sum += get_cost(a, now) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
 
   # All done - negative values are gains
   return sum
@@ -1519,7 +1516,7 @@ function sum_cost_elements(array, now,     sum_elements, e) {
 
   sum_elements = 0
   for (e in array) # Should this include [0] or not?
-    sum_elements += ((__MPX_H_TEMP__ = find_key(array[e],  now))?( array[e][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( array[e][0]):( 0))))
+    sum_elements += ((__MPX_KEY__ = find_key(array[e],  now))?( array[e][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( array[e][0]):( 0))))
   return sum_elements
 }
 
@@ -1534,7 +1531,7 @@ function get_cost_element(a, element, now,      i, sum_cost) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if ((Held_Until[(a)][( i)] > ( now))) # This is an unsold parcel at time (now)
-        sum_cost += ((__MPX_H_TEMP__ = find_key(Accounting_Cost[a][i][element],  now))?( Accounting_Cost[a][i][element][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Accounting_Cost[a][i][element][0]):( 0))))
+        sum_cost += ((__MPX_KEY__ = find_key(Accounting_Cost[a][i][element],  now))?( Accounting_Cost[a][i][element][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][i][element][0]):( 0))))
     }
   }
 
@@ -1546,12 +1543,12 @@ function get_parcel_element(a, p, element, now, adjusted) {
   # Adjusted or reduced cost?
   if (adjusted)
     # The adjusted parcel cost
-    adjusted = (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ element],  ( now)))?( Tax_Adjustments[a][ p][ element][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ element][0]):( 0)))))
+    adjusted = (((__MPX_KEY__ = find_key(Tax_Adjustments[a][ p][ element],  ( now)))?( Tax_Adjustments[a][ p][ element][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Adjustments[a][ p][ element][0]):( 0)))))
   else
     adjusted = 0
 
   # This elements costs
-  return ((__MPX_H_TEMP__ = find_key(Accounting_Cost[a][p][element],  now))?( Accounting_Cost[a][p][element][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Accounting_Cost[a][p][element][0]):( 0)))) - adjusted
+  return ((__MPX_KEY__ = find_key(Accounting_Cost[a][p][element],  now))?( Accounting_Cost[a][p][element][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][p][element][0]):( 0)))) - adjusted
 }
 
 # The initial cost
@@ -1560,7 +1557,7 @@ function get_cash_in(a, i, now) {
   # Is the account open?
   if (now >= Held_From[a][i])
     # Yes - always element I
-    return ((__MPX_H_TEMP__ = find_key(Accounting_Cost[a][i][I],  Held_From[a][i]))?( Accounting_Cost[a][i][I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Accounting_Cost[a][i][I][0]):( 0)))) # The Held_From time ensures  that later element I costs do not impact the result
+    return ((__MPX_KEY__ = find_key(Accounting_Cost[a][i][I],  Held_From[a][i]))?( Accounting_Cost[a][i][I][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][i][I][0]):( 0)))) # The Held_From time ensures  that later element I costs do not impact the result
 
   # No - so no activity
   return 0
@@ -1899,7 +1896,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       # Refine factor at parcel level
       if (first_year_factor) {
         # First year sometimes has modified depreciation
-        if (((((((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( now)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0)))))) <= Epsilon) && (((((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( now)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0)))))) >= -Epsilon)))
+        if (((((((__MPX_KEY__ = find_key(Tax_Adjustments[a][ p][ I],  ( now)))?( Tax_Adjustments[a][ p][ I][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Adjustments[a][ p][ I][0]):( 0)))))) <= Epsilon) && (((((__MPX_KEY__ = find_key(Tax_Adjustments[a][ p][ I],  ( now)))?( Tax_Adjustments[a][ p][ I][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Adjustments[a][ p][ I][0]):( 0)))))) >= -Epsilon)))
           delta = first_year_factor
         else
           delta = factor
@@ -2337,7 +2334,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                                                             description,
                                                             parcel_gains, adjusted_gains,
                                                             held_time, price_key,
-                                                            label, no_header_printed, to_label, proceeds_label,
+                                                            label, no_header_printed,
+                                                            to_label, proceeds_label,
 
                                                             asset_width,
 
@@ -2391,8 +2389,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
       # The price
       if (!is_realized_flag) {
-        last_key = find_key(Price[a], now)
-        current_price = ((__MPX_H_TEMP__ = find_key(Price[a],  last_key))?( Price[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Price[a][0]):( 0))))
+        current_price = ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0))))
+        last_key = (__MPX_KEY__)
       }
 
       # Need to select parcels by sold date
@@ -2407,11 +2405,17 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             # Two types of header
             if (is_detailed)
               printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
-                      asset_width, "Asset", 10, "Parcel", 8, "Units", 13, "Cost", 11, "From", 12, to_label, 11, "Price", 16, proceeds_label,
-                      13, "Reduced", 14, "Adjusted", 15, "Accounting", 9, "Type", 18, "Taxable", 15, "Per Unit" > reports_stream
+                      asset_width, "Asset", 10, "Parcel",
+                      7, "Units", 14, "Cost",
+                      11, "From", 12, to_label,
+                      11, "Price", 16, proceeds_label,
+                      13, "Reduced", 14, "Adjusted",
+                      15, "Accounting", 9, "Type",
+                      18, "Taxable", 15, "Per Unit" > reports_stream
             else if (no_header_printed) {
               printf "%*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
-                     asset_width, "Asset", 11, "Units", 13, "Cost", 11, "From", 12, to_label, 11, "Price", 16, proceeds_label,
+                     asset_width, "Asset",
+                     10, "Units", 14, "Cost", 11, "From", 12, to_label, 11, "Price", 16, proceeds_label,
                      13, "Reduced", 14, "Adjusted", 15, "Accounting", 9, "Type", 18, "Taxable" > reports_stream
               underline(152 + asset_width, 6, reports_stream)
             }
@@ -2500,8 +2504,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
                  asset_width + 1, label,
                  7, p,
-                 12, units,
-                 14, print_cash(parcel_cost),
+                 11, units,
+                 15, print_cash(parcel_cost),
                  11, get_date(Held_From[a][p]),
                  10, get_date(last_key),
                  12, print_cash(current_price),
@@ -2564,6 +2568,9 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           printf "\n%*s %15s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
 
         printf "\n" > reports_stream
+        if (is_detailed)
+         printf "\n" > reports_stream
+
         delete Gains_Stack[key]
       } # End of gains event
     } # End of each asset
@@ -2597,7 +2604,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("F" ~ /[cC]|[aA]/ && "F" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("QC" ~ /[cC]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2693,7 +2700,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("F" ~ /[dD]|[aA]/ && "F" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("QC" ~ /[dD]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2738,7 +2745,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("F" ~ /[oO]|[aA]/ && "F" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("QC" ~ /[oO]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2893,7 +2900,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("F" ~ /[bB]|[aA]/ && "F" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("QC" ~ /[bB]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3016,7 +3023,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("F" ~ /[mM]|[aA]/ && "F" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("QC" ~ /[mM]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3089,7 +3096,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("F" ~ /[fF]|[aA]/ && "F" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("QC" ~ /[fF]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3138,7 +3145,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
         sum_open += open_cost
 
         # Always get the parcel depreciation
-        parcel_depreciation = (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( open_key)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0))))) - (((__MPX_H_TEMP__ = find_key(Tax_Adjustments[a][ p][ I],  ( close_key)))?( Tax_Adjustments[a][ p][ I][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Tax_Adjustments[a][ p][ I][0]):( 0)))))
+        parcel_depreciation = (((__MPX_KEY__ = find_key(Tax_Adjustments[a][ p][ I],  ( open_key)))?( Tax_Adjustments[a][ p][ I][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Adjustments[a][ p][ I][0]):( 0))))) - (((__MPX_KEY__ = find_key(Tax_Adjustments[a][ p][ I],  ( close_key)))?( Tax_Adjustments[a][ p][ I][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Adjustments[a][ p][ I][0]):( 0)))))
 
         #  Just track the total depreciation
         account_depreciation   += parcel_depreciation
@@ -3222,7 +3229,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("F" ~ /[qQ]|[aA]/ && "F" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("QC" ~ /[qQ]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3274,10 +3281,10 @@ function print_dividend_qualification(now, past, is_detailed,
         assert(qualifying_date > (-1), sprintf("%s: %s <%s>",  Leaf[a], Read_Date_Error, get_date(key)))
 
         # These are the units that were qualified on the qualifying date
-        qualified_units = ((Qualification_Window)?(  ((__MPX_H_TEMP__ = find_key(Qualified_Units[underlying_asset],   qualifying_date))?( Qualified_Units[underlying_asset][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Qualified_Units[underlying_asset][0]):( 0))))):( ((__MPX_H_TEMP__ = find_key(Total_Units[underlying_asset],    qualifying_date))?( Total_Units[underlying_asset][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[underlying_asset][0]):( 0))))))
+        qualified_units = ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[underlying_asset],   qualifying_date))?( Qualified_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[underlying_asset][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[underlying_asset],    qualifying_date))?( Total_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[underlying_asset][0]):( 0))))))
 
         # Now get the total units
-        total_units = ((__MPX_H_TEMP__ = find_key(Total_Units[underlying_asset],   qualifying_date))?( Total_Units[underlying_asset][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[underlying_asset][0]):( 0))))
+        total_units = ((__MPX_KEY__ = find_key(Total_Units[underlying_asset],   qualifying_date))?( Total_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[underlying_asset][0]):( 0))))
 
         # If not all units are qualified need to check the second half of the Qualification Window
         if (!(((total_units - qualified_units) <= Epsilon) && ((total_units - qualified_units) >= -Epsilon))) {
@@ -3781,7 +3788,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, x, header) {
 
   # Print this out?
-  write_stream = (("F" ~ /[tT]|[aA]/ && "F" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("QC" ~ /[tT]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4022,7 +4029,7 @@ function income_tax_aud(now, past, benefits,
     # Foreign offsets have complex rules too :( sigh ):
     #
     # If they are not greater than the Foreign_Offset_Limit it is ok to just use  them
-    if (foreign_offsets > ((__MPX_H_TEMP__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Foreign_Offset_Limit[0]):( 0))))) {
+    if (foreign_offsets > ((__MPX_KEY__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Foreign_Offset_Limit[0]):( 0))))) {
       # But they are greater  ....
       # we have taxable_income
       # and income_tax
@@ -4036,7 +4043,7 @@ function income_tax_aud(now, past, benefits,
       if ((Journal_Type ~ /^IND$/))
         extra_tax += get_tax(now, Medicare_Levy, taxable_income - foreign_income + foreign_expenses)
       if (extra_tax < foreign_offsets)
-        foreign_offsets = max(((__MPX_H_TEMP__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Foreign_Offset_Limit[0]):( 0)))), extra_tax)
+        foreign_offsets = max(((__MPX_KEY__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Foreign_Offset_Limit[0]):( 0)))), extra_tax)
 
       printf "\t%40s\n", "Foreign Offset Limit Applied" > write_stream
     } else
@@ -4257,7 +4264,7 @@ function income_tax_aud(now, past, benefits,
 
   # If this is SMSF the levy is required
   if ((Journal_Type ~ /^SMSF$/))
-    printf "\t%40s %32s\n", "Supervisory Levy", print_cash(((__MPX_H_TEMP__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( ATO_Levy[0]):( 0))))) > write_stream
+    printf "\t%40s %32s\n", "Supervisory Levy", print_cash(((__MPX_KEY__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( ATO_Levy[0]):( 0))))) > write_stream
 
   # Medicare levy (if any)
   if (!(((medicare_levy) <= Epsilon) && ((medicare_levy) >= -Epsilon))) {
@@ -4274,7 +4281,7 @@ function income_tax_aud(now, past, benefits,
   tax_due = tax_owed - (tax_paid + tax_with)
   set_cost(TAX, - tax_due, now)
   underline(81, 0, write_stream)
-  printf "%48s %32s\n\n\n", "AMOUNT DUE OR REFUNDABLE", print_cash(((__MPX_H_TEMP__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( ATO_Levy[0]):( 0)))) + tax_due) > write_stream
+  printf "%48s %32s\n\n\n", "AMOUNT DUE OR REFUNDABLE", print_cash(((__MPX_KEY__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( ATO_Levy[0]):( 0)))) + tax_due) > write_stream
 
   # Clean up balance sheet - watch out for unbalanced transactions
   # Save contribution tax accounted for
@@ -4449,7 +4456,7 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   if (((x) >  Epsilon)) {
     # Only distribute actual delta_profits to the reserve
     # Compute the net allocated profits in the current period
-    x *= ((__MPX_H_TEMP__ = find_key(Reserve_Rate,  now))?( Reserve_Rate[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Reserve_Rate[0]):( 0))))
+    x *= ((__MPX_KEY__ = find_key(Reserve_Rate,  now))?( Reserve_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Reserve_Rate[0]):( 0))))
 
     # The only reserve set in eofy actions so use now
     adjust_cost(RESERVE, -x, now)
@@ -5397,7 +5404,7 @@ function parse_transaction(now, a, b, units, amount,
       # This is GST collected
       # The transaction itself will be posted later a => b
       # Need to adjust amount transacted
-      amount -= (g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_H_TEMP__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount)
+      amount -= (g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount)
       print_transaction(now, ("# GST " Leaf[b]), GST, b, II, g)
 
       # GST claimed
@@ -5444,7 +5451,7 @@ function parse_transaction(now, a, b, units, amount,
 
     # Get the number of units to be sold in the special case of sell all
     if ("SELL" == Write_Units) {
-      units = - ((__MPX_H_TEMP__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[a][0]):( 0))))
+      units = - ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
       Write_Units = sprintf("%10.3f", units)
     }
 
@@ -5463,7 +5470,7 @@ function parse_transaction(now, a, b, units, amount,
         # A sale
         # A, B, -U,  (1 - g) * x
         # G, B,  0,        g * x
-        g = - GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_H_TEMP__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount
+        g = - GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount
 
         # This must be recorded
         # This reduces GST liability
@@ -5474,7 +5481,7 @@ function parse_transaction(now, a, b, units, amount,
         # We Have A, B, -U, x - b, g
         # Produce A, B, -U, x - (1 - g) * x, # Note sign change with other case
         #         B, G,  0,           g * x, # Sign change engenders sense change in accounts
-        g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_H_TEMP__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * current_brokerage
+        g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * current_brokerage
 
         # This must be recorded
         print_transaction(now, ("# GST " Leaf[a]), b, GST, II, g)
@@ -5567,12 +5574,12 @@ function parse_transaction(now, a, b, units, amount,
         # A  purchase
         # A, B, U, (1 - g) * x
         # A, G, 0,      g * x
-        g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_H_TEMP__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount
+        g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount
       else
         # Brokerage Present => Adjust Brokerage
         # Produce A, B, U, x + (1 - g) * b
         #         A, G,  0,         g * b
-        g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_H_TEMP__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * current_brokerage
+        g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * current_brokerage
 
       # Non-zero GST to be paid
       adjust_cost(GST, g, now)
@@ -5662,7 +5669,7 @@ function parse_transaction(now, a, b, units, amount,
       # An expense
       # A, B, 0, (1 - g) * x
       # A, G, 0,      g * x
-      g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_H_TEMP__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount
+      g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount
 
       # Non-zero GST to be paid - transfer from EXPENSE account
       adjust_cost(GST,  g, now)
@@ -5711,9 +5718,9 @@ function set_account_term(a, now) {
 
     # Don't use real value again
     Real_Value[1] = 0
-  } else if ((a in Maturity_Date) && now > ((__MPX_H_TEMP__ = find_key(Maturity_Date[a],  ((now) - 1)))?( Maturity_Date[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Maturity_Date[a][0]):( 0))))) {
+  } else if ((a in Maturity_Date) && now > ((__MPX_KEY__ = find_key(Maturity_Date[a],  ((now) - 1)))?( Maturity_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Maturity_Date[a][0]):( 0))))) {
     # Compute the maturity date
-    Extra_Timestamp = add_months(now, ((__MPX_H_TEMP__ = find_key(Account_Term[a],  now))?( Account_Term[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Account_Term[a][0]):( 0)))))
+    Extra_Timestamp = add_months(now, ((__MPX_KEY__ = find_key(Account_Term[a],  now))?( Account_Term[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Account_Term[a][0]):( 0)))))
     (Maturity_Date[a][( now)] = ( Extra_Timestamp))
   } else
     # No term was set
@@ -5800,11 +5807,11 @@ function checkset(now, a, account, units, amount, is_check,
         quantity = get_value(account, now); break
       case "PRICE" :
         assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[(account)])))
-        quantity = ((__MPX_H_TEMP__ = find_key(Price[account],  now))?( Price[account][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Price[account][0]):( 0)))); break
+        quantity = ((__MPX_KEY__ = find_key(Price[account],  now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))); break
 
       case "COST" : quantity = get_cost(account, now); break
 
-      case "UNITS" : quantity = ((__MPX_H_TEMP__ = find_key(Total_Units[account],   now))?( Total_Units[account][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[account][0]):( 0)))); break
+      case "UNITS" : quantity = ((__MPX_KEY__ = find_key(Total_Units[account],   now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0)))); break
       default : assert((0), sprintf("%s => I don't know how to check %s\n",
                                       (Leaf[(account)]), action))
     }
@@ -5823,7 +5830,7 @@ function checkset(now, a, account, units, amount, is_check,
           amount /= units
         else # Just use the current cost if zero or negative units specified
           # If you want to set a zero value use PRICE instead
-          amount = get_cost(account, now) / ((__MPX_H_TEMP__ = find_key(Total_Units[account],   now))?( Total_Units[account][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[account][0]):( 0))))
+          amount = get_cost(account, now) / ((__MPX_KEY__ = find_key(Total_Units[account],   now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0))))
 
       case "PRICE" :
         # This is a single unit
@@ -6124,7 +6131,7 @@ function filter_array(now, data_array, name,
 function get_value(a, now) {
   # Depreciating assets are different
   if (((a) ~ /^ASSET\.CAPITAL[.:]/))
-    return (((__MPX_H_TEMP__ = find_key(Price[a],  now))?( Price[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Price[a][0]):( 0)))) * ((__MPX_H_TEMP__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[a][0]):( 0)))))
+    return (((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))))
 
   # Just the cost
   return get_cost(a, now)
@@ -6150,7 +6157,7 @@ function sell_qualified_units(a, u, now, half_window,      du, dq, key, next_key
 
 
     # How many provisionally qualified units are at the key entry?
-    dq = ((Qualification_Window)?(  ((__MPX_H_TEMP__ = find_key(Qualified_Units[a],   key))?( Qualified_Units[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_H_TEMP__ = find_key(Total_Units[a],    key))?( Total_Units[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[a][0]):( 0)))))) - ((Qualification_Window)?(  ((__MPX_H_TEMP__ = find_key(Qualified_Units[a],   next_key))?( Qualified_Units[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_H_TEMP__ = find_key(Total_Units[a],    next_key))?( Total_Units[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Total_Units[a][0]):( 0))))))
+    dq = ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   key))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[a],    key))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))))) - ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   next_key))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[a],    next_key))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))))
 
     # Assert all parcels must be positive
     assert(((dq) >  Epsilon), sprintf("Found a non-positive provisional parcel of units %s[%s] => %.3f",
@@ -6212,7 +6219,7 @@ function get_unrealized_gains(a, now,
 
   # Sum the total value of the asset
   gains = 0
-  current_price = ((__MPX_H_TEMP__ = find_key(Price[a],  now))?( Price[a][__MPX_H_TEMP__]):( ((0 == __MPX_H_TEMP__)?( Price[a][0]):( 0))))
+  current_price = ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0))))
 
 
 

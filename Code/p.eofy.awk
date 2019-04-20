@@ -100,7 +100,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                                                             description,
                                                             parcel_gains, adjusted_gains,
                                                             held_time, price_key,
-                                                            label, no_header_printed, to_label, proceeds_label,
+                                                            label, no_header_printed,
+                                                            to_label, proceeds_label,
 
                                                             asset_width,
 
@@ -154,8 +155,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
       # The price
       if (!is_realized_flag) {
-        last_key = find_key(Price[a], now)
-        current_price = find_entry(Price[a], last_key)
+        current_price = find_entry(Price[a], now)
+        last_key = found_key
       }
 
       # Need to select parcels by sold date
@@ -170,11 +171,17 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             # Two types of header
             if (is_detailed)
               printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
-                      asset_width, "Asset", 10, "Parcel", 8, "Units", 13, "Cost", 11, "From", 12, to_label, 11, "Price", 16, proceeds_label,
-                      13, "Reduced", 14, "Adjusted", 15, "Accounting", 9, "Type", 18, "Taxable", 15, "Per Unit" > reports_stream
+                      asset_width, "Asset", 10, "Parcel",
+                      7, "Units", 14, "Cost",
+                      11, "From", 12, to_label,
+                      11, "Price", 16, proceeds_label,
+                      13, "Reduced", 14, "Adjusted",
+                      15, "Accounting", 9, "Type",
+                      18, "Taxable", 15, "Per Unit" > reports_stream
             else if (no_header_printed) {
               printf "%*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
-                     asset_width, "Asset", 11, "Units", 13, "Cost", 11, "From", 12, to_label, 11, "Price", 16, proceeds_label,
+                     asset_width, "Asset",
+                     10, "Units", 14, "Cost", 11, "From", 12, to_label, 11, "Price", 16, proceeds_label,
                      13, "Reduced", 14, "Adjusted", 15, "Accounting", 9, "Type", 18, "Taxable" > reports_stream
               underline(152 + asset_width, 6, reports_stream)
             }
@@ -263,8 +270,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
                  asset_width + 1, label,
                  7, p,
-                 12, units,
-                 14, print_cash(parcel_cost),
+                 11, units,
+                 15, print_cash(parcel_cost),
                  11, get_date(Held_From[a][p]),
                  10, get_date(last_key),
                  12, print_cash(current_price),
@@ -327,6 +334,9 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           printf "\n%*s %15s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
 
         printf "\n" > reports_stream
+        if (is_detailed)
+         printf "\n" > reports_stream
+
         delete Gains_Stack[key]
       } # End of gains event
     } # End of each asset
