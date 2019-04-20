@@ -20,82 +20,11 @@
 # Include header
 @include "mpx.h"
 
-# This function actually reads the CBA formatted record
-# It is very minimal
-function read_price(  a, p, t, x, symbol, date_string) {
-  # Check syntax
-  assert(7 == NF, "Illegal price record syntax <" $0 ">")
-
-  # closing price
-  p = $6
-  if (near_zero(p))
-    next # Nothing to do
-
-  # The symbol has to be expanded
-  # the symbol needs a prefix and suffix , usually ASSET.CAPITAL.SHARES and ASX
-  # but an entry like these can override them, eg
-  # <<, Asset_Prefix, ASSET.CAPITAL.LONDON,>>
-  # <<, Asset_Suffix, FTSE,>>
-  #
-  symbol = Asset_Prefix ":" $1 "." Asset_Suffix
-
-  # Ok
-  a = initialize_account(symbol)
-  t = read_date(YYMMDD_date($2), CLOSING) # Set the CLOSING price
-
-  # A legal date?
-  assert(DATE_ERROR != t, Read_Date_Error)
-
-  # Logging
-@ifeq LOG read_price
-  if (t in Price[a])
-    printf "DUP " > "/dev/stderr"
-  else
-    printf "    " > "/dev/stderr"
-  printf "%32s[%s] => %12.4f\n", a, get_date(t), p > "/dev/stderr"
-@endif
-
-  # Set the price
-  set_entry(Price[a], p, t)
-
-  # Done
-}
-
-# This function actually reads the CBA formatted record
-# It is very minimal
-# Syntax of record is
-# $1 => Qualifying_Date, $2 => Dividend amount in cents (ignored), $3 => Record Date (ignored), $4 => Payment_Date (used), $5 => Dividend_Type (ignored), $6... (ignored)
-# 07/03/2019,77.3232,08/03/2019,26/03/2019,I,-,
-function read_qualifying_dates(  a, q_date, p_date) {
-  # Get the account
-  a = initialize_account(Asset_Prefix ":" Symbol)
-
-  # Ok
-  q_date = read_date($1) # Default hour - qualifying date
-
-  # A legal date?
-  if (q_date < Epoch)
-    return
-
-  # Now the payment date
-  p_date = read_date($4) # Default hour - payment date
-  assert(p_date > q_date, "Qualifying date <" $1 "> must always precede payment date <" $4 ">")
-  # Logging
-@ifeq LOG read_qualifying_dates
-  printf "\t%s, %s\n", get_date(q_date), get_date(p_date) > "/dev/stderr"
-@endif
-
-  # Set the ex dividend date
-  set_entry(Payment_Date[a], p_date, q_date)
-
-  # Done
-}
-
 # get the most relevant ex-dividend date
 function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) {
 
   # We start at the time "now" in the accounts
-  # Whihc should be equal to or shortly after the
+  # Which should be equal to or shortly after the
   # payment date - now since  the
   # payment date must be after the qualifying date
   # search back to find the earlier entries
@@ -109,8 +38,10 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
-    if (value > now)
+    if (value > now) {
+      Read_Date_Error = "Payment date is later than current date"
       return DATE_ERROR
+    }
     else if (near_zero(discrepancy))
       return exdividend_key
 
@@ -137,13 +68,16 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
     }
 
     # Best match was exdividend_key
-    if (discrepancy > ONE_WEEK)
+    if (discrepancy > ONE_WEEK) {
+      Read_Date_Error = "Failed to find a payment date within one week of current date"
       return DATE_ERROR
+    }
 
     return exdividend_key
   }
 
   # Failed to find a qualification date
+  Read_Date_Error = "Failed to find any payment date"
   return DATE_ERROR
 }
 
@@ -172,15 +106,15 @@ function read_state(nf,    i, x, value) {
 
   # Logging
 @ifeq LOG read_state
-  printf "%s", Variable_Name > "/dev/stderr"
+  printf "%s", Variable_Name > STDERR
 @endif
 
   # Is this an array?
   if (nf == 1) { # No
     SYMTAB[Variable_Name] = value
 @ifeq LOG read_state
-  # Logging
-  printf " => %s\n", value > "/dev/stderr"
+    # Logging
+    printf " => %s\n", value > STDERR
 @endif
   } else {
     # The rest of the keys
@@ -194,8 +128,8 @@ function read_state(nf,    i, x, value) {
 @ifeq LOG read_state
     # Logging
     for (i = 1; i < nf; i++)
-      printf "[%s]", Variable_Keys[i] > "/dev/stderr"
-    printf " => %s\n", value > "/dev/stderr"
+      printf "[%s]", Variable_Keys[i] > STDERR
+    printf " => %s\n", value > STDERR
 @endif
 
     # Set the array value
@@ -209,7 +143,9 @@ function set_array(array, keys, first_key, last_key, value, flag) {
   # The idea of deleting the a temporary scalar entry in this function was based on
   # Ed Morton's code found here => https://groups.google.com/forum/#!topic/comp.lang.awk/vKiSODr6Bds
   # Catch errors
+@ifeq LOG DEBUG
   assert(isarray(array), "set_array: Not an array")
+@endif
 
   # Delete temporary key
   if (flag) {
@@ -252,9 +188,6 @@ function write_state(array_names, scalar_names,    name) {
   # The scalars - compact form
   for (name in scalar_names)
     printf "<<,%s,%s,>>\n", scalar_names[name], format_value(SYMTAB[scalar_names[name]]) > Write_State
-  #
-  # # The last line is (oddly enough) when the journal starts - this allows initialization to occur when file read back in
-  # printf "START_JOURNAL\n" > Write_State
 }
 
 # This walks the array that we want to dump to file
@@ -903,6 +836,8 @@ function get_date(time, format) {
   # ok - if format is zero use timestamp
   if (0 == format)
     return time
+  if (time == Future)
+    return "     -     "
   return strftime(format, time, UTC)
 }
 
@@ -1076,12 +1011,12 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # What proportion of the sum is allocated to each unit at time now?
 @ifeq LOG adjust_cost
-    printf "%s\n", a > "/dev/stderr"
-    printf "\tTimeStamp => %s\n", get_date(now) > "/dev/stderr"
-    printf "\tInitial Units => %.3f\n", get_units(a, now) > "/dev/stderr"
-    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
-    printf "\tCost Base Adjustment => %s\n", print_cash(x) > "/dev/stderr"
-    printf "\tCost Element         => %s\n", Cost_Element > "/dev/stderr"
+    printf "%s\n", a > STDERR
+    printf "\tTimeStamp => %s\n", get_date(now) > STDERR
+    printf "\tInitial Units => %.3f\n", get_units(a, now) > STDERR
+    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > STDERR
+    printf "\tCost Base Adjustment => %s\n", print_cash(x) > STDERR
+    printf "\tCost Element         => %s\n", Cost_Element > STDERR
 @endif # LOG
     # Either divide adjustment between all open parcels OR
     # concentrate with a parcel with the same timestamp
@@ -1094,7 +1029,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
 @ifeq LOG adjust_cost
         # Debugging
-        printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
+        printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > STDERR
 @endif # LOG
         # Also record the parents cost
         # If this is a tax adjustment then only negative costs are significant
@@ -1115,7 +1050,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 @ifeq LOG adjust_cost
     printf "\tAverage Adjustment Per Unit  => %s\n",
       print_cash(x / get_units(a, now)) \
-       > "/dev/stderr"
+       > STDERR
 @endif # LOG
 
     # Scan back down the parcels held and unsold at time now
@@ -1130,7 +1065,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # Debugging
 @ifeq LOG adjust_cost
-    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
+    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > STDERR
 @endif # LOG
 
     # Balance costs
@@ -1157,18 +1092,18 @@ function update_cost(a, x, now,      p) {
 
   # Logging
 @ifeq LOG update_cost
-  printf "\tp => %16s x => %11s Date => %11s sum => %11s\n", p, print_cash(x), get_date(now), print_cash(get_cost(p, now)) > "/dev/stderr"
+  printf "\tp => %16s x => %11s Date => %11s sum => %11s\n", p, print_cash(x), get_date(now), print_cash(get_cost(p, now)) > STDERR
 @endif # LOG
   update_cost(p, x, now)
 }
 
 function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,        cost_base) {
 @ifeq LOG adjust_cost
-  printf "%s\n", a > "/dev/stderr"
-  printf "\tTimeStamp => %s\n", get_date(now) > "/dev/stderr"
-  printf "\t\tParcel  => %05d", p  > "/dev/stderr"
-  printf " Opening Parcel Cost[%s]=> %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > "/dev/stderr"
-  printf "\t\t\t\tParcel Adjustment => %s\n", print_cash(parcel_adjustment) > "/dev/stderr"
+  printf "%s\n", a > STDERR
+  printf "\tTimeStamp => %s\n", get_date(now) > STDERR
+  printf "\t\tParcel  => %05d", p  > STDERR
+  printf " Opening Parcel Cost[%s]=> %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > STDERR
+  printf "\t\t\t\tParcel Adjustment => %s\n", print_cash(parcel_adjustment) > STDERR
 @endif # LOG
 
   # save the cost adjustment/reduction related to this parcel
@@ -1212,29 +1147,72 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,  
 
   # Debugging
 @ifeq LOG adjust_cost
-  printf "\t\t\t\tReduced Parcel Cost[%s] => %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > "/dev/stderr"
+  printf "\t\t\t\tReduced Parcel Cost[%s] => %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > STDERR
 @endif # LOG
 } # End of adjust_parcel_cost
 
+# # The idea of the "cost" of the account
+# # This is the same as the reduced cost
+# function get_cost(a, now,      i, sum_cost) {
+#   # Initial cost
+#   sum_cost = 0
+#
+#   # Adjustments for units bought
+#   if (is_unitized(a)) {
+#     for (i = 0; i < Number_Parcels[a]; i ++) {
+#       if (Held_From[a][i] > now) # All further transactions occured after (now)
+#         break # All done
+#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
+#         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
+#     }
+#   } else if (a in Cost_Basis) # Cash-like
+#     sum_cost = find_entry(Cost_Basis[a], now)
+#
+#   return sum_cost
+# }
+
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
-function get_cost(a, now,      i, sum_cost) {
-  # Initial cost
-  sum_cost = 0
-
+function get_cost(a, now,     i, sum_cost) {
   # Adjustments for units bought
   if (is_unitized(a)) {
+    # Initial cost
+    sum_cost = 0
+
     for (i = 0; i < Number_Parcels[a]; i ++) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
     }
+    return sum_cost
   } else if (a in Cost_Basis) # Cash-like
-    sum_cost = find_entry(Cost_Basis[a], now)
+    return find_entry(Cost_Basis[a], now)
 
-  return sum_cost
+  return 0
 }
+
+# The tax adjustments at time (now)
+# Note that depreciation is always a tax adjustment
+function get_cost_adjustment(a, now,   i, sum_adjustments) {
+  # Initial adjustments
+  sum_adjustments = 0
+
+  # Adjustments for units bought
+  # Do not apply to equities
+  if (is_asset(a)) {
+    for (i = 0; i < Number_Parcels[a]; i ++) {
+      if (Held_From[a][i] > now) # All further transactions occured after (now)
+        break # All done
+      if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
+        sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
+    }
+  }
+
+  return sum_adjustments
+}
+
+
 
 # set the cost to a specified value (new_cost)
 function set_cost(a, new_cost, now,     initial_cost) {
@@ -1261,6 +1239,10 @@ function sum_market_gains(now,     sum, a) {
 
 # Sum  the cost elements
 function sum_cost_elements(array, now,     sum_elements, e) {
+@ifeq LOG DEBUG
+  assert(isarray(array), "<" $0 "> sum_cost_elements:  needs an array")
+@endif
+
   sum_elements = 0
   for (e in array) # Should this include [0] or not?
     sum_elements += find_entry(array[e], now)
@@ -1286,7 +1268,7 @@ function get_cost_element(a, element, now,      i, sum_cost) {
 }
 
 # The parcel cost
-function get_parcel_element(a, p, element, now, adjusted,    sum) {
+function get_parcel_element(a, p, element, now, adjusted) {
   # Adjusted or reduced cost?
   if (adjusted)
     # The adjusted parcel cost
@@ -1295,11 +1277,7 @@ function get_parcel_element(a, p, element, now, adjusted,    sum) {
     adjusted = 0
 
   # This elements costs
-  sum = find_entry(Accounting_Cost[a][p][element], now) - adjusted
-
-  # Remove the cash out component
-  #return sum - get_cash_out(a, p, now)
-  return sum
+  return find_entry(Accounting_Cost[a][p][element], now) - adjusted
 }
 
 # The initial cost
@@ -1350,44 +1328,6 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 
   # Remove the cash out component
   return sum - get_cash_out(a, p, now)
-}
-
-# The tax adjustments at time (now)
-# Note that depreciation is always a tax adjustment
-function get_Tax_Adjustments(a, now,   i, sum_adjustments) {
-  # Initial adjustments
-  sum_adjustments = 0
-
-  # Adjustments for units bought
-  # Do not apply to equities
-  if (!is_equity(a)) {
-    for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
-        break # All done
-      sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
-    }
-  }
-
-  return sum_adjustments
-}
-
-# Get the tax adjustment for a particular element
-function get_tax_element_adjustment(a, element, now,      i, sum_adjustments) {
-  # Initial adjustments
-  sum_adjustments = 0
-
-  # Adjustments for units bought
-  # Do not apply to equities
-  if (!is_equity(a)) {
-    for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
-        break # All done
-      sum_adjustments += get_parcel_tax_adjustment(a, i, element, now)
-
-    }
-  }
-
-  return sum_adjustments
 }
 
 # Print out transactions
@@ -1461,8 +1401,6 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
   # Print statement
   # This could be a zero, single or double entry transaction
   #
-  # # floating point precision
-  # float_precision = ternary("" == float_precision, PRECISION, float_precision)
 
   # First the date
   string = sprintf("%11s", get_date(now))
@@ -1662,9 +1600,9 @@ function initialize_account(account_name,     class_name, array, p, n,
       Underlying_Asset[account_name] = initialize_account(linked_name)
 
 @ifeq LOG initialize_account
-      printf "Initialize Linked Account\n" > "/dev/stderr"
-      printf "\tIncome Account[%s] => %s\n", leaf_name, account_name > "/dev/stderr"
-      printf "\tLinked Account[%s] => %s\n", linked_name, Underlying_Asset[account_name] > "/dev/stderr"
+      printf "Initialize Linked Account\n" > STDERR
+      printf "\tIncome Account[%s] => %s\n", leaf_name, account_name > STDERR
+      printf "\tLinked Account[%s] => %s\n", linked_name, Underlying_Asset[account_name] > STDERR
 @endif
     }
 
@@ -1728,7 +1666,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
         # Already depreciated
 @ifeq LOG depreciate_now
         # Debugging
-        printf "\tAlready Depreciated to => %s\n", get_date(now) > "/dev/stderr"
+        printf "\tAlready Depreciated to => %s\n", get_date(now) > STDERR
 @endif # LOG
         continue # Get next parcel
       }
@@ -1742,10 +1680,10 @@ function depreciate_now(a, now,       p, delta, sum_delta,
 
 @ifeq LOG depreciate_now
       # Debugging
-      printf "\tParcel => %04d\n", p > "/dev/stderr"
+      printf "\tParcel => %04d\n", p > STDERR
       if (keys_in(Parcel_Tag, a, p))
-        printf "\tName   => %s\n", Parcel_Tag[a][p] > "/dev/stderr"
-      printf "\tMethod => %s\n", Method_Name[a] > "/dev/stderr"
+        printf "\tName   => %s\n", Parcel_Tag[a][p] > STDERR
+      printf "\tMethod => %s\n", Method_Name[a] > STDERR
 @endif # LOG
 
       # Refine factor at parcel level
@@ -1784,16 +1722,16 @@ function depreciate_now(a, now,       p, delta, sum_delta,
 
 @ifeq LOG depreciate_now
       # Debugging
-      printf "\tOpen  => %s\n", print_cash(open_value) > "/dev/stderr"
-      printf "\tDelta  => %s\n", print_cash(delta) > "/dev/stderr"
+      printf "\tOpen  => %s\n", print_cash(open_value) > STDERR
+      printf "\tDelta  => %s\n", print_cash(delta) > STDERR
       if (delta == open_value)
-        printf "\tZero Parcel => %d\n", p > "/dev/stderr"
+        printf "\tZero Parcel => %d\n", p > STDERR
 @endif # LOG
     } # End of if unsold parcel
   } # End of each parcel
 
 @ifeq LOG depreciate_now
-  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "depreciate_now", get_short_name(a), get_date(now), get_reduced_cost(a, now) > "/dev/stderr"
+  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "depreciate_now", get_short_name(a), get_date(now), get_reduced_cost(a, now) > STDERR
 @endif # LOG
 
   # Return the depreciation
@@ -1921,15 +1859,16 @@ function url_encode(string,     c, chars, url, i) {
   split(string, chars, "")
 
   # the encoded string
+  # loop in reverse order
   url = ""
   for (i in chars) {
     c = chars[i]
 
-    # Just append plain vanilla characters
+    # Just prepend plain vanilla characters
 	  if (c ~ /[0-9A-Za-z]/)
-	    url = url c
+	    url = c url
 	  else # Get the hex code
-	    url = url "%" sprintf("%02X", get_char(c))
+	    url = "%" sprintf("%02X", get_char(c)) url
   }
 
   # Tidy up array
@@ -1956,6 +1895,14 @@ function string_hash(text,    prime, modulo, h, chars, i) {
 
   # Return hash h
   return sprintf("%05x", h)
+}
+
+# print underline
+function underline(width, margin, stream) {
+ stream = ternary(stream, stream, STDOUT)
+ if (margin)
+   printf "%*s", margin, "" > stream
+ print_block("_", width, stream)
 }
 
 ### New date parser
@@ -2018,7 +1965,7 @@ function read_date(date_string, hour,
     # If still before the EPOCH this is an error
     if (year < EPOCH_START) {
       Read_Date_Error = "Date <" date_string "> is before epoch start <" get_date(Epoch) ">"
-      return DATE_ERROR
+      return BEFORE_EPOCH
     }
   } else {
     Read_Date_Error = "Can't parse date <" date_string "> wrong number of fields"

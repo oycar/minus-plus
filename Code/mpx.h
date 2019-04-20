@@ -13,6 +13,15 @@
 @undef EXPORT_FORMAT
 @endif
 
+# // Logic conventions
+@define  TRUE   (1)
+@define  FALSE  (0)
+
+# // Output Streams
+@define STDOUT "/dev/stdout"
+@define STDERR "/dev/stderr"
+@define DEVNULL "/dev/null"
+
 # //
 @define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count \
 Lifetime Long_Name Maturity_Date Method_Name Number_Parcels \
@@ -29,13 +38,37 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define HOUR (12)
 @define CLOSING (16)
 @define DATE_ERROR (-1)
+@define BEFORE_EPOCH (-2)
 @define PRECISION (2)
 @define MAX_PRECISION (6)
 @define CLASS_INDEX (1)
 
+# // Default Import Values
+@define KEY_FIELD  (1)
+@define VALUE_FIELD (2)
+@define KEY_DATE @eval (TRUE)
+@define VALUE_DATE @eval (FALSE)
+
 # // Output Date Formats
 @define MONTH_FORMAT ("%Y %b %d") # // 2010 Jun 10
 @define ISO_FORMAT   ("%F")       # // 2010-Jun-10
+
+# // Default Reports
+@define ALL_REPORTS ("a:b:c:d:f:m:o:q:t:z")
+
+# // Default Reports
+@ifndef SHOW_REPORTS
+@define   SHOW_REPORTS "bcot"
+@endif # // SHOW_REPORTS
+
+@define report_balance(s)   ternary(SHOW_REPORTS ~ /[bB]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_capital(s)   ternary(SHOW_REPORTS ~ /[cC]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_deferred(s)  ternary(SHOW_REPORTS ~ /[dD]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_fixed(s)     ternary(SHOW_REPORTS ~ /[fF]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_market(s)    ternary(SHOW_REPORTS ~ /[mM]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_operating(s) ternary(SHOW_REPORTS ~ /[oO]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_dividend(s)  ternary(SHOW_REPORTS ~ /[qQ]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_tax(s)       ternary(SHOW_REPORTS ~ /[tT]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
 
 # // Default Asset Prefix for Price Lists
 @define ASSET_PREFIX ("ASSET.CAPITAL.SHARES")
@@ -75,8 +108,6 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 # // Fixed asset
 @define is_fixed(a) ((a) ~ /^ASSET\.FIXED[.:]/)
-
-#//@define is_depreciating(a) ((a) ~ /^ASSET\.FIXED[.:]/)
 @define is_tax(a)  ((a) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)
 @define is_term(a) ((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)
 @define is_current(a) ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/)
@@ -133,6 +164,11 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Round to zero
 @define round_zero(x) ternary(near_zero(x), 0, x)
 
+# // Numerical comparisons
+@define greater_than(x, y) ((x - y) > 0)
+@define less_than(x, y)    ((x - y) < 0)
+@define greater_than_or_equal(x, y) ((x - y) >= 0)
+@define less_than_or_equal(x, y)    ((x - y) <= 0)
 
 @define is_closed(a, now) (!is_open((a), (now)))
 @define is_new(a) ("" == first_key(Cost_Basis[a]))
@@ -141,7 +177,6 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define is_unsold(a, p, now) (Held_Until[(a)][(p)] > (now))
 @define get_short_name(name) (Leaf[(name)])
 @define get_reduced_cost(a, now) (get_cost(a, now))
-@define get_adjusted_cost(a, now) (get_cost(a, now) - get_Tax_Adjustments(a, now))
 @define get_parcel_tax_adjustment(a, p, element, now) (find_entry(Tax_Adjustments[a][p][element], (now)))
 @define get_parcel_proceeds(a, p) (first_entry(Accounting_Cost[a][p][0]))
 
@@ -155,8 +190,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define adjust_units(a, du, now) sum_entry(Total_Units[a], du, now)
 
 # // Qualified units - reading is simple - no window qualified units equal all units
-@define get_qualified_units(a, now) ternary(Qualification_Window,  find_entry(Qualified_Units[a], now), get_units(a, now),)
-
+@define get_qualified_units(a, now) ternary(Qualification_Window,  find_entry(Qualified_Units[a], now), get_units(a, now))
 
 #// GST proportion at time (t)
 @define gst_proportion(t) ternary(__MPX_H_TEMP__ = find_entry(GST_Rate,t), __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__), 0)
@@ -206,7 +240,19 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define carry_forward_limit(t) ternary(CARRY_FORWARD_LIMIT, ((t) - CARRY_FORWARD_LIMIT), Epoch)
 @define write_back_limit(t) ternary(WRITE_BACK_LIMIT, ((t) - WRITE_BACK_LIMIT), Epoch)
 
+# // Multi-Line Macro
+@define filter_block(key, data, start, end) for (key in data) {\
+  if (key - end > 0)\
+    continue;\
+  if (key - start >= 0)\
+    stack[key] = data[key];\
+  else\
+    break;\
+}
 
+# // Print a block of n identical characters
+@define print_block(c, n, stream) if (TRUE) {while (n-- > 1) printf "%1s", c > stream; print c > stream}
+@define print_line(l, stream) ternary(l, underline(73, 8, stream), underline(47, 8, stream))
 
 # // These two are not very readable
 # // @define get_cash_in(a, i, now) (ternary((now >= Held_From[(a)][(i)]), find_entry(Accounting_Cost[(a)][(i)][I], Held_From[(a)][(i)]), 0))

@@ -33,9 +33,10 @@ current_directory=`pwd`
 MPXDIR=~/Cloudstation/Projects/Minus-Plus/Code
 
 # Usage
-USAGE="Usage: $(basename $0) [-a account name] [-C journal-currency] [-d output-date-format] [-f financial-year] [-F financial-statements-file] [-h]\
- [-l log-function] [-P price-file] [-q qualify_window] [-s] [-T journal-type] [-v] [-x show_extra_detail]\
- [-w write-variable,...] [-W write-state-file] [-E export-format] [-Z preprocess_only] <journal-file>"
+USAGE="Usage: $(basename $0) [-a: show-account-transactions] [-c: journal-currency] [-e export-format] [-f: financial-year] [-i mpx-information-and-copyright-notice]\
+ [-l: log-function] [-p: write-price-file] [-q: dividend-qualification-window] [-s show-all-transactions]\
+ [-v write-variable-1,write_variable-2,...] [-w: write-state-file] [-x show-extra-detail] [-z preprocess_only]\
+ [-ABCDFMOQTZ extra-report-toggles] <data-import-file> <state-file> <journal-file>"
 
 # This is a simple front end for mpx
 # it handles arguments and runs the preprocessor
@@ -49,78 +50,42 @@ write_file=0
 write_variables=""
 preprocess_only=false
 qualify_window=0
-report_file=""
 Show_All=0
 Show_Extra=0
+Show_Reports="" # Default reports
 
 # Default journal currency and type
 journal_currency="AUD"
-journal_type="PTY"
 
 # A useful alias for an awk aware preprocessor
 # This uses gpp
 shopt -s expand_aliases
 alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
 
-# logging is an array
-while getopts ":a:C:d:Ef:F:hl:P:q:sT:vw:W:xZ" opt; do
+# Interpret options 
+while getopts ":a:c:ef:il:p:q:sv:w:xzABCDFMOQTZ" opt; do
     case $opt in
 
     a)
       account_name=$OPTARG
       ;;
 
-    C) # AUD is the default
+    c) # AUD is the default
       journal_currency=${OPTARG}
       ;;
 
-    d)
-      date_format="${OPTARG}" # Protect this with double quotes because it may contain spaces
-      ;;
-
-    E)
+    e)
       # Export format transactions
       date_format="%d/%m/%Y"
       Export_Format=1
       ;;
 
-    f)
+    f) # Financial year
       financial_year=$OPTARG
       ;;
-    F) # Financial statements
-      wfile $OPTARG
-      report_file=$OPTARG
-      ;;
 
-    h) # Hide
-      Show_All=0
-      ;;
-    l)
-      log_function=$OPTARG
-    ;;
-
-    P)
-      # This is a price file
-      write_variables="Price"
-      wfile $OPTARG
-      write_file=$OPTARG
-      ;;
-
-    q) # Dividend Qualification
-      qualify_window=$OPTARG
-      ;;
-
-    s)
-      # show all transactions
-      Show_All=true
-      ;;
-
-    T) # PTY is the default
-      journal_type=${OPTARG}
-      ;;
-
-    v)
-   printf "mpx - Minus-Plus-Times command line accounting and financial reporting\n\
+    i) # Information
+   printf "mpx - Minus-Plus command line accounting and financial reporting\n\
 Copyright (C) 2019  Robert Whitehurst\n\
 \n\
 This program is free software: you can redistribute it and/or modify\n\
@@ -139,12 +104,42 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
       exit 1
       ;;
 
-    w)
+    l) # Logging / debugging
+      log_function=$OPTARG
+    ;;
+
+    p) # This is a price file
+      write_variables="Price"
+      wfile $OPTARG
+      write_file=$OPTARG
+      ;;
+
+    q) # Dividend Qualification
+      qualify_window=$OPTARG
+      ;;
+
+    # Skinning a cat another way
+    A) Show_Reports+="A";;
+    B) Show_Reports+="B";;
+    C) Show_Reports+="C";;
+    D) Show_Reports+="D";;
+    F) Show_Reports+="F";;
+    M) Show_Reports+="M";;
+    O) Show_Reports+="O";;
+    Q) Show_Reports+="Q";;
+    T) Show_Reports+="T";;
+    Z) Show_Reports+="Z";;
+
+
+    s) # show all transactions
+      Show_All=true
+      ;;
+
+    v) # Generalized variable selection
       write_variables="${OPTARG}"
     ;;
 
-    W)
-      #   Write state to this file
+    w) #   Write state to this file
       wfile $OPTARG
       write_file=$OPTARG
       ;;
@@ -153,7 +148,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
       Show_Extra=1
       ;;
 
-    Z)
+    z)
       preprocess_only=true
       ;;
 
@@ -183,7 +178,11 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   #
   # Preprocess (if its available...)
   if command -v app >/dev/null 2>&1 ; then
-    app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" -D JOURNAL_TYPE=\"${journal_type}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+    if [ -z ${Show_Reports} ] ; then
+      app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+    else
+      app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" -D SHOW_REPORTS=\"${Show_Reports}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+    fi
   else
     echo >&2 "mpx warning: No preprocessor gpp found - using prebuilt mpx script."
   fi
@@ -191,7 +190,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   if [ "$preprocess_only" == "false" ]; then
     # Go back to original directory
     cd "${current_directory}"
-    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v FY=${financial_year} -v Show_Account=${account_name} -v Show_All=${Show_All} -v Reports="${report_file}" -v Show_Extra=${Show_Extra} -v Qualification_Window=${qualify_window} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
+    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v FY=${financial_year} -v Show_Account=${account_name} -v Show_All=${Show_All} -v Show_Extra=${Show_Extra} -v Qualification_Window=${qualify_window} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
   fi
 
 exit 0;
