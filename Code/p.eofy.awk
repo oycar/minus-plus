@@ -699,7 +699,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
           print_cash(current_assets[now]), print_cash(current_assets[past]) > reports_stream
 
   # Now the non-current assets
-  label = sprintf("Non-Current Assets\n")
+  label = sprintf("Non Current Assets\n")
   label = print_account_class(reports_stream, label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
 
   # Here we need to adjust for accounting gains & losses
@@ -708,7 +708,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 
   # Print a nice line
   underline(73, 8, reports_stream)
-  printf "\t%24s %21s %26s\n\n", "Total Non–Current Assets", print_cash(assets[now] - current_assets[now]), print_cash(assets[past] - current_assets[past]) > reports_stream
+  printf "\t%24s %21s %26s\n\n", "Total Non Current Assets", print_cash(assets[now] - current_assets[now]), print_cash(assets[past] - current_assets[past]) > reports_stream
 
   # Print Total Assets
   underline(73, 8, reports_stream)
@@ -1137,6 +1137,8 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
       # The required name component is the last in the parent - watch out for
       # the leading "*" if only a single component
       subclass = get_name_component(Parent_Name[x], 0)
+      if (is_star(subclass))
+        subclass = substr(subclass, 2)
 
       # Initialize sums
       if (last_subclass != subclass) {
@@ -1211,6 +1213,7 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
   return heading
 }
 
+# Watch out for top level name
 function print_subclass_sum(name, sum_now, sum_past, stream) {
   printf "\t%24s %21s", substr(name, 1, 1) tolower(substr(name, 2)), print_cash(sum_now) > stream
   if (sum_past)

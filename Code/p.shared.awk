@@ -1418,7 +1418,7 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf(", %11.2f", get_cost(matched, now))
+      string = string sprintf(", %14s", print_cash(get_cost(matched, now)))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)
@@ -2000,6 +2000,16 @@ function set_months(   i, month_name, mon) {
   }
 
   delete month_name
+}
+
+# Set a default epoch & future
+function set_epoch() {
+  # The Epoch
+  # A more practical Epoch
+  Epoch = mktime(EPOCH_START " 01 01 00 00 00", UTC)
+
+  # A distant Future
+  Future = mktime(EPOCH_END " 12 31 00 00 00", UTC)
 }
 
 # Get the time stamp m months in the  future

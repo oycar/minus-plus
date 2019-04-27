@@ -57,6 +57,9 @@
 #   Produce output for import into Ledger?
 #
 BEGIN {
+  # Initialize
+  Start_Journal = FALSE
+
   # An array to hold real values
   make_array(Real_Value)
 
@@ -93,11 +96,8 @@ BEGIN {
   UTC = 1
 
   # The Epoch
-  # A more practical Epoch
-  Epoch = mktime(EPOCH_START " 01 01 00 00 00", UTC)
-
-  # A distant Future
-  Future = mktime(EPOCH_END " 12 31 00 00 00", UTC)
+  if ("" == Epoch)
+    set_epoch()
 
   # Default FY date
   FY_Date = FY_DATE
@@ -368,7 +368,8 @@ function import_csv_data(array, symbol, name,
 /START_JOURNAL/ {
   if (NF > 1) {
     # Check not called before
-    assert(-1 == Last_Time, "Can't START_JOURNAL twice")
+    assert(!Start_Journal, "Can't START_JOURNAL twice")
+    ##assert(-1 == Last_Time, "Can't START_JOURNAL twice")
 
     # Is the currency consistent
     assert(JOURNAL_CURRENCY == Journal_Currency, "Incompatible journal currency <" Journal_Currency "> in journal file - expected <" JOURNAL_CURRENCY "> instead")
@@ -387,6 +388,7 @@ function import_csv_data(array, symbol, name,
   }
 
   # Can only call this once and check a legal timestamp
+  Start_Journal = TRUE
   assert(Last_Time > DATE_ERROR, Read_Date_Error)
 
   # Need to initialize FY information
@@ -454,6 +456,10 @@ $1 ~ /(CHECK|SET|SET_BANDS|SET_ENTRY)/ {
 
 # Default record
 {
+  # Skip empty lines
+  if ("" == $0)
+    next
+
  # Use a function so we can control scope of variables
  read_input_record()
  next
@@ -519,8 +525,6 @@ function set_special_accounts() {
   ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
 
   # Keeping a record of taxable income, gains, losses
-  #CAPITAL_LOSSES   = initialize_account("SPECIAL.TAX:CAPITAL.LOSSES")
-  #TAX_LOSSES       = initialize_account("SPECIAL.TAX:TAX.LOSSES")
   TAXABLE_GAINS    = initialize_account("SPECIAL.TAX:TAXABLE.GAINS")
   TAXABLE_INCOME   = initialize_account("SPECIAL.TAX:TAXABLE.INCOME")
   INCOME_TAX       = initialize_account("SPECIAL.TAX:INCOME.TAX")
@@ -677,9 +681,8 @@ function set_array_bands(now, bands, nf,     i, k) {
 }
 
 function read_input_record(   t, n, a, threshold) {
-  # Skip empty lines
-  if ("" == $0)
-    next
+  # Must have started journal
+  assert(Start_Journal, "No START_JOURNAL record found")
 
   # Optional values
   new_line()
@@ -794,7 +797,7 @@ function parse_transaction(now, a, b, units, amount,
     adjust_cost(FRANKING, - amount, now)
 
     print_transaction(now, "Reduce Franking Balance", FRANKING, NULL, 0, amount)
-   } else if (is_tax(b)) {
+   } else if (b != GST && is_tax(b)) {
     # Increase franking
     adjust_cost(FRANKING, amount, now)
 

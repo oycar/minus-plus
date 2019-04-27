@@ -30,6 +30,10 @@ BEGIN {
   make_array(Member_Liability)
   make_array(Reserve_Rate)
 
+  # The Epoch
+  if ("" == Epoch)
+    set_epoch()
+
   # // Can set constants here
   if ("" == Qualification_Window)
     EOFY_Window = Qualification_Window = 0

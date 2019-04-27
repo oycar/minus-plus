@@ -101,6 +101,8 @@ END {
 
 
 
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -1643,7 +1645,7 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf(", %11.2f", get_cost(matched, now))
+      string = string sprintf(", %14s", print_cash(get_cost(matched, now)))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)
@@ -2202,6 +2204,16 @@ function set_months(   i, month_name, mon) {
   delete month_name
 }
 
+# Set a default epoch & future
+function set_epoch() {
+  # The Epoch
+  # A more practical Epoch
+  Epoch = mktime((2000) " 01 01 00 00 00", UTC)
+
+  # A distant Future
+  Future = mktime((2999) " 12 31 00 00 00", UTC)
+}
+
 # Get the time stamp m months in the  future
 function add_months(now, number_months,   y, m, d,
                                           delta_years, delta_months) {
@@ -2604,7 +2616,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("QC" ~ /[cC]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2700,7 +2712,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("QC" ~ /[dD]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2745,7 +2757,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("QC" ~ /[oO]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2900,7 +2912,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("QC" ~ /[bB]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -2933,7 +2945,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
           print_cash(current_assets[now]), print_cash(current_assets[past]) > reports_stream
 
   # Now the non-current assets
-  label = sprintf("Non-Current Assets\n")
+  label = sprintf("Non Current Assets\n")
   label = print_account_class(reports_stream, label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
 
   # Here we need to adjust for accounting gains & losses
@@ -2942,7 +2954,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 
   # Print a nice line
   underline(73, 8, reports_stream)
-  printf "\t%24s %21s %26s\n\n", "Total Non–Current Assets", print_cash(assets[now] - current_assets[now]), print_cash(assets[past] - current_assets[past]) > reports_stream
+  printf "\t%24s %21s %26s\n\n", "Total Non Current Assets", print_cash(assets[now] - current_assets[now]), print_cash(assets[past] - current_assets[past]) > reports_stream
 
   # Print Total Assets
   underline(73, 8, reports_stream)
@@ -3023,7 +3035,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("QC" ~ /[mM]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3096,7 +3108,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("QC" ~ /[fF]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3229,7 +3241,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("QC" ~ /[qQ]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3357,6 +3369,8 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
       # The required name component is the last in the parent - watch out for
       # the leading "*" if only a single component
       subclass = get_name_component(Parent_Name[x], 0)
+      if (((subclass) ~ /^*/))
+        subclass = substr(subclass, 2)
 
       # Initialize sums
       if (last_subclass != subclass) {
@@ -3431,6 +3445,7 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
   return heading
 }
 
+# Watch out for top level name
 function print_subclass_sum(name, sum_now, sum_past, stream) {
   printf "\t%24s %21s", substr(name, 1, 1) tolower(substr(name, 2)), print_cash(sum_now) > stream
   if (sum_past)
@@ -3662,6 +3677,10 @@ BEGIN {
   ((SUBSEP in Member_Liability)?((1)):((0)))
   ((SUBSEP in Reserve_Rate)?((1)):((0)))
 
+  # The Epoch
+  if ("" == Epoch)
+    set_epoch()
+
   # // Can set constants here
   if ("" == Qualification_Window)
     EOFY_Window = Qualification_Window = 0
@@ -3788,7 +3807,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, x, header) {
 
   # Print this out?
-  write_stream = (("QC" ~ /[tT]|[aA]/ && "QC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4544,6 +4563,9 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
 #   Produce output for import into Ledger?
 #
 BEGIN {
+  # Initialize
+  Start_Journal = (0)
+
   # An array to hold real values
   ((SUBSEP in Real_Value)?((1)):((0)))
 
@@ -4580,11 +4602,8 @@ BEGIN {
   UTC = 1
 
   # The Epoch
-  # A more practical Epoch
-  Epoch = mktime((2000) " 01 01 00 00 00", UTC)
-
-  # A distant Future
-  Future = mktime((2999) " 12 31 00 00 00", UTC)
+  if ("" == Epoch)
+    set_epoch()
 
   # Default FY date
   FY_Date = ("Jul-01")
@@ -4846,7 +4865,8 @@ function import_csv_data(array, symbol, name,
 /START_JOURNAL/ {
   if (NF > 1) {
     # Check not called before
-    assert(-1 == Last_Time, "Can't START_JOURNAL twice")
+    assert(!Start_Journal, "Can't START_JOURNAL twice")
+    ##assert(-1 == Last_Time, "Can't START_JOURNAL twice")
 
     # Is the currency consistent
     assert("AUD" == Journal_Currency, "Incompatible journal currency <" Journal_Currency "> in journal file - expected <" "AUD" "> instead")
@@ -4865,6 +4885,7 @@ function import_csv_data(array, symbol, name,
   }
 
   # Can only call this once and check a legal timestamp
+  Start_Journal = (1)
   assert(Last_Time > (-1), Read_Date_Error)
 
   # Need to initialize FY information
@@ -4932,6 +4953,10 @@ $1 ~ /(CHECK|SET|SET_BANDS|SET_ENTRY)/ {
 
 # Default record
 {
+  # Skip empty lines
+  if ("" == $0)
+    next
+
  # Use a function so we can control scope of variables
  read_input_record()
  next
@@ -4997,8 +5022,6 @@ function set_special_accounts() {
   ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
 
   # Keeping a record of taxable income, gains, losses
-  #CAPITAL_LOSSES   = initialize_account("SPECIAL.TAX:CAPITAL.LOSSES")
-  #TAX_LOSSES       = initialize_account("SPECIAL.TAX:TAX.LOSSES")
   TAXABLE_GAINS    = initialize_account("SPECIAL.TAX:TAXABLE.GAINS")
   TAXABLE_INCOME   = initialize_account("SPECIAL.TAX:TAXABLE.INCOME")
   INCOME_TAX       = initialize_account("SPECIAL.TAX:INCOME.TAX")
@@ -5147,9 +5170,8 @@ function set_array_bands(now, bands, nf,     i, k) {
 }
 
 function read_input_record(   t, n, a, threshold) {
-  # Skip empty lines
-  if ("" == $0)
-    next
+  # Must have started journal
+  assert(Start_Journal, "No START_JOURNAL record found")
 
   # Optional values
   new_line()
@@ -5264,7 +5286,7 @@ function parse_transaction(now, a, b, units, amount,
     adjust_cost(FRANKING, - amount, now)
 
     print_transaction(now, "Reduce Franking Balance", FRANKING, NULL, 0, amount)
-   } else if (((b) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)) {
+   } else if (b != GST && ((b) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)) {
     # Increase franking
     adjust_cost(FRANKING, amount, now)
 
