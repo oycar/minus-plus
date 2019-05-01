@@ -40,7 +40,6 @@
 #
 #   Fix up wiki files
 #   More flexible ordering of optional fields?
-#   Selectively print individual reports
 #   other tax_statement calculations (eg UK, US, NZ etc...)
 #
 #   Tax Adjustments / could be simplified?
@@ -49,12 +48,10 @@
 #   Read single entry transactions
 #   special notes for -l version
 #   describe gpp properly
-#   single entry style
 #   Share splits etc
 #   Short day-by-day performance summary (cost-value-etc.. estimated for EOFY)
 #
 #   Integrate with graphing/analysis package (eris)
-#   Produce output for import into Ledger?
 #
 BEGIN {
   # Initialize
@@ -540,6 +537,7 @@ function set_special_accounts() {
   TAX          = initialize_account("LIABILITY.TAX:TAX")
   RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
   GST          = initialize_account("LIABILITY.TAX:TAX.GST")
+  LEVY         = initialize_account("LIABILITY.CURRENT.TAX:TAX.LEVY")
 
   # Offsets
   NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")

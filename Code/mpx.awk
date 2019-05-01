@@ -3804,7 +3804,7 @@ function income_tax_aud(now, past, benefits,
                                         franking_offsets, foreign_offsets, franking_balance,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
                                         taxable_income,
-                                        medicare_levy, extra_levy, x, header) {
+                                        medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
   write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
@@ -4078,23 +4078,13 @@ function income_tax_aud(now, past, benefits,
   # No Carry Offsets (Class C)
   # The low income tax offset depends on income
   if ((Journal_Type ~ /^IND$/)) {
-    x = get_tax(now, Low_Income_Offset, taxable_income)
+    no_carry_offsets = get_tax(now, Low_Income_Offset, taxable_income)
 
     # This is an Australian no-carry offset computed from the taxable income
-    if (!(((x) <= Epsilon) && ((x) >= -Epsilon))) {
-      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(x) > write_stream
-      header = ""
-    }
+
 
     # Get the other no_carry offsets
-    no_carry_offsets = -(get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
-    if (!(((no_carry_offsets) <= Epsilon) && ((no_carry_offsets) >= -Epsilon))) {
-      printf "%s\t%40s %32s\n", header, "Other No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
-      header = ""
-    }
-
-    # No need to adjust cost - since it will not be retained
-    no_carry_offsets += x
+    no_carry_offsets -= (get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
   } else
     # Just get the total change in the offset
     no_carry_offsets = -(get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
@@ -4103,8 +4093,10 @@ function income_tax_aud(now, past, benefits,
   no_carry_offsets += foreign_offsets
 
   # The no-carry offset
-  if (!(((no_carry_offsets) <= Epsilon) && ((no_carry_offsets) >= -Epsilon)))
-    printf "\t%40s %32s\n", "Total No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
+  if ((((no_carry_offsets) > Epsilon) || ((no_carry_offsets) < -Epsilon))) {
+    printf "%s\t%40s %32s\n", header, "Total No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
+    header = ""
+  }
 
   # Other offsets
   # The carry offset (Class D)
@@ -4113,7 +4105,6 @@ function income_tax_aud(now, past, benefits,
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
   }
-  printf "\n" > write_stream
 
   # The refundable offset (Class E)
   refundable_offsets = - get_cost(REFUNDABLE_OFFSETS, now)
@@ -4291,6 +4282,14 @@ function income_tax_aud(now, past, benefits,
     tax_owed += medicare_levy
   }
 
+  # Any other levys
+  tax_levy = get_cost(LEVY, ((now) - 1)) - get_cost(LEVY, past)
+  if ((((tax_levy) > Epsilon) || ((tax_levy) < -Epsilon))) {
+    printf "\t%40s %32s\n", "Tax Levy", print_cash(tax_levy) > write_stream
+    tax_owed += tax_levy
+  }
+
+
   if (!(((tax_paid) <= Epsilon) && ((tax_paid) >= -Epsilon)))
     printf "\t%40s %32s\n", "Income Tax Distributions Paid", print_cash(tax_paid) > write_stream
   if (!(((tax_with) <= Epsilon) && ((tax_with) >= -Epsilon)))
@@ -4384,6 +4383,7 @@ function income_tax_aud(now, past, benefits,
   set_cost(PAYG, 0, now)
   set_cost(WITHOLDING, 0, now)
   set_cost(CONTRIBUTION_TAX, 0, now)
+  #set_cost(LEVY, 0, now)
 }
 
 #
@@ -4546,7 +4546,6 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
 #
 #   Fix up wiki files
 #   More flexible ordering of optional fields?
-#   Selectively print individual reports
 #   other tax_statement calculations (eg UK, US, NZ etc...)
 #
 #   Tax Adjustments / could be simplified?
@@ -4555,12 +4554,10 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
 #   Read single entry transactions
 #   special notes for -l version
 #   describe gpp properly
-#   single entry style
 #   Share splits etc
 #   Short day-by-day performance summary (cost-value-etc.. estimated for EOFY)
 #
 #   Integrate with graphing/analysis package (eris)
-#   Produce output for import into Ledger?
 #
 BEGIN {
   # Initialize
@@ -5037,6 +5034,7 @@ function set_special_accounts() {
   TAX          = initialize_account("LIABILITY.TAX:TAX")
   RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
   GST          = initialize_account("LIABILITY.TAX:TAX.GST")
+  LEVY         = initialize_account("LIABILITY.CURRENT.TAX:TAX.LEVY")
 
   # Offsets
   NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
