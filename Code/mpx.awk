@@ -703,10 +703,10 @@ function ctrim(s, left_c, right_c,      string) {
   return s
 }
 
-# Is a number between two others? (allow boundary cases to be inside)
-function is_between(x, low, high) {
-  return  (x - low) * (x - high) <= 0
-}
+# # Is a number between two others? (allow boundary cases to be inside)
+# function is_between(x, low, high) {
+#   return  (x - low) * (x - high) <= 0
+# }
 
 # Clear global values ready to read a new input record
 function new_line() {
@@ -3168,7 +3168,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
           if ((( a in Parcel_Tag) && ( p in Parcel_Tag[ a])))
             printf "%28s %6d ", Parcel_Tag[a][p], p > reports_stream
           else
-            printf "%34d ", p > reports_stream
+            printf "%35d ", p > reports_stream
 
           # Depreciation is the sum of the I tax adjustments
           printf " [%11s, %11s] %14s %14s %14s %14s %14s\n",
@@ -4283,12 +4283,11 @@ function income_tax_aud(now, past, benefits,
   }
 
   # Any other levys
-  tax_levy = get_cost(LEVY, ((now) - 1)) - get_cost(LEVY, past)
+  tax_levy = - get_cost("*LIABILITY.CURRENT.LEVY", ((now) - 1))
   if ((((tax_levy) > Epsilon) || ((tax_levy) < -Epsilon))) {
-    printf "\t%40s %32s\n", "Tax Levy", print_cash(tax_levy) > write_stream
+    printf "\t%40s %32s\n", "Tax Levies", print_cash(tax_levy) > write_stream
     tax_owed += tax_levy
   }
-
 
   if (!(((tax_paid) <= Epsilon) && ((tax_paid) >= -Epsilon)))
     printf "\t%40s %32s\n", "Income Tax Distributions Paid", print_cash(tax_paid) > write_stream
@@ -4730,7 +4729,7 @@ BEGIN {
     Variable_Name = trim($2)
     assert(Variable_Name in SYMTAB, "<" Variable_Name "> is not declared")
 
-    # Would be nice to have scalar syntax
+    # Scalar syntax
     # <<,Variable_Name,Value>>
     # Any more fields on this line?
     if ($NF ~ />>/ && NF == 4) {
@@ -5034,7 +5033,9 @@ function set_special_accounts() {
   TAX          = initialize_account("LIABILITY.TAX:TAX")
   RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
   GST          = initialize_account("LIABILITY.TAX:TAX.GST")
-  LEVY         = initialize_account("LIABILITY.CURRENT.TAX:TAX.LEVY")
+
+  # Tax levies
+  #LEVY         = initialize_account("LIABILITY.CURRENT.TAX:TAX.LEVY")
 
   # Offsets
   NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
@@ -5407,7 +5408,7 @@ function parse_transaction(now, a, b, units, amount,
         #
         (Payment_Date[underlying_asset][( Extra_Timestamp)] = ( now))
 
-      } else if (Qualification_Window && (((a) ~ ("^" ( "INCOME.DIVIDEND") "[.:]")) || ((a) ~ ("^" ( "INCOME.DISTRIBUTION.CLOSELY_HELD") "[.:]")))) {
+      } else if (Qualification_Window && (((a) ~ ("^" ( "INCOME.DIVIDEND") "[.:]")) || ((a) ~ ("^" ( "INCOME.DISTRIBUTION.CLOSE") "[.:]")))) {
         Extra_Timestamp = get_exdividend_date(underlying_asset, now)
 
         # This must exist
@@ -5859,7 +5860,6 @@ function checkset(now, a, account, units, amount, is_check,
       break
 
       case "COST" :
-      case "SIZE" : # Just an alias for COST - looks neater for non cash special accounts
         # Override the account cost -> this can cause the accounts not to balance!
         set_cost(account, amount, now)
       break

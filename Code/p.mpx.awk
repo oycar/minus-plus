@@ -224,7 +224,7 @@ BEGIN {
     Variable_Name = trim($2)
     assert(Variable_Name in SYMTAB, "<" Variable_Name "> is not declared")
 
-    # Would be nice to have scalar syntax
+    # Scalar syntax
     # <<,Variable_Name,Value>>
     # Any more fields on this line?
     if ($NF ~ />>/ && NF == 4) {
@@ -537,7 +537,9 @@ function set_special_accounts() {
   TAX          = initialize_account("LIABILITY.TAX:TAX")
   RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
   GST          = initialize_account("LIABILITY.TAX:TAX.GST")
-  LEVY         = initialize_account("LIABILITY.CURRENT.TAX:TAX.LEVY")
+
+  # Tax levies
+  #LEVY         = initialize_account("LIABILITY.CURRENT.TAX:TAX.LEVY")
 
   # Offsets
   NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
@@ -918,7 +920,7 @@ function parse_transaction(now, a, b, units, amount,
         #
         set_entry(Payment_Date[underlying_asset], now, Extra_Timestamp)
 
-      } else if (Qualification_Window && (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION.CLOSELY_HELD"))) {
+      } else if (Qualification_Window && (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION.CLOSE"))) {
         Extra_Timestamp = get_exdividend_date(underlying_asset, now)
 
         # This must exist
@@ -1413,7 +1415,6 @@ function checkset(now, a, account, units, amount, is_check,
       break
 
       case "COST" :
-      case "SIZE" : # Just an alias for COST - looks neater for non cash special accounts
         # Override the account cost -> this can cause the accounts not to balance!
         set_cost(account, amount, now)
       break

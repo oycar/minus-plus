@@ -673,12 +673,11 @@ function income_tax_aud(now, past, benefits,
   }
 
   # Any other levys
-  tax_levy = get_cost(LEVY, just_before(now)) - get_cost(LEVY, past)
+  tax_levy = - get_cost("*LIABILITY.CURRENT.LEVY", just_before(now))
   if (not_zero(tax_levy)) {
-    printf "\t%40s %32s\n", "Tax Levy", print_cash(tax_levy) > write_stream
+    printf "\t%40s %32s\n", "Tax Levies", print_cash(tax_levy) > write_stream
     tax_owed += tax_levy
   }
-
 
   if (!near_zero(tax_paid))
     printf "\t%40s %32s\n", "Income Tax Distributions Paid", print_cash(tax_paid) > write_stream

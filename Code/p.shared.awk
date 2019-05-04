@@ -399,10 +399,10 @@ function ctrim(s, left_c, right_c,      string) {
   return s
 }
 
-# Is a number between two others? (allow boundary cases to be inside)
-function is_between(x, low, high) {
-  return  (x - low) * (x - high) <= 0
-}
+# # Is a number between two others? (allow boundary cases to be inside)
+# function is_between(x, low, high) {
+#   return  (x - low) * (x - high) <= 0
+# }
 
 # Clear global values ready to read a new input record
 function new_line() {

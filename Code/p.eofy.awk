@@ -935,7 +935,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
           if (keys_in(Parcel_Tag, a, p))
             printf "%28s %6d ", Parcel_Tag[a][p], p > reports_stream
           else
-            printf "%34d ", p > reports_stream
+            printf "%35d ", p > reports_stream
 
           # Depreciation is the sum of the I tax adjustments
           printf " [%11s, %11s] %14s %14s %14s %14s %14s\n",
