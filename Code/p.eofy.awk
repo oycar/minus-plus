@@ -23,8 +23,8 @@ function eofy_actions(now,      past, allocated_profits,
                                 benefits) {
   # EOFY actions
   # Turn on reporting?
-  if (now > Start_Time)
-    EOFY = STDERR
+  ##if (now > Start_Time)
+  ##  EOFY = STDERR
 
   # past is referred to now
   past = last_year(now)
@@ -329,15 +329,16 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
         } else
           printf "%14s", print_cash(proceeds - reduced_cost) > reports_stream
 
-        # Extra entries
-        for (key in Gains_Stack)
-          printf "\n%*s %15s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
+        # Extra entries {
+        for (key in Gains_Stack) {
+          printf "\n%*s %14s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
+          delete Gains_Stack[key]
+        }
 
         printf "\n" > reports_stream
         if (is_detailed)
          printf "\n" > reports_stream
 
-        delete Gains_Stack[key]
       } # End of gains event
     } # End of each asset
 

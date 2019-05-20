@@ -1330,7 +1330,8 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 # Print out transactions
 # Generalize for the case of a single entry transaction
 function print_transaction(now, comments, a, b, u, amount, fields, n_field,     matched) {
-  if (!Show_All && (now < Start_Time || now > Stop_Time))
+  ##if (!Show_All && (now < Start_Time || now > Stop_Time))
+  if (!Show_All && now > Stop_Time)
     return
 
   # Are we matching particular accounts?

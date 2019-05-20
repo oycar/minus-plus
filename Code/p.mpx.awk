@@ -192,7 +192,8 @@ BEGIN {
     Show_All = 0
 
   # EOFY statements are not printed until requested
-  EOFY = "/dev/null"
+  ##EOFY = "/dev/null"
+  EOFY = STDERR
 
   # Which account to track
   if ("" == Show_Account)
@@ -200,8 +201,13 @@ BEGIN {
   else
     Show_All = FALSE
 
+  # Last time is the most recent earlier timestamp
   # Initially set the last time to be -1
   Last_Time = - 1
+
+  # The last recorded timestamp in a state file
+  # is Last_State - also initialized to -1
+  Last_State = - 1
   FY_Time = -1
   FY_Year = -1 # Not set yet
 } # End of BEGIN block
@@ -363,16 +369,19 @@ function import_csv_data(array, symbol, name,
 
 
 /START_JOURNAL/ {
-  if (NF > 1) {
-    # Check not called before
-    assert(!Start_Journal, "Can't START_JOURNAL twice")
-    ##assert(-1 == Last_Time, "Can't START_JOURNAL twice")
+  # Allow multiple calls
+  if (Start_Journal)
+    next
 
+  if (!Start_Journal) {
     # Is the currency consistent
     assert(JOURNAL_CURRENCY == Journal_Currency, "Incompatible journal currency <" Journal_Currency "> in journal file - expected <" JOURNAL_CURRENCY "> instead")
 
-    # Set the initial time
-    Last_Time = read_date($2)
+    # The very first start journal sets the last state
+    if (NF > 1) {
+      Last_Time = Last_State = read_date($2)
+      assert(Last_State > DATE_ERROR, Read_Date_Error)
+    }
 
     # Set default functions
     Income_Tax_Function     = "income_tax_" tolower(Journal_Currency)
@@ -382,25 +391,25 @@ function import_csv_data(array, symbol, name,
     # These functions are not
     Balance_Profits_Function  = "balance_journal"
     Check_Balance_Function  = "check_balance"
+
+    # Flag this
+    Start_Journal = TRUE
   }
 
-  # Can only call this once and check a legal timestamp
-  Start_Journal = TRUE
-  assert(Last_Time > DATE_ERROR, Read_Date_Error)
-
   # Need to initialize FY information
+  # Start time should be deprecated - obsolete?
   if (FY) {
     # Initialize the financial year
     Stop_Time = read_date(FY "-" FY_Date, 0)
-    Start_Time = last_year(Stop_Time)
+    ##Start_Time = last_year(Stop_Time)
   } else {
-    # Default Start_Time and Stop_Time
-    if (!Start_Time)
-      Start_Time = Last_Time
-    else {
-      Start_Time = read_date(Start_Time)
-      assert(DATE_ERROR < Start_Time, "Start_Time " Read_Date_Error)
-    }
+    # # Default Start_Time and Stop_Time
+    # if (!Start_Time)
+    #   Start_Time = Last_Time
+    # else {
+    #   Start_Time = read_date(Start_Time)
+    #   assert(DATE_ERROR < Start_Time, "Start_Time " Read_Date_Error)
+    # }
 
     # Is a specific stop time set
     if (!Stop_Time)
@@ -419,7 +428,7 @@ function import_csv_data(array, symbol, name,
   initialize_state()
 
   # Which Calendar year is this?
-  FY_Year = get_year_number(Last_Time)
+  FY_Year = get_year_number(Last_State)
 
   # The timestamp at the end of the year
   # This assumes FY_Date is the date of the
@@ -747,24 +756,23 @@ function read_input_record(   t, n, a, threshold) {
   n = parse_line(t)
 
   # There are n accounts in each transaction
-  if (n == 2)
+  # Currently flag a single entry transaction as an error
+  assert(2 == n || 0 == n, sprintf("<%s> - syntax error %d accounts found in transaction", $0, n))
+
+  # If the transaction is already parsed simply print it out
+  if (t < just_after(Last_State)) {
+    if (2 == n)
+      print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], units, amount)
+  } else if (2 == n) {
     parse_transaction(t, Account[1], Account[2], units, amount)
-  else if (n == 1) {
-    # So far all this can do is initialize an account
-    if (t >= Start_Time)
-      printf "## Single Entry Transaction\n" > STDERR
-    print_transaction(t, Comments, Account[1], NULL, Write_Units, amount)
-  } else {
-    # A zero entry line - a null transaction or a comment in the ledger
-    if (t >= Start_Time)
-      print_transaction(t, Comments)
-  }
+
+    # Were totals changed by this transaction?
+    @Check_Balance_Function(t)
+  } else # A zero entry line - a null transaction or a comment in the journal
+    print_transaction(t, Comments)
 
   # Clean up the Account array
   delete Account
-
-  # Were totals changed by this transaction?
-  @Check_Balance_Function(t)
 }
 
 # Break out transaction parsing into a separate module
@@ -1377,6 +1385,9 @@ function checkset(now, a, account, units, amount, is_check,
 
   # First lets check
   if (is_check) {
+    # Check the action just after now
+    #now = just_after(now)
+
     switch(action) {
       case "VALUE" :
         assert(is_unitized(account), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", get_short_name(account)))
@@ -1393,8 +1404,8 @@ function checkset(now, a, account, units, amount, is_check,
     }
 
     # Is this a checkpoint?
-    assert(near_zero(amount - quantity), sprintf("%s fails checkpoint %s[%s] => %.4f != %.4f\n",
-                                                 action, get_short_name(account), get_date(now), quantity, amount))
+    assert(near_zero(amount - quantity), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
+                                                 get_short_name(account), action, get_date(now), quantity, amount))
 
   } else {
     # is a setter
@@ -1633,9 +1644,12 @@ END {
 
   # Write out code state - it sould be ok to do this after all processing now
   if (Write_State) {
+    # Record the last state
+    Last_State = Last_Time
     write_state(Array_Names, Scalar_Names)
 
-    # The last line is (oddly enough) when the journal starts - this allows initialization to occur when file read back in
+    # The last line is (oddly enough) when the journal starts -
+    # this allows initialization to occur when the file is read back in
     if (!Write_Variables)
       printf "START_JOURNAL\n" > Write_State
   }
@@ -2360,7 +2374,8 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
 
 @ifeq LOG check_balance
   # Verbose balance printing
-  show_balance = (now >= Start_Time)
+  #show_balance = (now >= Start_Time)
+  show_balance = TRUE
 @else
   # No default printing
   show_balance = FALSE

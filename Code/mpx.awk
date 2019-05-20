@@ -40,7 +40,6 @@ END {
 }
 
 
-
 # // Control Logging
 
 
@@ -90,8 +89,6 @@ END {
 
 
 # // Default Reports
-
-
 
 
 
@@ -1606,7 +1603,8 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 # Print out transactions
 # Generalize for the case of a single entry transaction
 function print_transaction(now, comments, a, b, u, amount, fields, n_field,     matched) {
-  if (!Show_All && (now < Start_Time || now > Stop_Time))
+  ##if (!Show_All && (now < Start_Time || now > Stop_Time))
+  if (!Show_All && now > Stop_Time)
     return
 
   # Are we matching particular accounts?
@@ -2272,8 +2270,8 @@ function eofy_actions(now,      past, allocated_profits,
                                 benefits) {
   # EOFY actions
   # Turn on reporting?
-  if (now > Start_Time)
-    EOFY = "/dev/stderr"
+  ##if (now > Start_Time)
+  ##  EOFY = STDERR
 
   # past is referred to now
   past = ((now) + one_year(now, -1))
@@ -2575,15 +2573,16 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
         } else
           printf "%14s", print_cash(proceeds - reduced_cost) > reports_stream
 
-        # Extra entries
-        for (key in Gains_Stack)
-          printf "\n%*s %15s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
+        # Extra entries {
+        for (key in Gains_Stack) {
+          printf "\n%*s %14s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
+          delete Gains_Stack[key]
+        }
 
         printf "\n" > reports_stream
         if (is_detailed)
          printf "\n" > reports_stream
 
-        delete Gains_Stack[key]
       } # End of gains event
     } # End of each asset
 
@@ -2616,7 +2615,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2712,7 +2711,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2757,7 +2756,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2912,7 +2911,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3035,7 +3034,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3108,7 +3107,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[fF]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3241,7 +3240,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3807,7 +3806,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4100,14 +4099,15 @@ function income_tax_aud(now, past, benefits,
 
   # Other offsets
   # The carry offset (Class D)
-  carry_offsets = - get_cost(CARRY_OFFSETS, now)
+  carry_offsets = -(get_cost(CARRY_OFFSETS, now) - get_cost(CARRY_OFFSETS, past))
+  #carry_offsets = - get_cost(CARRY_OFFSETS, now)
   if (!(((carry_offsets) <= Epsilon) && ((carry_offsets) >= -Epsilon))) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
   }
 
   # The refundable offset (Class E)
-  refundable_offsets = - get_cost(REFUNDABLE_OFFSETS, now)
+  refundable_offsets = - (get_cost(REFUNDABLE_OFFSETS, now) - get_cost(REFUNDABLE_OFFSETS, past))
   if (!(((refundable_offsets) <= Epsilon) && ((refundable_offsets) >= -Epsilon))) {
     printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
     header = ""
@@ -4352,7 +4352,7 @@ function income_tax_aud(now, past, benefits,
   set_cost(CARRY_OFFSETS, -carry_offsets, now)
 
   # Refundable offsets were (well) refunded so reset them too
-  set_cost(REFUNDABLE_OFFSETS, 0, now)
+  #set_cost(REFUNDABLE_OFFSETS, 0, now)
 
   # Now we need Deferred Tax - the hypothetical liability that would be due if all
   # assets were liquidated today
@@ -4697,7 +4697,8 @@ BEGIN {
     Show_All = 0
 
   # EOFY statements are not printed until requested
-  EOFY = "/dev/null"
+  ##EOFY = "/dev/null"
+  EOFY = "/dev/stderr"
 
   # Which account to track
   if ("" == Show_Account)
@@ -4705,8 +4706,13 @@ BEGIN {
   else
     Show_All = (0)
 
+  # Last time is the most recent earlier timestamp
   # Initially set the last time to be -1
   Last_Time = - 1
+
+  # The last recorded timestamp in a state file
+  # is Last_State - also initialized to -1
+  Last_State = - 1
   FY_Time = -1
   FY_Year = -1 # Not set yet
 } # End of BEGIN block
@@ -4859,16 +4865,19 @@ function import_csv_data(array, symbol, name,
 
 
 /START_JOURNAL/ {
-  if (NF > 1) {
-    # Check not called before
-    assert(!Start_Journal, "Can't START_JOURNAL twice")
-    ##assert(-1 == Last_Time, "Can't START_JOURNAL twice")
+  # Allow multiple calls
+  if (Start_Journal)
+    next
 
+  if (!Start_Journal) {
     # Is the currency consistent
     assert("AUD" == Journal_Currency, "Incompatible journal currency <" Journal_Currency "> in journal file - expected <" "AUD" "> instead")
 
-    # Set the initial time
-    Last_Time = read_date($2)
+    # The very first start journal sets the last state
+    if (NF > 1) {
+      Last_Time = Last_State = read_date($2)
+      assert(Last_State > (-1), Read_Date_Error)
+    }
 
     # Set default functions
     Income_Tax_Function     = "income_tax_" tolower(Journal_Currency)
@@ -4878,25 +4887,25 @@ function import_csv_data(array, symbol, name,
     # These functions are not
     Balance_Profits_Function  = "balance_journal"
     Check_Balance_Function  = "check_balance"
+
+    # Flag this
+    Start_Journal = (1)
   }
 
-  # Can only call this once and check a legal timestamp
-  Start_Journal = (1)
-  assert(Last_Time > (-1), Read_Date_Error)
-
   # Need to initialize FY information
+  # Start time should be deprecated - obsolete?
   if (FY) {
     # Initialize the financial year
     Stop_Time = read_date(FY "-" FY_Date, 0)
-    Start_Time = ((Stop_Time) + one_year(Stop_Time, -1))
+    ##Start_Time = last_year(Stop_Time)
   } else {
-    # Default Start_Time and Stop_Time
-    if (!Start_Time)
-      Start_Time = Last_Time
-    else {
-      Start_Time = read_date(Start_Time)
-      assert((-1) < Start_Time, "Start_Time " Read_Date_Error)
-    }
+    # # Default Start_Time and Stop_Time
+    # if (!Start_Time)
+    #   Start_Time = Last_Time
+    # else {
+    #   Start_Time = read_date(Start_Time)
+    #   assert(DATE_ERROR < Start_Time, "Start_Time " Read_Date_Error)
+    # }
 
     # Is a specific stop time set
     if (!Stop_Time)
@@ -4915,7 +4924,7 @@ function import_csv_data(array, symbol, name,
   initialize_state()
 
   # Which Calendar year is this?
-  FY_Year = (strftime("%Y", (Last_Time), UTC) + 0)
+  FY_Year = (strftime("%Y", (Last_State), UTC) + 0)
 
   # The timestamp at the end of the year
   # This assumes FY_Date is the date of the
@@ -4968,14 +4977,14 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_Time Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
       if (!index(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate "), Array_Names[x])) {
-        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_Time Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
+        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
         Scalar_Names[x] = Array_Names[x]
@@ -4985,7 +4994,7 @@ function initialize_state(    x) {
     # Use default read and write list
     Write_Variables = (0)
     MPX_Arrays = ("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
-    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_Time Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
+    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
     split(MPX_Scalars, Scalar_Names, " ")
@@ -5235,24 +5244,23 @@ function read_input_record(   t, n, a, threshold) {
   n = parse_line(t)
 
   # There are n accounts in each transaction
-  if (n == 2)
+  # Currently flag a single entry transaction as an error
+  assert(2 == n || 0 == n, sprintf("<%s> - syntax error %d accounts found in transaction", $0, n))
+
+  # If the transaction is already parsed simply print it out
+  if (t < ((Last_State) + 1)) {
+    if (2 == n)
+      print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], units, amount)
+  } else if (2 == n) {
     parse_transaction(t, Account[1], Account[2], units, amount)
-  else if (n == 1) {
-    # So far all this can do is initialize an account
-    if (t >= Start_Time)
-      printf "## Single Entry Transaction\n" > "/dev/stderr"
-    print_transaction(t, Comments, Account[1], NULL, Write_Units, amount)
-  } else {
-    # A zero entry line - a null transaction or a comment in the ledger
-    if (t >= Start_Time)
-      print_transaction(t, Comments)
-  }
+
+    # Were totals changed by this transaction?
+    @Check_Balance_Function(t)
+  } else # A zero entry line - a null transaction or a comment in the journal
+    print_transaction(t, Comments)
 
   # Clean up the Account array
   delete Account
-
-  # Were totals changed by this transaction?
-  @Check_Balance_Function(t)
 }
 
 # Break out transaction parsing into a separate module
@@ -5822,6 +5830,9 @@ function checkset(now, a, account, units, amount, is_check,
 
   # First lets check
   if (is_check) {
+    # Check the action just after now
+    #now = just_after(now)
+
     switch(action) {
       case "VALUE" :
         assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[(account)])))
@@ -5838,8 +5849,8 @@ function checkset(now, a, account, units, amount, is_check,
     }
 
     # Is this a checkpoint?
-    assert((((amount - quantity) <= Epsilon) && ((amount - quantity) >= -Epsilon)), sprintf("%s fails checkpoint %s[%s] => %.4f != %.4f\n",
-                                                 action, (Leaf[(account)]), get_date(now), quantity, amount))
+    assert((((amount - quantity) <= Epsilon) && ((amount - quantity) >= -Epsilon)), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
+                                                 (Leaf[(account)]), action, get_date(now), quantity, amount))
 
   } else {
     # is a setter
@@ -6061,9 +6072,12 @@ END {
 
   # Write out code state - it sould be ok to do this after all processing now
   if (Write_State) {
+    # Record the last state
+    Last_State = Last_Time
     write_state(Array_Names, Scalar_Names)
 
-    # The last line is (oddly enough) when the journal starts - this allows initialization to occur when file read back in
+    # The last line is (oddly enough) when the journal starts -
+    # this allows initialization to occur when the file is read back in
     if (!Write_Variables)
       printf "START_JOURNAL\n" > Write_State
   }

@@ -472,14 +472,15 @@ function income_tax_aud(now, past, benefits,
 
   # Other offsets
   # The carry offset (Class D)
-  carry_offsets = - get_cost(CARRY_OFFSETS, now)
+  carry_offsets = -(get_cost(CARRY_OFFSETS, now) - get_cost(CARRY_OFFSETS, past))
+  #carry_offsets = - get_cost(CARRY_OFFSETS, now)
   if (!near_zero(carry_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
   }
 
   # The refundable offset (Class E)
-  refundable_offsets = - get_cost(REFUNDABLE_OFFSETS, now)
+  refundable_offsets = - (get_cost(REFUNDABLE_OFFSETS, now) - get_cost(REFUNDABLE_OFFSETS, past))
   if (!near_zero(refundable_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
     header = ""
@@ -742,7 +743,7 @@ function income_tax_aud(now, past, benefits,
   set_cost(CARRY_OFFSETS, -carry_offsets, now)
 
   # Refundable offsets were (well) refunded so reset them too
-  set_cost(REFUNDABLE_OFFSETS, 0, now)
+  #set_cost(REFUNDABLE_OFFSETS, 0, now)
 
   # Now we need Deferred Tax - the hypothetical liability that would be due if all
   # assets were liquidated today
