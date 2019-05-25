@@ -760,7 +760,7 @@ function read_input_record(   t, n, a, threshold) {
   assert(2 == n || 0 == n, sprintf("<%s> - syntax error %d accounts found in transaction", $0, n))
 
   # If the transaction is already parsed simply print it out
-  if (t < just_after(Last_State)) {
+  if (t < just_before(Last_State)) {
     if (2 == n)
       print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], units, amount)
   } else if (2 == n) {
@@ -1220,6 +1220,7 @@ function parse_transaction(now, a, b, units, amount,
       adjust_cost(a, -amount, Extra_Timestamp)
       adjust_cost(b,  amount, now)
     } else if (is_unitized(b)) {
+      # Instalment purchase
       adjust_cost(a, -amount, now)
       adjust_cost(b,  amount, Extra_Timestamp)
     } else if (is_term(b) || is_current(b)) {
