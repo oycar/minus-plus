@@ -1148,26 +1148,6 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,  
 @endif # LOG
 } # End of adjust_parcel_cost
 
-# # The idea of the "cost" of the account
-# # This is the same as the reduced cost
-# function get_cost(a, now,      i, sum_cost) {
-#   # Initial cost
-#   sum_cost = 0
-#
-#   # Adjustments for units bought
-#   if (is_unitized(a)) {
-#     for (i = 0; i < Number_Parcels[a]; i ++) {
-#       if (Held_From[a][i] > now) # All further transactions occured after (now)
-#         break # All done
-#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-#         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
-#     }
-#   } else if (a in Cost_Basis) # Cash-like
-#     sum_cost = find_entry(Cost_Basis[a], now)
-#
-#   return sum_cost
-# }
-
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
 function get_cost(a, now,     i, sum_cost) {

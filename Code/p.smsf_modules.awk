@@ -91,24 +91,26 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 }
 
 # This checks all is ok
-function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustments, balance, show_balance) {
+function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustments, sum_future, balance, show_balance) {
   # The following should always be true (Equity is treated a special case of liability)
-  # Assets - Liabilities = 0 (SMSFs have asimplified equation)
+  # Assets - Liabilities = 0 (SMSFs have a simplified equation)
+  # A complication exists if back payments are included so we have innstead
+  # Assets - Liabilities = Future_Payments
   # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
   sum_assets =  get_cost("*ASSET", now) - get_cost("*INCOME.GAINS.REALIZED", now) - get_cost("*EXPENSE.LOSSES.REALIZED", now) - get_cost("*EXPENSE.UNREALIZED", now)
 
   # Work out the total assets etc
   sum_liabilities = - get_cost("*LIABILITY", now)
-  sum_adjustments =   get_cost("*SPECIAL.BALANCING", now)
+  sum_future      = - get_cost(FUTURE_PAYMENT, now)
 
   # The balance should be zero
   # A super fund has only assets and liabilities since the income and expenses are attributed to members
   sum_adjustments = accumulated_profits(now) - get_cost(ALLOCATED, now)
-  balance = sum_assets - (sum_liabilities + sum_adjustments)
+  balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 @ifeq LOG check_balance
   # Verbose balance printing
-  show_balance = (now >= Start_Time)
+  show_balance = TRUE
 @else
   # No default printing
   show_balance = FALSE
@@ -118,14 +120,18 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
   if (!near_zero(balance)) {
     printf "Problem - Accounts Unbalanced <%s>\n", $0
     show_balance = TRUE
-  }
+  } else
+    balance = 0
 
   # // Print the balance if necessary
   if (show_balance) {
     printf "\tDate => %s\n", get_date(now)
     printf "\tAssets      => %20.2f\n", sum_assets
     printf "\tLiabilities => %20.2f\n", sum_liabilities
-    printf "\tAdjustments => %20.2f\n", sum_adjustments
+    if (not_zero(sum_adjustments))
+      printf "\tAdjustments => %20.2f\n", sum_adjustments
+    if (not_zero(sum_future))
+      printf "\tFuture      => %20.2f\n", sum_future
     printf "\tBalance     => %20.2f\n", balance
     assert(near_zero(balance), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }

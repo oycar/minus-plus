@@ -43,8 +43,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Control Export format
 
 
@@ -89,8 +87,6 @@ END {
 
 
 # // Default Reports
-
-
 
 
 
@@ -1425,26 +1421,6 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,  
 
 } # End of adjust_parcel_cost
 
-# # The idea of the "cost" of the account
-# # This is the same as the reduced cost
-# function get_cost(a, now,      i, sum_cost) {
-#   # Initial cost
-#   sum_cost = 0
-#
-#   # Adjustments for units bought
-#   if (is_unitized(a)) {
-#     for (i = 0; i < Number_Parcels[a]; i ++) {
-#       if (Held_From[a][i] > now) # All further transactions occured after (now)
-#         break # All done
-#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-#         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
-#     }
-#   } else if (a in Cost_Basis) # Cash-like
-#     sum_cost = find_entry(Cost_Basis[a], now)
-#
-#   return sum_cost
-# }
-
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
 function get_cost(a, now,     i, sum_cost) {
@@ -2617,7 +2593,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("B" ~ /[cC]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2713,7 +2689,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("B" ~ /[dD]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2758,7 +2734,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[oO]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2913,7 +2889,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[bB]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3036,7 +3012,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("B" ~ /[mM]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3109,7 +3085,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[fF]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3242,7 +3218,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[qQ]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3808,7 +3784,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("B" ~ /[tT]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4496,38 +4472,44 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 }
 
 # This checks all is ok
-function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustments, balance, show_balance) {
+function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustments, sum_future, balance, show_balance) {
   # The following should always be true (Equity is treated a special case of liability)
-  # Assets - Liabilities = 0 (SMSFs have asimplified equation)
+  # Assets - Liabilities = 0 (SMSFs have a simplified equation)
+  # A complication exists if back payments are included so we have innstead
+  # Assets - Liabilities = Future_Payments
   # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
   sum_assets =  get_cost("*ASSET", now) - get_cost("*INCOME.GAINS.REALIZED", now) - get_cost("*EXPENSE.LOSSES.REALIZED", now) - get_cost("*EXPENSE.UNREALIZED", now)
 
   # Work out the total assets etc
   sum_liabilities = - get_cost("*LIABILITY", now)
-  sum_adjustments =   get_cost("*SPECIAL.BALANCING", now)
+  sum_future      = - get_cost(FUTURE_PAYMENT, now)
 
   # The balance should be zero
   # A super fund has only assets and liabilities since the income and expenses are attributed to members
   sum_adjustments = (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now)
-  balance = sum_assets - (sum_liabilities + sum_adjustments)
+  balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 
-  # No default printing
-  show_balance = (0)
+  # Verbose balance printing
+  show_balance = (1)
 
 
   # Is there an error?
   if (!(((balance) <= Epsilon) && ((balance) >= -Epsilon))) {
     printf "Problem - Accounts Unbalanced <%s>\n", $0
     show_balance = (1)
-  }
+  } else
+    balance = 0
 
   # // Print the balance if necessary
   if (show_balance) {
     printf "\tDate => %s\n", get_date(now)
     printf "\tAssets      => %20.2f\n", sum_assets
     printf "\tLiabilities => %20.2f\n", sum_liabilities
-    printf "\tAdjustments => %20.2f\n", sum_adjustments
+    if ((((sum_adjustments) > Epsilon) || ((sum_adjustments) < -Epsilon)))
+      printf "\tAdjustments => %20.2f\n", sum_adjustments
+    if ((((sum_future) > Epsilon) || ((sum_future) < -Epsilon)))
+      printf "\tFuture      => %20.2f\n", sum_future
     printf "\tBalance     => %20.2f\n", balance
     assert((((balance) <= Epsilon) && ((balance) >= -Epsilon)), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
@@ -4710,7 +4692,7 @@ BEGIN {
 
   # Last time is the most recent earlier timestamp
   # Initially set the last time to be -1
-  Last_Time = - 1
+  Last_Record = - 1
 
   # The last recorded timestamp in a state file
   # is Last_State - also initialized to -1
@@ -4871,43 +4853,27 @@ function import_csv_data(array, symbol, name,
   if (Start_Journal)
     next
 
-  if (!Start_Journal) {
-    # Is the currency consistent
-    assert("AUD" == Journal_Currency, "Incompatible journal currency <" Journal_Currency "> in journal file - expected <" "AUD" "> instead")
+  # Flag this
+  Start_Journal = (1)
 
-    # The very first start journal sets the last state
-    if (NF > 1) {
-      Last_Time = Last_State = read_date($2)
-      assert(Last_State > (-1), Read_Date_Error)
-    }
+  # Is the currency consistent
+  assert("AUD" == Journal_Currency, "Incompatible journal currency <" Journal_Currency "> in journal file - expected <" "AUD" "> instead")
 
-    # Set default functions
-    Income_Tax_Function     = "income_tax_" tolower(Journal_Currency)
-    Initialize_Tax_Function = "initialize_tax_" tolower(Journal_Currency)
-    Dividend_Qualification_Function = "dividend_qualification_" tolower(Journal_Currency)
+  # Set default functions
+  Income_Tax_Function     = "income_tax_" tolower(Journal_Currency)
+  Initialize_Tax_Function = "initialize_tax_" tolower(Journal_Currency)
+  Dividend_Qualification_Function = "dividend_qualification_" tolower(Journal_Currency)
 
-    # These functions are not
-    Balance_Profits_Function  = "balance_journal"
-    Check_Balance_Function  = "check_balance"
-
-    # Flag this
-    Start_Journal = (1)
-  }
+  # These functions are not
+  Balance_Profits_Function  = "balance_journal"
+  Check_Balance_Function  = "check_balance"
 
   # Need to initialize FY information
   # Start time should be deprecated - obsolete?
   if (FY) {
     # Initialize the financial year
     Stop_Time = read_date(FY "-" FY_Date, 0)
-    ##Start_Time = last_year(Stop_Time)
   } else {
-    # # Default Start_Time and Stop_Time
-    # if (!Start_Time)
-    #   Start_Time = Last_Time
-    # else {
-    #   Start_Time = read_date(Start_Time)
-    #   assert(DATE_ERROR < Start_Time, "Start_Time " Read_Date_Error)
-    # }
 
     # Is a specific stop time set
     if (!Stop_Time)
@@ -4925,13 +4891,20 @@ function import_csv_data(array, symbol, name,
   # Initialize state file information
   initialize_state()
 
+  # All done
+  next
+}
+
+function set_financial_year(now,   new_fy) {
   # Which Calendar year is this?
-  FY_Year = (strftime("%Y", (Last_State), UTC) + 0)
+  FY_Year = (strftime("%Y", (now), UTC) + 0)
 
   # The timestamp at the end of the year
   # This assumes FY_Date is the date of the
   # first day of a financial year
-  FY_Time = read_date(FY_Year "-" FY_Date, 0)
+  new_fy = read_date(FY_Year "-" FY_Date, 0)
+  assert(new_fy > ((FY_Time) - 1), "Cannot regress financial year: Current FY => " get_date(FY_Time) " New FY => " get_date(new_fy))
+  FY_Time = new_fy
 
   # Get the day number for the FY_Date
   FY_Day = (strftime("%j", (FY_Time), UTC) + 0)
@@ -4939,9 +4912,6 @@ function import_csv_data(array, symbol, name,
   # Feb 28 has day number 59 so if FY_Day <= 60 - (1st day next FY)
   # then the current FY would include leap day if (FY - 1) was a leap year
   FY_Length = (((( FY_Day) <= (60))?( ((((FY_Year) - 1) % 4 == 0 && ((FY_Year) - 1) % 100 != 0) || ((FY_Year) - 1) % 400 == 0)):( (((FY_Year) % 4 == 0 && (FY_Year) % 100 != 0) || (FY_Year) % 400 == 0))) + 365)
-
-  # All done
-  next
 }
 
 # Standard control function syntax is
@@ -4952,7 +4922,7 @@ function import_csv_data(array, symbol, name,
 #  SET
 #  CHECK
 #
-$1 ~ /(CHECK|SET|SET_BANDS|SET_ENTRY)/ {
+$1 ~ /^(CHECK|SET)/ { #|SET_BANDS|SET_ENTRY)/ {
  # Use a function so we can control scope of variables
  read_control_record()
  next
@@ -5027,6 +4997,7 @@ function set_special_accounts() {
   # Balancing - to simplify processing of transactions at EOFY
   # These are income/expense items not needed in the operating statement
   ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
+  FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
 
   # Keeping a record of taxable income, gains, losses
   TAXABLE_GAINS    = initialize_account("SPECIAL.TAX:TAXABLE.GAINS")
@@ -5091,7 +5062,7 @@ function read_control_record(       now, i, x, p, is_check){
   new_line()
 
   # Use the last recorded date
-  now = ((-1 != Last_Time)?( Last_Time):( Epoch))
+  now = ((-1 != Last_Record)?( Last_Record):( Epoch))
 
   # The control records - must be exact match
   is_check = (0)
@@ -5151,6 +5122,27 @@ function read_control_record(       now, i, x, p, is_check){
       (SYMTAB[i][( now)] = ( p))
       break
 
+    ## Several dates can be set
+    case "SET_FINANCIAL_YEAR" :
+      # This would set the first day of the next FY so go back one day
+      now = yesterday(read_date($2 "-" ("Jul-01")))
+      assert(now > (-1), Read_Date_Error)
+      if (now > Last_State)
+        set_financial_year(now)
+      break
+
+    #
+    case "SET_LAST_RECORD" :
+      Last_Record = read_date($2)
+      assert(Last_Record > (-1), Read_Date_Error)
+
+      ## This might have reverted to before the last state and/or the FY
+      assert(Last_State <= Last_Record, "Can't revert to before the latest state <"  get_date(Last_State) ">")
+
+      Last_State = (((Last_State)<( Last_Record))?(Last_State):( Last_Record))
+
+    break
+
     default: # This should not happen
       assert((0), "Unknown Control Record <" i ">")
       break
@@ -5193,11 +5185,11 @@ function read_input_record(   t, n, a, threshold) {
   assert(t > (-1), Read_Date_Error)
 
   # If this is a new time check if it is a new FY
-  if (t > Last_Time) {
+  if (t > Last_Record) {
     # Are we done?
     if (t > Stop_Time + EOFY_Window)
       # this record will not be processed so
-      # don't update Last_Time
+      # don't update Last_Record
       exit
 
     # We need to check for accounts changing from TERM=>CURRENT
@@ -5208,7 +5200,7 @@ function read_input_record(   t, n, a, threshold) {
     # Does if occur before now?
     # Comment this will not work if no transactions in that year
     # so need to ensure check at EOFY
-    while (threshold > Last_Time) {
+    while (threshold > Last_Record) {
       # Which accounts does this key correpond to?
       for (a in Threshold_Dates[threshold]) {
         if (Threshold_Dates[threshold][a] > t) {
@@ -5224,8 +5216,8 @@ function read_input_record(   t, n, a, threshold) {
       threshold = find_key(Threshold_Dates, ((threshold) - 1))
     }
 
-    # Update the Last_Time
-    Last_Time = t
+    # Update the Last_Record
+    Last_Record = t
 
     while (FY_Time + EOFY_Window < t) {
       # Get each EOFY in turn
@@ -5239,7 +5231,7 @@ function read_input_record(   t, n, a, threshold) {
       FY_Time = ((FY_Time) + one_year(FY_Time,  1))
     }
   } else # Check for semi-monotonicity
-    assert(t == Last_Time, sprintf("Current entry %s is earlier than the previously recorded transaction %s", $0, get_date(Last_Time)))
+    assert(t == Last_Record, sprintf("Current entry %s is earlier than the previously recorded transaction %s", $0, get_date(Last_Record)))
 
   # Modular form - parse the line
   # returns number of accounts
@@ -5257,9 +5249,12 @@ function read_input_record(   t, n, a, threshold) {
     parse_transaction(t, Account[1], Account[2], units, amount)
 
     # Were totals changed by this transaction?
-    @Check_Balance_Function(t)
+    #@Check_Balance_Function(t)
   } else # A zero entry line - a null transaction or a comment in the journal
     print_transaction(t, Comments)
+
+  # Were totals changed by this transaction?
+  @Check_Balance_Function(t)
 
   # Clean up the Account array
   delete Account
@@ -5681,8 +5676,13 @@ function parse_transaction(now, a, b, units, amount,
       adjust_cost(b,  amount, now)
     } else if (((b) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
       # Instalment purchase
-      adjust_cost(a, -amount, now)
       adjust_cost(b,  amount, Extra_Timestamp)
+      adjust_cost(a, -amount, now)
+
+      # This will not balance when re-read from the state file unless balancing entries made
+      adjust_cost(FUTURE_PAYMENT, -amount, Extra_Timestamp)
+      adjust_cost(FUTURE_PAYMENT,  amount, now)
+
     } else if (((b) ~ /^(ASSET|LIABILITY)\.TERM[.:]/) || ((b) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/)) {
       # This is a term deposit or similar (eg a mortgage or loan issued by the fund)
       adjust_cost(a, -amount, now)
@@ -5834,8 +5834,6 @@ function checkset(now, a, account, units, amount, is_check,
   # First lets check
   if (is_check) {
     # Check the action just after now
-    #now = just_after(now)
-
     switch(action) {
       case "VALUE" :
         assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[(account)])))
@@ -5853,7 +5851,7 @@ function checkset(now, a, account, units, amount, is_check,
 
     # Is this a checkpoint?
     assert((((amount - quantity) <= Epsilon) && ((amount - quantity) >= -Epsilon)), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
-                                                 (Leaf[(account)]), action, get_date(now), quantity, amount))
+                                                 (Leaf[(account)]), action, get_date(now, LONG_FORMAT), quantity, amount))
 
   } else {
     # is a setter
@@ -6046,11 +6044,11 @@ END {
   # Delete empty accounts
   # Filter out data entries that were added by import CSV records
   # that do not overlap with the the holding period
-  filter_data(Last_Time)
+  filter_data(Last_Record)
 
   # Make sure any eofy transactions are recorded
   # This loop will happen at least once
-  if (Last_Time > Stop_Time)
+  if (Last_Record > Stop_Time)
     eofy_actions(Stop_Time)
   else if (Stop_Time < Future) {
     # We need to produce statements
@@ -6064,7 +6062,7 @@ END {
       # Update FY length
       FY_Length = (((( FY_Day) <= (60))?( ((((FY_Year) - 1) % 4 == 0 && ((FY_Year) - 1) % 100 != 0) || ((FY_Year) - 1) % 400 == 0)):( (((FY_Year) % 4 == 0 && (FY_Year) % 100 != 0) || (FY_Year) % 400 == 0))) + 365)
       FY_Time = ((FY_Time) + one_year(FY_Time,  1))
-    } while (FY_Time + EOFY_Window < Last_Time)
+    } while (FY_Time + EOFY_Window < Last_Record)
 
     # Fix FY_Time so that the snapshot is accurate
     FY_Year --
@@ -6076,7 +6074,7 @@ END {
   # Write out code state - it sould be ok to do this after all processing now
   if (Write_State) {
     # Record the last state
-    Last_State = Last_Time
+    Last_State = Last_Record
     write_state(Array_Names, Scalar_Names)
 
     # The last line is (oddly enough) when the journal starts -
@@ -6674,15 +6672,16 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
 
 
-  # No default printing
-  show_balance = (0)
+  # Verbose balance printing
+  show_balance = (1)
 
 
   # Is there an error?
   if (!(((balance) <= Epsilon) && ((balance) >= -Epsilon))) {
     printf "Problem - Accounts Unbalanced <%s>\n", $0 > "/dev/stderr"
     show_balance = (1)
-  }
+  } else
+    balance = 0
 
   # // Print the balance if necessary
   if (show_balance) {
@@ -6692,7 +6691,8 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
     printf "\tExpenses    => %20.2f\n", sum_expenses > "/dev/stderr"
     printf "\tLiabilities => %20.2f\n", sum_liabilities > "/dev/stderr"
     printf "\tEquities    => %20.2f\n", sum_equities > "/dev/stderr"
-    printf "\tAdjustments => %20.2f\n", sum_adjustments > "/dev/stderr"
+    if ((((sum_adjustments) > Epsilon) || ((sum_adjustments) < -Epsilon)))
+      printf "\tAdjustments => %20.2f\n", sum_adjustments > "/dev/stderr"
     printf "\tBalance     => %20.2f\n", balance > "/dev/stderr"
     assert((((balance) <= Epsilon) && ((balance) >= -Epsilon)), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
