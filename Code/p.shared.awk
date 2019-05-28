@@ -1441,7 +1441,7 @@ function initialize_account(account_name,     class_name, array, p, n,
 
   # Either an uninitialized long name OR a short name
   if (account_name in Long_Name)
-    return Long_Name[overload_name(account_name)]
+    return Long_Name[account_name]
 
   # Special cases exist which could mean this is not an uninitialized long name
   # Is this a new long name or an optional string?
@@ -1464,36 +1464,16 @@ function initialize_account(account_name,     class_name, array, p, n,
   #    Long[D] => A.B.C:D
   # but we passed in account_name => "A.B.Z:D"?
   #
-  # Actually let's allow this - but only in very restricted cases
-  # the leaves will be distinguished and
-  # a reference to an ambiguous leaf will be taken to refer to the
-  # most recent definition
-  #   This allows dynamic reassigment of leaf pointers
-  #   But the accounts' must have consistent classes
-  #
+  # Actually let's allow this - but only in very restricted casee of the account never having been used
+  # This might be possible some day...
   leaf_name = array[2]
-
   if ((leaf_name in Long_Name)) {
     if (Leaf[Long_Name[leaf_name]] == leaf_name) {
       # If the existing account is new (unused) it can be deleted
-      if (is_new(Long_Name[leaf_name]))
-        delete Long_Name[leaf_name]
-      else {
-        #
-        # Are the accounts compatible?
-        # Parent names must match OR convert X.TERM => X.CURRENT
-        # Mapping leaf_name => new leaf_name
-        p = Long_Name[leaf_name]
-        assert(is_term(p) && is_current(account_name),
-          sprintf("Can't overload %s => %s - can only map TERM => CURRENT", account_name, p))
+      assert(is_new(Long_Name[leaf_name]), sprintf("Account name %s: Leaf name[%s] => %s is already taken", account_name, leaf_name, Long_Name[leaf_name]))
 
-        # Check to see if  the Show_Account is being overloaded - which is why check was not needed earlier
-        if (Show_Account == p)
-          Show_Account = account_name
-
-        # Overload the leaf name
-        leaf_name = overload_name(leaf_name, 1)
-      }
+      # Must be a new (unused) name
+      delete Long_Name[leaf_name]
     }
   }
 
@@ -1800,30 +1780,6 @@ function url_init(   i) {
   Document_Filetype = "pdf" # Default file type
   for (i = 0; i <= 255; i++)
     URL_Lookup[sprintf("%c", i)] = i
-}
-
-# Get a long account name from a  possibly overloaded leaf name
-#
-# Overloading
-#   This is useful when an account class changes
-#   IN practice a very rare eventuality
-#
-function overload_name(leaf_name, overload) {
-  # Overload a name when reqested
-  overload = ternary(overload, 1, 0)
-
-  # If this leaf name is overloaded get the most recent version
-  if (leaf_name in Leaf_Count)
-    overload += Leaf_Count[leaf_name]
-
-  # Is the name overloaded?
-  if (overload) {
-    Leaf_Count[leaf_name] = overload
-    leaf_name = leaf_name "_" overload
-  }
-
-  # Return leaf name
-  return leaf_name
 }
 
 # urlencode a string

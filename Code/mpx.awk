@@ -1665,7 +1665,7 @@ function initialize_account(account_name,     class_name, array, p, n,
 
   # Either an uninitialized long name OR a short name
   if (account_name in Long_Name)
-    return Long_Name[overload_name(account_name)]
+    return Long_Name[account_name]
 
   # Special cases exist which could mean this is not an uninitialized long name
   # Is this a new long name or an optional string?
@@ -1688,36 +1688,16 @@ function initialize_account(account_name,     class_name, array, p, n,
   #    Long[D] => A.B.C:D
   # but we passed in account_name => "A.B.Z:D"?
   #
-  # Actually let's allow this - but only in very restricted cases
-  # the leaves will be distinguished and
-  # a reference to an ambiguous leaf will be taken to refer to the
-  # most recent definition
-  #   This allows dynamic reassigment of leaf pointers
-  #   But the accounts' must have consistent classes
-  #
+  # Actually let's allow this - but only in very restricted casee of the account never having been used
+  # This might be possible some day...
   leaf_name = array[2]
-
   if ((leaf_name in Long_Name)) {
     if (Leaf[Long_Name[leaf_name]] == leaf_name) {
       # If the existing account is new (unused) it can be deleted
-      if (("" == first_key(Cost_Basis[Long_Name[leaf_name]])))
-        delete Long_Name[leaf_name]
-      else {
-        #
-        # Are the accounts compatible?
-        # Parent names must match OR convert X.TERM => X.CURRENT
-        # Mapping leaf_name => new leaf_name
-        p = Long_Name[leaf_name]
-        assert(((p) ~ /^(ASSET|LIABILITY)\.TERM[.:]/) && ((account_name) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/),
-          sprintf("Can't overload %s => %s - can only map TERM => CURRENT", account_name, p))
+      assert(("" == first_key(Cost_Basis[Long_Name[leaf_name]])), sprintf("Account name %s: Leaf name[%s] => %s is already taken", account_name, leaf_name, Long_Name[leaf_name]))
 
-        # Check to see if  the Show_Account is being overloaded - which is why check was not needed earlier
-        if (Show_Account == p)
-          Show_Account = account_name
-
-        # Overload the leaf name
-        leaf_name = overload_name(leaf_name, 1)
-      }
+      # Must be a new (unused) name
+      delete Long_Name[leaf_name]
     }
   }
 
@@ -1999,30 +1979,6 @@ function url_init(   i) {
   Document_Filetype = "pdf" # Default file type
   for (i = 0; i <= 255; i++)
     URL_Lookup[sprintf("%c", i)] = i
-}
-
-# Get a long account name from a  possibly overloaded leaf name
-#
-# Overloading
-#   This is useful when an account class changes
-#   IN practice a very rare eventuality
-#
-function overload_name(leaf_name, overload) {
-  # Overload a name when reqested
-  overload = ((overload)?( 1):( 0))
-
-  # If this leaf name is overloaded get the most recent version
-  if (leaf_name in Leaf_Count)
-    overload += Leaf_Count[leaf_name]
-
-  # Is the name overloaded?
-  if (overload) {
-    Leaf_Count[leaf_name] = overload
-    leaf_name = leaf_name "_" overload
-  }
-
-  # Return leaf name
-  return leaf_name
 }
 
 # urlencode a string
@@ -2590,7 +2546,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2686,7 +2642,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2731,7 +2687,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2886,7 +2842,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3021,7 +2977,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3094,7 +3050,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[fF]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[fF]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3227,7 +3183,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3800,7 +3756,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4629,7 +4585,6 @@ BEGIN {
   ((SUBSEP in Held_From)?((1)):((0)))
   ((SUBSEP in Held_Until)?((1)):((0)))
   ((SUBSEP in Leaf)?((1)):((0)))
-  ((SUBSEP in Leaf_Count)?((1)):((0)))
   ((SUBSEP in Lifetime)?((1)):((0)))
   ((SUBSEP in Long_Name)?((1)):((0)))
   ((SUBSEP in Maturity_Date)?((1)):((0)))
@@ -4954,13 +4909,13 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
-      if (!index(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate "), Array_Names[x])) {
+      if (!index(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate "), Array_Names[x])) {
         assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
@@ -4970,7 +4925,7 @@ function initialize_state(    x) {
   } else {
     # Use default read and write list
     Write_Variables = (0)
-    MPX_Arrays = ("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
+    MPX_Arrays = ("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
     MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")

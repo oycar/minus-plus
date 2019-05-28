@@ -124,7 +124,6 @@ BEGIN {
   make_array(Held_From)
   make_array(Held_Until)
   make_array(Leaf)
-  make_array(Leaf_Count)
   make_array(Lifetime)
   make_array(Long_Name)
   make_array(Maturity_Date)
