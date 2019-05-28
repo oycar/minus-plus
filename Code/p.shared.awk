@@ -982,10 +982,6 @@ function match_account(a, show_name) {
   if (show_name == a)
     return a
 
-  # On the first call the long name might not have been set
-  #if (show_name == get_key(Leaf, a))
-  #  return a
-
   # If the class name is another account it does not match
   if (show_name in Leaf)
     return FALSE
@@ -1310,8 +1306,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 # Print out transactions
 # Generalize for the case of a single entry transaction
 function print_transaction(now, comments, a, b, u, amount, fields, n_field,     matched) {
-  ##if (!Show_All && (now < Start_Time || now > Stop_Time))
-  if (!Show_All && now > Stop_Time)
+  if (now > Stop_Time)
     return
 
   # Are we matching particular accounts?

@@ -75,11 +75,6 @@ BEGIN {
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
   #
-  # # Franking Credits
-  # FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
-  # FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
-  # # Other tax credits, offsets & deductions
-  # LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
 
   # Franking deficit
   FRANKING_DEFICIT   = initialize_account("SPECIAL.OFFSET.FRANKING_DEFICIT:FRANKING.OFFSETS")

@@ -43,6 +43,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Control Export format
 
 
@@ -1281,10 +1283,6 @@ function match_account(a, show_name) {
   if (show_name == a)
     return a
 
-  # On the first call the long name might not have been set
-  #if (show_name == get_key(Leaf, a))
-  #  return a
-
   # If the class name is another account it does not match
   if (show_name in Leaf)
     return (0)
@@ -1581,8 +1579,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 # Print out transactions
 # Generalize for the case of a single entry transaction
 function print_transaction(now, comments, a, b, u, amount, fields, n_field,     matched) {
-  ##if (!Show_All && (now < Start_Time || now > Stop_Time))
-  if (!Show_All && now > Stop_Time)
+  if (now > Stop_Time)
     return
 
   # Are we matching particular accounts?
@@ -2593,7 +2590,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("B" ~ /[cC]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2689,7 +2686,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("B" ~ /[dD]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2734,7 +2731,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[oO]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2861,7 +2858,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
 
   # If detailed print tax credits
   label = sprintf("Appendix\n\nTax Offsets\n")
-  label = print_account_class(reports_stream, label, "select_class", "SPECIAL.OFFSET", "", "get_cost", now, past, past, more_past, is_detailed, -1) > reports_stream
+  label = print_account_class(reports_stream, label, "select_class", "SPECIAL.OFFSET", "", "get_cost", now, past, past, more_past, is_detailed, -1)
 
   # Print a nice line
   if (!label) {
@@ -2889,7 +2886,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[bB]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -2911,10 +2908,11 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   # We start with the current assets (cash)
   label = sprintf("Current Assets\n")
   label = print_account_class(reports_stream, label, "select_class", "ASSET.CURRENT", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  label = print_account_class(reports_stream, label, "current_class", "ASSET.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
 
   # Term assets are current if they mature within one year
-  current_assets[now]  = get_cost("*ASSET.CURRENT", now)
-  current_assets[past] = get_cost("*ASSET.CURRENT", past)
+  current_assets[now]  = get_cost("*ASSET.CURRENT", now) + account_sum[now]
+  current_assets[past] = get_cost("*ASSET.CURRENT", past) + account_sum[past]
 
   # Print a nice line
   underline(73, 8, reports_stream)
@@ -2923,7 +2921,13 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 
   # Now the non-current assets
   label = sprintf("Non Current Assets\n")
-  label = print_account_class(reports_stream, label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  #label = print_account_class(reports_stream, label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  #label = print_account_class(reports_stream, label, "not_current_class", "ASSET", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  class_list["ASSET.TERM"] = (1)
+  class_list["ASSET.CURRENT"] = (1)
+  label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed)
+  label = print_account_class(reports_stream, label, "not_current_class", "ASSET.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  delete class_list
 
   # Here we need to adjust for accounting gains & losses
   assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
@@ -2944,8 +2948,10 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   # We start with the current liabilities
   label = sprintf("Current Liabilities\n")
   label = print_account_class(reports_stream, label, "select_class", "LIABILITY.CURRENT", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
-  current_liabilities[now]   = -(get_cost("*LIABILITY.CURRENT", now ) + get_cost("*LIABILITY.TAX", now))
-  current_liabilities[past]  = -(get_cost("*LIABILITY.CURRENT", past) + get_cost("*LIABILITY.TAX", past))
+  label = print_account_class(reports_stream, label, "current_class", "LIABILITY.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+
+  current_liabilities[now]   = -(get_cost("*LIABILITY.CURRENT", now ) + get_cost("*LIABILITY.TAX", now) + account_sum[now])
+  current_liabilities[past]  = -(get_cost("*LIABILITY.CURRENT", past) + get_cost("*LIABILITY.TAX", past) + account_sum[past])
 
   # Print a nice line
   if (!label) {
@@ -2958,10 +2964,13 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   label = sprintf("Non-Current Liabilities\n")
 
   # Now the remaining non current liabilities
+  class_list["LIABILITY.TERM"] = (1)
   class_list["LIABILITY.CURRENT"] = (1)
   class_list["LIABILITY.MEMBER"] = (1)
   class_list["LIABILITY.TAX"] = (1)
-  label = print_account_class(reports_stream, label, "block_class_list", "LIABILITY", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed, -1, 2)
+  label = print_account_class(reports_stream, label, "block_class_list", "LIABILITY", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+  label = print_account_class(reports_stream, label, "not_current_class", "LIABILITY.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+
   liabilities[now]  = - get_cost("*LIABILITY", now)
   liabilities[past] = - get_cost("*LIABILITY", past)
   delete class_list
@@ -3012,7 +3021,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("B" ~ /[mM]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3085,7 +3094,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[fF]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[fF]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3218,7 +3227,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("B" ~ /[qQ]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3320,7 +3329,7 @@ function print_dividend_qualification(now, past, is_detailed,
 # selector function
 function print_account_class(stream, heading, selector, class_name, blocked_class, income_function, now, now_past, past, past_past, print_all, sign,
   subclass, last_subclass,
-  x, account_income, account_sum, did_print) {
+  x, account_income, did_print) { # account_sum, did_print) {
 
   # Bail out when nothing to print
   if ("/dev/null" == stream)
@@ -3418,6 +3427,8 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
       print_subclass_sum(subclass, account_sum[now], account_sum[past], stream)
   }
 
+  # record sums
+
   # return heading
   return heading
 }
@@ -3456,6 +3467,16 @@ function block_class_list(a, class_name, blocked_class_list,      x) {
 
   # Just the simple case
   return ((a) ~ ("^" ( class_name) "[.:]"))
+}
+
+# Special purpose filter for current accounts
+function current_class(a, class_name, blocked_class) {
+  return ((a) ~ ("^" ( class_name) "[.:]")) && !(a in Maturity_Date)
+}
+
+# And its pigeon pair
+function not_current_class(a, class_name, blocked_class) {
+  return ((a) ~ ("^" ( class_name) "[.:]")) && (a in Maturity_Date)
 }
 
 # Shared code for applying losses to taxable gains
@@ -3699,11 +3720,6 @@ BEGIN {
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
   #
-  # # Franking Credits
-  # FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
-  # FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
-  # # Other tax credits, offsets & deductions
-  # LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
 
   # Franking deficit
   FRANKING_DEFICIT   = initialize_account("SPECIAL.OFFSET.FRANKING_DEFICIT:FRANKING.OFFSETS")
@@ -3784,7 +3800,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("B" ~ /[tT]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4490,8 +4506,8 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
   balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 
-  # Verbose balance printing
-  show_balance = (1)
+  # No default printing
+  show_balance = (0)
 
 
   # Is there an error?
@@ -4548,6 +4564,7 @@ BEGIN {
 
   # An array to hold real values
   ((SUBSEP in Real_Value)?((1)):((0)))
+  ((SUBSEP in account_sum)?((1)):((0)))
 
   # And a gains stack
   ((SUBSEP in Gains_Stack)?((1)):((0)))
@@ -4676,19 +4693,26 @@ BEGIN {
   if ("" == Show_Extra)
     Show_Extra = 0
 
-  # Show all transactions
-  if ("" == Show_All)
-    Show_All = 0
+  # stop time - can be overriden by FY option
+  # Need to initialize FY information
+  if (FY)
+    # Initialize the financial year
+    Stop_Time = read_date(FY "-" FY_Date, 0)
+  else {
+    if (!Stop_Time)
+      Stop_Time = Future
+    else {
+      Stop_Time = read_date(Stop_Time)
+      assert((-1) < Stop_Time, "Stop_Time " Read_Date_Error)
+    }
+  }
 
   # EOFY statements are not printed until requested
-  ##EOFY = "/dev/null"
   EOFY = "/dev/stderr"
 
   # Which account to track
   if ("" == Show_Account)
     Show_Account = (0)
-  else
-    Show_All = (0)
 
   # Last time is the most recent earlier timestamp
   # Initially set the last time to be -1
@@ -4770,7 +4794,6 @@ BEGIN {
     Asset_Prefix = ("ASSET.CAPITAL.SHARES")
 
   # End of if importing
-
   next
 }
 
@@ -4778,7 +4801,6 @@ BEGIN {
   import_csv_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
   next
 }
-
 
 ##
 ## Imports CSV format
@@ -4847,7 +4869,6 @@ function import_csv_data(array, symbol, name,
   # Done
 }
 
-
 /START_JOURNAL/ {
   # Allow multiple calls
   if (Start_Journal)
@@ -4867,22 +4888,6 @@ function import_csv_data(array, symbol, name,
   # These functions are not
   Balance_Profits_Function  = "balance_journal"
   Check_Balance_Function  = "check_balance"
-
-  # Need to initialize FY information
-  # Start time should be deprecated - obsolete?
-  if (FY) {
-    # Initialize the financial year
-    Stop_Time = read_date(FY "-" FY_Date, 0)
-  } else {
-
-    # Is a specific stop time set
-    if (!Stop_Time)
-      Stop_Time = Future
-    else {
-      Stop_Time = read_date(Stop_Time)
-      assert((-1) < Stop_Time, "Stop_Time " Read_Date_Error)
-    }
-  }
 
   # Initialize local tax variables
   @Initialize_Tax_Function()
@@ -5131,18 +5136,6 @@ function read_control_record(       now, i, x, p, is_check){
         set_financial_year(now)
       break
 
-    #
-    case "SET_LAST_RECORD" :
-      Last_Record = read_date($2)
-      assert(Last_Record > (-1), Read_Date_Error)
-
-      ## This might have reverted to before the last state and/or the FY
-      assert(Last_State <= Last_Record, "Can't revert to before the latest state <"  get_date(Last_State) ">")
-
-      Last_State = (((Last_State)<( Last_Record))?(Last_State):( Last_Record))
-
-    break
-
     default: # This should not happen
       assert((0), "Unknown Control Record <" i ">")
       break
@@ -5205,7 +5198,7 @@ function read_input_record(   t, n, a, threshold) {
       for (a in Threshold_Dates[threshold]) {
         if (Threshold_Dates[threshold][a] > t) {
           # It is updated
-          update_fixed_account(a, t, Threshold_Dates[threshold][a])
+          convert_term_account(a, t, Threshold_Dates[threshold][a])
 
           # Make sure this won't be picked up again
           Threshold_Dates[threshold][a] = t
@@ -5761,7 +5754,7 @@ function set_account_term(a, now) {
   # Ensure the name  of this account is correct
   #   X.TERM => non-current
   #   X.CURRENT => current
-  return update_fixed_account(a, now, Extra_Timestamp)
+  return convert_term_account(a, now, Extra_Timestamp)
 }
 
 #
@@ -5769,7 +5762,10 @@ function set_account_term(a, now) {
 # Ensure the name  of this account is correct
 #   X.TERM => non-current
 #   X.CURRENT => current
-function update_fixed_account(a, now, maturity,       active_account, x, threshold) {
+# This is deprecated
+# Use a filter function in print_account_class
+# Use the absence of
+function convert_term_account(a, now, maturity,       active_account, x, threshold) {
 
 
   # Is this a current or non-current account?
@@ -5792,16 +5788,19 @@ function update_fixed_account(a, now, maturity,       active_account, x, thresho
   } else if (((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)) {
     # Need to rename account
     # TERM => CURRENT
-    active_account = gensub(/(\.TERM)([.:])/, ".CURRENT\\2", 1, a)
+    #active_account = gensub(/(\.TERM)([.:])/, ".CURRENT\\2", 1, a)
 
     # Create the new account is necessary
-    active_account = initialize_account(active_account)
+    #active_account = initialize_account(active_account)
 
     # Now create a synthetic transaction
     # DATE, A, ACTIVE_ACCOUNT, 0, COST(A), # ....
-    set_cost(active_account, get_cost(a, ((now) - 1)), now)
-    set_cost(a, 0, now)
+    #set_cost(active_account, get_cost(a, just_before(now)), now)
+    #set_cost(a, 0, now)
 
+    # Need to identify this as a current account
+    if (a in Maturity_Date)
+      delete Maturity_Date[a]
 
   }
 
@@ -6074,7 +6073,8 @@ END {
   # Write out code state - it sould be ok to do this after all processing now
   if (Write_State) {
     # Record the last state
-    Last_State = Last_Record
+    if (Last_Record > Last_State)
+      Last_State = Last_Record
     write_state(Array_Names, Scalar_Names)
 
     # The last line is (oddly enough) when the journal starts -
@@ -6672,8 +6672,8 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
 
 
-  # Verbose balance printing
-  show_balance = (1)
+  # No default printing
+  show_balance = (0)
 
 
   # Is there an error?

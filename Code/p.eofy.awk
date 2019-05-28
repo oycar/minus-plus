@@ -639,7 +639,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
 
   # If detailed print tax credits
   label = sprintf("Appendix\n\nTax Offsets\n")
-  label = print_account_class(reports_stream, label, "select_class", "SPECIAL.OFFSET", "", "get_cost", now, past, past, more_past, is_detailed, -1) > reports_stream
+  label = print_account_class(reports_stream, label, "select_class", "SPECIAL.OFFSET", "", "get_cost", now, past, past, more_past, is_detailed, -1)
 
   # Print a nice line
   if (!label) {
@@ -689,10 +689,11 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   # We start with the current assets (cash)
   label = sprintf("Current Assets\n")
   label = print_account_class(reports_stream, label, "select_class", "ASSET.CURRENT", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  label = print_account_class(reports_stream, label, "current_class", "ASSET.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
 
   # Term assets are current if they mature within one year
-  current_assets[now]  = get_cost("*ASSET.CURRENT", now)
-  current_assets[past] = get_cost("*ASSET.CURRENT", past)
+  current_assets[now]  = get_cost("*ASSET.CURRENT", now) + account_sum[now]
+  current_assets[past] = get_cost("*ASSET.CURRENT", past) + account_sum[past]
 
   # Print a nice line
   underline(73, 8, reports_stream)
@@ -701,7 +702,13 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 
   # Now the non-current assets
   label = sprintf("Non Current Assets\n")
-  label = print_account_class(reports_stream, label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  #label = print_account_class(reports_stream, label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  #label = print_account_class(reports_stream, label, "not_current_class", "ASSET", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  class_list["ASSET.TERM"] = TRUE
+  class_list["ASSET.CURRENT"] = TRUE
+  label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed)
+  label = print_account_class(reports_stream, label, "not_current_class", "ASSET.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
+  delete class_list
 
   # Here we need to adjust for accounting gains & losses
   assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
@@ -722,8 +729,10 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   # We start with the current liabilities
   label = sprintf("Current Liabilities\n")
   label = print_account_class(reports_stream, label, "select_class", "LIABILITY.CURRENT", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
-  current_liabilities[now]   = -(get_cost("*LIABILITY.CURRENT", now ) + get_cost("*LIABILITY.TAX", now))
-  current_liabilities[past]  = -(get_cost("*LIABILITY.CURRENT", past) + get_cost("*LIABILITY.TAX", past))
+  label = print_account_class(reports_stream, label, "current_class", "LIABILITY.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+
+  current_liabilities[now]   = -(get_cost("*LIABILITY.CURRENT", now ) + get_cost("*LIABILITY.TAX", now) + account_sum[now])
+  current_liabilities[past]  = -(get_cost("*LIABILITY.CURRENT", past) + get_cost("*LIABILITY.TAX", past) + account_sum[past])
 
   # Print a nice line
   if (!label) {
@@ -736,10 +745,13 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   label = sprintf("Non-Current Liabilities\n")
 
   # Now the remaining non current liabilities
+  class_list["LIABILITY.TERM"] = TRUE
   class_list["LIABILITY.CURRENT"] = TRUE
   class_list["LIABILITY.MEMBER"] = TRUE
   class_list["LIABILITY.TAX"] = TRUE
-  label = print_account_class(reports_stream, label, "block_class_list", "LIABILITY", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed, -1, 2)
+  label = print_account_class(reports_stream, label, "block_class_list", "LIABILITY", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+  label = print_account_class(reports_stream, label, "not_current_class", "LIABILITY.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed, -1)
+
   liabilities[now]  = - get_cost("*LIABILITY", now)
   liabilities[past] = - get_cost("*LIABILITY", past)
   delete class_list
@@ -1112,7 +1124,7 @@ function print_dividend_qualification(now, past, is_detailed,
 # selector function
 function print_account_class(stream, heading, selector, class_name, blocked_class, income_function, now, now_past, past, past_past, print_all, sign,
   subclass, last_subclass,
-  x, account_income, account_sum, did_print) {
+  x, account_income, did_print) { # account_sum, did_print) {
 
   # Bail out when nothing to print
   if (DEVNULL == stream)
@@ -1210,6 +1222,8 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
       print_subclass_sum(subclass, account_sum[now], account_sum[past], stream)
   }
 
+  # record sums
+
   # return heading
   return heading
 }
@@ -1248,6 +1262,16 @@ function block_class_list(a, class_name, blocked_class_list,      x) {
 
   # Just the simple case
   return is_class(a, class_name)
+}
+
+# Special purpose filter for current accounts
+function current_class(a, class_name, blocked_class) {
+  return is_class(a, class_name) && !(a in Maturity_Date)
+}
+
+# And its pigeon pair
+function not_current_class(a, class_name, blocked_class) {
+  return is_class(a, class_name) && (a in Maturity_Date)
 }
 
 # Shared code for applying losses to taxable gains

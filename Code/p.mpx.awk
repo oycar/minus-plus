@@ -59,6 +59,7 @@ BEGIN {
 
   # An array to hold real values
   make_array(Real_Value)
+  make_array(account_sum)
 
   # And a gains stack
   make_array(Gains_Stack)
@@ -187,19 +188,26 @@ BEGIN {
   if ("" == Show_Extra)
     Show_Extra = 0
 
-  # Show all transactions
-  if ("" == Show_All)
-    Show_All = 0
+  # stop time - can be overriden by FY option
+  # Need to initialize FY information
+  if (FY)
+    # Initialize the financial year
+    Stop_Time = read_date(FY "-" FY_Date, 0)
+  else {
+    if (!Stop_Time)
+      Stop_Time = Future
+    else {
+      Stop_Time = read_date(Stop_Time)
+      assert(DATE_ERROR < Stop_Time, "Stop_Time " Read_Date_Error)
+    }
+  }
 
   # EOFY statements are not printed until requested
-  ##EOFY = "/dev/null"
   EOFY = STDERR
 
   # Which account to track
   if ("" == Show_Account)
     Show_Account = FALSE
-  else
-    Show_All = FALSE
 
   # Last time is the most recent earlier timestamp
   # Initially set the last time to be -1
@@ -288,7 +296,6 @@ BEGIN {
     Asset_Prefix = ASSET_PREFIX
 
   # End of if importing
-
   next
 }
 
@@ -296,7 +303,6 @@ BEGIN {
   import_csv_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
   next
 }
-
 
 ##
 ## Imports CSV format
@@ -367,7 +373,6 @@ function import_csv_data(array, symbol, name,
   # Done
 }
 
-
 /START_JOURNAL/ {
   # Allow multiple calls
   if (Start_Journal)
@@ -387,22 +392,6 @@ function import_csv_data(array, symbol, name,
   # These functions are not
   Balance_Profits_Function  = "balance_journal"
   Check_Balance_Function  = "check_balance"
-
-  # Need to initialize FY information
-  # Start time should be deprecated - obsolete?
-  if (FY) {
-    # Initialize the financial year
-    Stop_Time = read_date(FY "-" FY_Date, 0)
-  } else {
-
-    # Is a specific stop time set
-    if (!Stop_Time)
-      Stop_Time = Future
-    else {
-      Stop_Time = read_date(Stop_Time)
-      assert(DATE_ERROR < Stop_Time, "Stop_Time " Read_Date_Error)
-    }
-  }
 
   # Initialize local tax variables
   @Initialize_Tax_Function()
@@ -655,18 +644,6 @@ function read_control_record(       now, i, x, p, is_check){
         set_financial_year(now)
       break
 
-    #
-    case "SET_LAST_RECORD" :
-      Last_Record = read_date($2)
-      assert(Last_Record > DATE_ERROR, Read_Date_Error)
-
-      ## This might have reverted to before the last state and/or the FY
-      assert(Last_State <= Last_Record, "Can't revert to before the latest state <"  get_date(Last_State) ">")
-
-      Last_State = min_value(Last_State, Last_Record)
-
-    break
-
     default: # This should not happen
       assert(FALSE, "Unknown Control Record <" i ">")
       break
@@ -733,7 +710,7 @@ function read_input_record(   t, n, a, threshold) {
       for (a in Threshold_Dates[threshold]) {
         if (Threshold_Dates[threshold][a] > t) {
           # It is updated
-          update_fixed_account(a, t, Threshold_Dates[threshold][a])
+          convert_term_account(a, t, Threshold_Dates[threshold][a])
 
           # Make sure this won't be picked up again
           Threshold_Dates[threshold][a] = t
@@ -1319,7 +1296,7 @@ function set_account_term(a, now) {
   # Ensure the name  of this account is correct
   #   X.TERM => non-current
   #   X.CURRENT => current
-  return update_fixed_account(a, now, Extra_Timestamp)
+  return convert_term_account(a, now, Extra_Timestamp)
 }
 
 #
@@ -1327,8 +1304,11 @@ function set_account_term(a, now) {
 # Ensure the name  of this account is correct
 #   X.TERM => non-current
 #   X.CURRENT => current
-function update_fixed_account(a, now, maturity,       active_account, x, threshold) {
-@ifeq LOG update_fixed_account
+# This is deprecated
+# Use a filter function in print_account_class
+# Use the absence of
+function convert_term_account(a, now, maturity,       active_account, x, threshold) {
+@ifeq LOG convert_term_account
   printf "%s => %s\n", LOG, get_date(now) > STDERR
   printf "\tActive account => %s\n", a > STDERR
   printf "\t\t Cost     => %s\n", print_cash(get_cost(a, now)) > STDERR
@@ -1352,7 +1332,7 @@ function update_fixed_account(a, now, maturity,       active_account, x, thresho
 
     # The time "now" is recorded since  the entry can be modified later
     set_entry(Threshold_Dates[threshold], maturity, active_account)
-@ifeq LOG update_fixed_account
+@ifeq LOG convert_term_account
     printf "\tThreshold_Dates => \n" > STDERR
     walk_array(Threshold_Dates, 1, STDERR)
     printf "\n" > STDERR
@@ -1360,19 +1340,23 @@ function update_fixed_account(a, now, maturity,       active_account, x, thresho
   } else if (is_term(a)) {
     # Need to rename account
     # TERM => CURRENT
-    active_account = gensub(/(\.TERM)([.:])/, ".CURRENT\\2", 1, a)
+    #active_account = gensub(/(\.TERM)([.:])/, ".CURRENT\\2", 1, a)
 
     # Create the new account is necessary
-    active_account = initialize_account(active_account)
+    #active_account = initialize_account(active_account)
 
     # Now create a synthetic transaction
     # DATE, A, ACTIVE_ACCOUNT, 0, COST(A), # ....
-    set_cost(active_account, get_cost(a, just_before(now)), now)
-    set_cost(a, 0, now)
+    #set_cost(active_account, get_cost(a, just_before(now)), now)
+    #set_cost(a, 0, now)
 
-@ifeq LOG update_fixed_account
-    printf "\tRenamed account => %s\n", active_account > STDERR
-    printf "\t\t Cost     => %s\n", print_cash(get_cost(active_account, now)) > STDERR
+    # Need to identify this as a current account
+    if (a in Maturity_Date)
+      delete Maturity_Date[a]
+@ifeq LOG convert_term_account
+    printf "\tRelabelled account => %s\n", a > STDERR
+    printf "\tCurrent Account [%s] => %d\n", a, is_current(a) > STDERR
+    ##printf "\t\t Cost     => %s\n", print_cash(get_cost(active_account, now)) > STDERR
 @endif
   }
 
@@ -1662,7 +1646,8 @@ END {
   # Write out code state - it sould be ok to do this after all processing now
   if (Write_State) {
     # Record the last state
-    Last_State = Last_Record
+    if (Last_Record > Last_State)
+      Last_State = Last_Record
     write_state(Array_Names, Scalar_Names)
 
     # The last line is (oddly enough) when the journal starts -
