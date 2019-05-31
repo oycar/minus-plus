@@ -54,6 +54,9 @@ function eofy_actions(now,      past, allocated_profits,
   if (Qualification_Window)
     print_dividend_qualification(now, past, 1)
 
+  # Print Imputation report
+  @Imputation_Report_Function(now, past, Show_Extra)
+
   # Realized gains report
   get_capital_gains(now, past, Show_Extra)
 
@@ -636,21 +639,6 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
     printf "\n" > reports_stream
   print_line(past, reports_stream)
   printf "\n\n" > reports_stream
-
-  # If detailed print tax credits
-  label = sprintf("Appendix\n\nTax Offsets\n")
-  label = print_account_class(reports_stream, label, "select_class", "SPECIAL.OFFSET", "", "get_cost", now, past, past, more_past, is_detailed, -1)
-
-  # Print a nice line
-  if (!label) {
-    print_line(past, reports_stream)
-    x = get_cost("*SPECIAL.OFFSET", past)
-    printf "\t%24s%22s %26s\n\n", "Total Tax Offsets",
-              print_cash(x - get_cost("*SPECIAL.OFFSET", now)),
-              print_cash(get_cost("*SPECIAL.OFFSET", more_past) - x) > reports_stream
-  }
-
-  printf "\n\n\n" > reports_stream
 
   # Only need current benefits
   x = benefits[now]

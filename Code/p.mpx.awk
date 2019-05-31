@@ -387,8 +387,9 @@ function import_csv_data(array, symbol, name,
   Income_Tax_Function     = "income_tax_" tolower(Journal_Currency)
   Initialize_Tax_Function = "initialize_tax_" tolower(Journal_Currency)
   Dividend_Qualification_Function = "dividend_qualification_" tolower(Journal_Currency)
+  Imputation_Report_Function      = "imputation_report_" tolower(Journal_Currency)
 
-  # These functions are not
+  # These functions are not dependent on currency
   Balance_Profits_Function  = "balance_journal"
   Check_Balance_Function  = "check_balance"
 
@@ -524,17 +525,28 @@ function set_special_accounts() {
   RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
   GST          = initialize_account("LIABILITY.TAX:TAX.GST")
 
-  # Tax levies
-  #LEVY         = initialize_account("LIABILITY.CURRENT.TAX:TAX.LEVY")
-
   # Offsets
   NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
   CARRY_OFFSETS      = initialize_account("SPECIAL.OFFSET.CARRY:CARRY.OFFSETS")
   REFUNDABLE_OFFSETS = initialize_account("SPECIAL.OFFSET.REFUNDABLE:REFUNDABLE.OFFSETS")
 
   # Franking Credits - strictly speaking should be AUD accounts
-  FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
-  FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
+  ##FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
+  ##FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
+
+  ## Franking Credits
+  #
+  FRANKING          = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
+  FRANKING_PAID     = initialize_account("SPECIAL.FRANKING:FRANKING.PAID") # Disbursed
+  FRANKING_STAMPED  = initialize_account("SPECIAL.FRANKING:FRANKING.STAMPED") # Received through net tax paid
+
+  # Franking deficit offset
+  # Other offsets stored in unique accounts with same branch name
+  FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
+
+  # Franking tax account - a creditor like account
+  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
+
   # Other tax credits, offsets & deductions
   LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
 
@@ -793,12 +805,18 @@ function parse_transaction(now, a, b, units, amount,
     # Reduce franking
     adjust_cost(FRANKING, - amount, now)
 
-    print_transaction(now, "Reduce Franking Balance", FRANKING, NULL, 0, amount)
+    # Note this as a reduction in the balance
+    adjust_cost(FRANKING_STAMPED, amount, now)
+
+    print_transaction(now, "Reduce Franking Balance", FRANKING, FRANKING_STAMPED, 0, amount)
    } else if (b != GST && is_tax(b)) {
     # Increase franking
     adjust_cost(FRANKING, amount, now)
 
-    print_transaction(now, "Increase Franking Balance", NULL, FRANKING, 0, amount)
+    # Note this as an increase in the balance
+    adjust_cost(FRANKING_STAMPED, -amount, now)
+
+    print_transaction(now, "Increase Franking Balance", FRANKING_STAMPED, FRANKING, 0, amount)
   }
 
   # A SMSF member benefit
@@ -877,14 +895,14 @@ function parse_transaction(now, a, b, units, amount,
       else {
         # Create tax credits account - just in time
         # Type of credits account depends on the underlying asset
-        # INCOME.DIVIDEND     => SPECIAL.OFFSET.FRANKING
-        # INCOME.DISTRIBUTION => SPECIAL.OFFSET.FRANKING
-        # INCOME.FOREIGN      => SPECIAL.OFFSET.FOREIGN
+        # INCOME.DIVIDEND     => SPECIAL.FRANKING.OFFSET
+        # INCOME.DISTRIBUTION => SPECIAL.FRANKING.OFFSET
+        # INCOME.FOREIGN      => SPECIAL.FOREIGN.OFFSET
         #
         if (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION"))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.OFFSET.FRANKING:I_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
         else if (is_class(a, "INCOME.FOREIGN"))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.OFFSET.FOREIGN:C_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FOREIGN.OFFSET:C_TAX." Leaf[underlying_asset])
         else
           assert(FALSE, sprintf("Can't link a tax credit account to income account %s", a))
       }

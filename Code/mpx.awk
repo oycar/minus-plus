@@ -100,6 +100,7 @@ END {
 
 
 
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -2229,6 +2230,9 @@ function eofy_actions(now,      past, allocated_profits,
   if (Qualification_Window)
     print_dividend_qualification(now, past, 1)
 
+  # Print Imputation report
+  @Imputation_Report_Function(now, past, Show_Extra)
+
   # Realized gains report
   get_capital_gains(now, past, Show_Extra)
 
@@ -2546,7 +2550,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("IBOTC" ~ /[cC]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2642,7 +2646,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("IBOTC" ~ /[dD]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2687,7 +2691,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("IBOTC" ~ /[oO]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2812,21 +2816,6 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   ((past)?( underline(73, 8,  reports_stream)):( underline(47, 8,  reports_stream)))
   printf "\n\n" > reports_stream
 
-  # If detailed print tax credits
-  label = sprintf("Appendix\n\nTax Offsets\n")
-  label = print_account_class(reports_stream, label, "select_class", "SPECIAL.OFFSET", "", "get_cost", now, past, past, more_past, is_detailed, -1)
-
-  # Print a nice line
-  if (!label) {
-    ((past)?( underline(73, 8,  reports_stream)):( underline(47, 8,  reports_stream)))
-    x = get_cost("*SPECIAL.OFFSET", past)
-    printf "\t%24s%22s %26s\n\n", "Total Tax Offsets",
-              print_cash(x - get_cost("*SPECIAL.OFFSET", now)),
-              print_cash(get_cost("*SPECIAL.OFFSET", more_past) - x) > reports_stream
-  }
-
-  printf "\n\n\n" > reports_stream
-
   # Only need current benefits
   x = benefits[now]
   delete losses
@@ -2842,7 +2831,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("IBOTC" ~ /[bB]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -2977,7 +2966,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("IBOTC" ~ /[mM]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3050,7 +3039,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[fF]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("IBOTC" ~ /[fF]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3183,7 +3172,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("IBOTC" ~ /[qQ]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3627,6 +3616,7 @@ BEGIN {
   ((SUBSEP in GST_Rate)?((1)):((0)))
   ((SUBSEP in LIC_Allowance)?((1)):((0)))
   ((SUBSEP in Low_Income_Offset)?((1)):((0)))
+  ((SUBSEP in Middle_Income_Offset)?((1)):((0)))
   ((SUBSEP in Medicare_Levy)?((1)):((0)))
   ((SUBSEP in Member_Liability)?((1)):((0)))
   ((SUBSEP in Reserve_Rate)?((1)):((0)))
@@ -3667,18 +3657,19 @@ BEGIN {
   #  The Default Medicare Levy
   Medicare_Levy[Epoch][0] = 0.00
 
-  # The default low income offset
+  # The default low and middle income offsets
   Low_Income_Offset[Epoch][0] = 0.00
+  Middle_Income_Offset[Epoch][0] = 0.00
 
-  # Other special accounts
-  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
+  # # Other special accounts
+  # FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
 
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
   #
-
-  # Franking deficit
-  FRANKING_DEFICIT   = initialize_account("SPECIAL.OFFSET.FRANKING_DEFICIT:FRANKING.OFFSETS")
+  #
+  # # Franking deficit
+  # FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # For super funds the amount claimable is sometimes reduced to 75%
   Reduced_GST   = 0.75
@@ -3752,11 +3743,12 @@ function income_tax_aud(now, past, benefits,
                                         tax_owed, tax_paid, tax_due, tax_with, tax_cont, income_tax,
                                         franking_offsets, foreign_offsets, franking_balance,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
+                                        low_income_offset, middle_income_offset,
                                         taxable_income,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("IBOTC" ~ /[tT]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -3824,7 +3816,7 @@ function income_tax_aud(now, past, benefits,
   #
 
   # Tax credits received during this FY
-  franking_offsets = - (get_cost("*SPECIAL.OFFSET.FRANKING", now) - get_cost("*SPECIAL.OFFSET.FRANKING", past))
+  franking_offsets = - (get_cost("*SPECIAL.FRANKING.OFFSET", now) - get_cost("*SPECIAL.FRANKING.OFFSET", past))
   if (!(((franking_offsets) <= Epsilon) && ((franking_offsets) >= -Epsilon))) {
     other_income += franking_offsets
     printf "%s\t%40s %32s\n", header, "Franking Offsets", print_cash(franking_offsets) > write_stream
@@ -4025,14 +4017,16 @@ function income_tax_aud(now, past, benefits,
     foreign_offsets = 0
 
   # No Carry Offsets (Class C)
-  # The low income tax offset depends on income
+  # The low income and middle income tax offsets depend on income
   if ((Journal_Type ~ /^IND$/)) {
-    no_carry_offsets = get_tax(now, Low_Income_Offset, taxable_income)
+    low_income_offset = get_tax(now, Low_Income_Offset, taxable_income)
+    middle_income_offset = get_tax(now, Middle_Income_Offset, taxable_income)
 
     # This is an Australian no-carry offset computed from the taxable income
 
 
-    # Get the other no_carry offsets
+    # Set the no_carry offsets
+    no_carry_offsets = low_income_offset + middle_income_offset
     no_carry_offsets -= (get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
   } else
     # Just get the total change in the offset
@@ -4332,7 +4326,6 @@ function income_tax_aud(now, past, benefits,
   set_cost(PAYG, 0, now)
   set_cost(WITHOLDING, 0, now)
   set_cost(CONTRIBUTION_TAX, 0, now)
-  #set_cost(LEVY, 0, now)
 }
 
 #
@@ -4355,7 +4348,7 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     imputation_credits = (get_cost(Tax_Credits[underlying_asset],  now) - get_cost(Tax_Credits[underlying_asset], (( now) - 1)))
     if (!(((imputation_credits) <= Epsilon) && ((imputation_credits) >= -Epsilon))) {
       # Create an unqualified account
-      unqualified_account = initialize_account("SPECIAL.OFFSET.FRANKING.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
+      unqualified_account = initialize_account("SPECIAL.FRANKING.OFFSET.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
 
       # The adjustment
       unqualified *= imputation_credits
@@ -4372,6 +4365,75 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     } # No credits at time now
   } # No tax credits for this account
 } # All done
+
+
+#
+#
+## Imputation Report Function
+##
+function imputation_report_aud(now, past, is_detailed,
+                              reports_stream, more_past, label, x, offset_class) {
+  # Set arguments
+  more_past = ((past) + one_year(past, -1))
+  is_detailed = ("" == is_detailed) ? 1 : 2
+
+  # Show imputation report
+  # The reports_stream is the pipe to write the schedule out to
+  reports_stream = (("IBOTC" ~ /[iI]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+
+  # Let's go
+  printf "%s\n", Journal_Title > reports_stream
+  printf "Statement of Imputation Credits\n" > reports_stream
+
+  printf "For the year ending %s\n", get_date(yesterday(now)) > reports_stream
+  underline(81, 0, reports_stream)
+  printf "%53s %26s\n", strftime("%Y", now, UTC), strftime("%Y", past, UTC) > reports_stream
+  printf "%53s %26s\n", "$", "$" > reports_stream
+
+  # Franking Account Balance at Start of Period
+  printf "Franking Account\n"
+  printf "\t%24s%22s %26s\n\n", "Opening Balance",
+            print_cash(get_cost(FRANKING, past)),
+            print_cash(get_cost(FRANKING, more_past)) > reports_stream
+
+  # Franking offsets
+  offset_class = "SPECIAL.FRANKING.OFFSET"
+
+  # If detailed print tax credits
+  label = sprintf("Franking Offsets Received\n")
+  label = print_account_class(reports_stream, label, "select_class", offset_class, "", "get_cost", now, past, past, more_past, is_detailed, -1)
+  # Print a nice line
+  if (!label) {
+    ((past)?( underline(73, 8,  reports_stream)):( underline(47, 8,  reports_stream)))
+    x = get_cost("*" offset_class, past)
+    printf "\t%24s%22s %26s\n\n", "Total Tax Offsets",
+              print_cash(x - get_cost("*" offset_class, now)),
+              print_cash(get_cost("*" offset_class, more_past) - x) > reports_stream
+  }
+
+  # Show the franking credits earned through tax payments
+  ((past)?( underline(73, 8,  reports_stream)):( underline(47, 8,  reports_stream)))
+  x = get_cost(FRANKING_STAMPED, past)
+  printf "\t%24s%22s %26s\n\n", "Net Franked Tax Payments",
+    print_cash(x - get_cost(FRANKING_STAMPED, now)),
+    print_cash(get_cost(FRANKING_STAMPED, more_past) - x) > reports_stream
+
+  # Franking Credits Disbursed
+  ((past)?( underline(73, 8,  reports_stream)):( underline(47, 8,  reports_stream)))
+  x = get_cost(FRANKING_PAID, past)
+  printf "\t%24s%22s %26s\n\n", "Franking Credits Paid",
+    print_cash(x - get_cost(FRANKING_PAID, now)),
+    print_cash(get_cost(FRANKING_PAID, more_past) - x) > reports_stream
+
+  # The balance
+  ((past)?( underline(73, 8,  reports_stream)):( underline(47, 8,  reports_stream)))
+  x = get_cost(FRANKING, past)
+  printf "\t%24s%22s %26s\n\n", "Closing Balance",
+    print_cash(get_cost(FRANKING, now)),
+    print_cash(get_cost(FRANKING, past)) > reports_stream
+
+  printf "\n\n\n" > reports_stream
+}
 
 #!/usr/local/bin/gawk -f
 # p.smsf_modules.awk
@@ -4839,8 +4901,9 @@ function import_csv_data(array, symbol, name,
   Income_Tax_Function     = "income_tax_" tolower(Journal_Currency)
   Initialize_Tax_Function = "initialize_tax_" tolower(Journal_Currency)
   Dividend_Qualification_Function = "dividend_qualification_" tolower(Journal_Currency)
+  Imputation_Report_Function      = "imputation_report_" tolower(Journal_Currency)
 
-  # These functions are not
+  # These functions are not dependent on currency
   Balance_Profits_Function  = "balance_journal"
   Check_Balance_Function  = "check_balance"
 
@@ -4909,13 +4972,13 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
-      if (!index(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate "), Array_Names[x])) {
+      if (!index(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate "), Array_Names[x])) {
         assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
@@ -4925,7 +4988,7 @@ function initialize_state(    x) {
   } else {
     # Use default read and write list
     Write_Variables = (0)
-    MPX_Arrays = ("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
+    MPX_Arrays = ("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
     MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
@@ -4976,17 +5039,28 @@ function set_special_accounts() {
   RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
   GST          = initialize_account("LIABILITY.TAX:TAX.GST")
 
-  # Tax levies
-  #LEVY         = initialize_account("LIABILITY.CURRENT.TAX:TAX.LEVY")
-
   # Offsets
   NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
   CARRY_OFFSETS      = initialize_account("SPECIAL.OFFSET.CARRY:CARRY.OFFSETS")
   REFUNDABLE_OFFSETS = initialize_account("SPECIAL.OFFSET.REFUNDABLE:REFUNDABLE.OFFSETS")
 
   # Franking Credits - strictly speaking should be AUD accounts
-  FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
-  FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
+  ##FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
+  ##FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
+
+  ## Franking Credits
+  #
+  FRANKING          = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
+  FRANKING_PAID     = initialize_account("SPECIAL.FRANKING:FRANKING.PAID") # Disbursed
+  FRANKING_STAMPED  = initialize_account("SPECIAL.FRANKING:FRANKING.STAMPED") # Received through net tax paid
+
+  # Franking deficit offset
+  # Other offsets stored in unique accounts with same branch name
+  FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
+
+  # Franking tax account - a creditor like account
+  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
+
   # Other tax credits, offsets & deductions
   LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
 
@@ -5237,12 +5311,18 @@ function parse_transaction(now, a, b, units, amount,
     # Reduce franking
     adjust_cost(FRANKING, - amount, now)
 
-    print_transaction(now, "Reduce Franking Balance", FRANKING, NULL, 0, amount)
+    # Note this as a reduction in the balance
+    adjust_cost(FRANKING_STAMPED, amount, now)
+
+    print_transaction(now, "Reduce Franking Balance", FRANKING, FRANKING_STAMPED, 0, amount)
    } else if (b != GST && ((b) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)) {
     # Increase franking
     adjust_cost(FRANKING, amount, now)
 
-    print_transaction(now, "Increase Franking Balance", NULL, FRANKING, 0, amount)
+    # Note this as an increase in the balance
+    adjust_cost(FRANKING_STAMPED, -amount, now)
+
+    print_transaction(now, "Increase Franking Balance", FRANKING_STAMPED, FRANKING, 0, amount)
   }
 
   # A SMSF member benefit
@@ -5321,14 +5401,14 @@ function parse_transaction(now, a, b, units, amount,
       else {
         # Create tax credits account - just in time
         # Type of credits account depends on the underlying asset
-        # INCOME.DIVIDEND     => SPECIAL.OFFSET.FRANKING
-        # INCOME.DISTRIBUTION => SPECIAL.OFFSET.FRANKING
-        # INCOME.FOREIGN      => SPECIAL.OFFSET.FOREIGN
+        # INCOME.DIVIDEND     => SPECIAL.FRANKING.OFFSET
+        # INCOME.DISTRIBUTION => SPECIAL.FRANKING.OFFSET
+        # INCOME.FOREIGN      => SPECIAL.FOREIGN.OFFSET
         #
         if (((a) ~ ("^" ( "INCOME.DIVIDEND") "[.:]")) || ((a) ~ ("^" ( "INCOME.DISTRIBUTION") "[.:]")))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.OFFSET.FRANKING:I_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
         else if (((a) ~ ("^" ( "INCOME.FOREIGN") "[.:]")))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.OFFSET.FOREIGN:C_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FOREIGN.OFFSET:C_TAX." Leaf[underlying_asset])
         else
           assert((0), sprintf("Can't link a tax credit account to income account %s", a))
       }

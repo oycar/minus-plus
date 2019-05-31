@@ -26,6 +26,7 @@ BEGIN {
   make_array(GST_Rate)
   make_array(LIC_Allowance)
   make_array(Low_Income_Offset)
+  make_array(Middle_Income_Offset)
   make_array(Medicare_Levy)
   make_array(Member_Liability)
   make_array(Reserve_Rate)
@@ -66,18 +67,19 @@ BEGIN {
   #  The Default Medicare Levy
   Medicare_Levy[Epoch][0] = 0.00
 
-  # The default low income offset
+  # The default low and middle income offsets
   Low_Income_Offset[Epoch][0] = 0.00
+  Middle_Income_Offset[Epoch][0] = 0.00
 
-  # Other special accounts
-  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
+  # # Other special accounts
+  # FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
 
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
   #
-
-  # Franking deficit
-  FRANKING_DEFICIT   = initialize_account("SPECIAL.OFFSET.FRANKING_DEFICIT:FRANKING.OFFSETS")
+  #
+  # # Franking deficit
+  # FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # For super funds the amount claimable is sometimes reduced to 75%
   Reduced_GST   = 0.75
@@ -151,6 +153,7 @@ function income_tax_aud(now, past, benefits,
                                         tax_owed, tax_paid, tax_due, tax_with, tax_cont, income_tax,
                                         franking_offsets, foreign_offsets, franking_balance,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
+                                        low_income_offset, middle_income_offset,
                                         taxable_income,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
@@ -223,7 +226,7 @@ function income_tax_aud(now, past, benefits,
   #
 
   # Tax credits received during this FY
-  franking_offsets = - (get_cost("*SPECIAL.OFFSET.FRANKING", now) - get_cost("*SPECIAL.OFFSET.FRANKING", past))
+  franking_offsets = - (get_cost("*SPECIAL.FRANKING.OFFSET", now) - get_cost("*SPECIAL.FRANKING.OFFSET", past))
   if (!near_zero(franking_offsets)) {
     other_income += franking_offsets
     printf "%s\t%40s %32s\n", header, "Franking Offsets", print_cash(franking_offsets) > write_stream
@@ -438,19 +441,25 @@ function income_tax_aud(now, past, benefits,
     foreign_offsets = 0
 
   # No Carry Offsets (Class C)
-  # The low income tax offset depends on income
+  # The low income and middle income tax offsets depend on income
   if (is_individual) {
-    no_carry_offsets = get_tax(now, Low_Income_Offset, taxable_income)
+    low_income_offset = get_tax(now, Low_Income_Offset, taxable_income)
+    middle_income_offset = get_tax(now, Middle_Income_Offset, taxable_income)
 
     # This is an Australian no-carry offset computed from the taxable income
 @ifeq LOG income_tax
-    if (not_zero(no_carry_offsets)) {
-      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(no_carry_offsets) > write_stream
+    if (not_zero(low_income_offset)) {
+      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(low_income_offset) > write_stream
+      header = ""
+    }
+    if (not_zero(middle_income_offset)) {
+      printf "%s\t%40s %32s\n", header, "Middle Income Tax Offset", print_cash(middle_income_offset) > write_stream
       header = ""
     }
 @endif
 
-    # Get the other no_carry offsets
+    # Set the no_carry offsets
+    no_carry_offsets = low_income_offset + middle_income_offset
     no_carry_offsets -= (get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
   } else
     # Just get the total change in the offset
@@ -777,7 +786,6 @@ function income_tax_aud(now, past, benefits,
   set_cost(PAYG, 0, now)
   set_cost(WITHOLDING, 0, now)
   set_cost(CONTRIBUTION_TAX, 0, now)
-  #set_cost(LEVY, 0, now)
 }
 
 #
@@ -800,7 +808,7 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     imputation_credits = get_delta_cost(Tax_Credits[underlying_asset], now)
     if (!near_zero(imputation_credits)) {
       # Create an unqualified account
-      unqualified_account = initialize_account("SPECIAL.OFFSET.FRANKING.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
+      unqualified_account = initialize_account("SPECIAL.FRANKING.OFFSET.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
 
       # The adjustment
       unqualified *= imputation_credits
@@ -827,3 +835,72 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     } # No credits at time now
   } # No tax credits for this account
 } # All done
+
+
+#
+#
+## Imputation Report Function
+##
+function imputation_report_aud(now, past, is_detailed,
+                              reports_stream, more_past, label, x, offset_class) {
+  # Set arguments
+  more_past = last_year(past)
+  is_detailed = ("" == is_detailed) ? 1 : 2
+
+  # Show imputation report
+  # The reports_stream is the pipe to write the schedule out to
+  reports_stream = report_imputation(EOFY)
+
+  # Let's go
+  printf "%s\n", Journal_Title > reports_stream
+  printf "Statement of Imputation Credits\n" > reports_stream
+
+  printf "For the year ending %s\n", get_date(yesterday(now)) > reports_stream
+  underline(81, 0, reports_stream)
+  printf "%53s %26s\n", strftime("%Y", now, UTC), strftime("%Y", past, UTC) > reports_stream
+  printf "%53s %26s\n", "$", "$" > reports_stream
+
+  # Franking Account Balance at Start of Period
+  printf "Franking Account\n"
+  printf "\t%24s%22s %26s\n\n", "Opening Balance",
+            print_cash(get_cost(FRANKING, past)),
+            print_cash(get_cost(FRANKING, more_past)) > reports_stream
+
+  # Franking offsets
+  offset_class = "SPECIAL.FRANKING.OFFSET"
+
+  # If detailed print tax credits
+  label = sprintf("Franking Offsets Received\n")
+  label = print_account_class(reports_stream, label, "select_class", offset_class, "", "get_cost", now, past, past, more_past, is_detailed, -1)
+  # Print a nice line
+  if (!label) {
+    print_line(past, reports_stream)
+    x = get_cost("*" offset_class, past)
+    printf "\t%24s%22s %26s\n\n", "Total Tax Offsets",
+              print_cash(x - get_cost("*" offset_class, now)),
+              print_cash(get_cost("*" offset_class, more_past) - x) > reports_stream
+  }
+
+  # Show the franking credits earned through tax payments
+  print_line(past, reports_stream)
+  x = get_cost(FRANKING_STAMPED, past)
+  printf "\t%24s%22s %26s\n\n", "Net Franked Tax Payments",
+    print_cash(x - get_cost(FRANKING_STAMPED, now)),
+    print_cash(get_cost(FRANKING_STAMPED, more_past) - x) > reports_stream
+
+  # Franking Credits Disbursed
+  print_line(past, reports_stream)
+  x = get_cost(FRANKING_PAID, past)
+  printf "\t%24s%22s %26s\n\n", "Franking Credits Paid",
+    print_cash(x - get_cost(FRANKING_PAID, now)),
+    print_cash(get_cost(FRANKING_PAID, more_past) - x) > reports_stream
+
+  # The balance
+  print_line(past, reports_stream)
+  x = get_cost(FRANKING, past)
+  printf "\t%24s%22s %26s\n\n", "Closing Balance",
+    print_cash(get_cost(FRANKING, now)),
+    print_cash(get_cost(FRANKING, past)) > reports_stream
+
+  printf "\n\n\n" > reports_stream
+}

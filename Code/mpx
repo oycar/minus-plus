@@ -63,7 +63,7 @@ shopt -s expand_aliases
 alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
 
 # Interpret options
-while getopts ":a:c:ef:il:p:q:s:v:w:xzABCDFMOQTZ" opt; do
+while getopts ":a:c:ef:il:p:q:s:v:w:xzABCDFIMOQTZ" opt; do
     case $opt in
 
     a) account_name=$OPTARG;;
@@ -114,6 +114,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
     C) Show_Reports+="C";;
     D) Show_Reports+="D";;
     F) Show_Reports+="F";;
+    I) Show_Reports+="I";;
     M) Show_Reports+="M";;
     O) Show_Reports+="O";;
     Q) Show_Reports+="Q";;
