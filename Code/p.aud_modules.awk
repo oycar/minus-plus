@@ -109,6 +109,8 @@ function initialize_tax_aud() {
     # Special versions of functions for SMSFs
     Check_Balance_Function   = "check_balance_smsf"
     Balance_Profits_Function = "balance_profits_smsf"
+    Update_Member_Function   = "update_member_liability_smsf"
+    Update_Profits_Function  = "update_profits_smsf"
 
     # Special accounts for SMSFs
     RESERVE   = initialize_account("LIABILITY.RESERVE:INVESTMENT.RESERVE")

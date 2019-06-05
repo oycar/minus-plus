@@ -2550,7 +2550,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("IBOTC" ~ /[cC]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("MB" ~ /[cC]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2646,7 +2646,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("IBOTC" ~ /[dD]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("MB" ~ /[dD]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2691,7 +2691,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("IBOTC" ~ /[oO]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[oO]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2831,7 +2831,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("IBOTC" ~ /[bB]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[bB]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -2966,7 +2966,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("IBOTC" ~ /[mM]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("MB" ~ /[mM]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3039,7 +3039,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("IBOTC" ~ /[fF]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[fF]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3172,7 +3172,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("IBOTC" ~ /[qQ]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[qQ]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3699,6 +3699,8 @@ function initialize_tax_aud() {
     # Special versions of functions for SMSFs
     Check_Balance_Function   = "check_balance_smsf"
     Balance_Profits_Function = "balance_profits_smsf"
+    Update_Member_Function   = "update_member_liability_smsf"
+    Update_Profits_Function  = "update_profits_smsf"
 
     # Special accounts for SMSFs
     RESERVE   = initialize_account("LIABILITY.RESERVE:INVESTMENT.RESERVE")
@@ -3748,7 +3750,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("IBOTC" ~ /[tT]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("MB" ~ /[tT]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4379,7 +4381,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("IBOTC" ~ /[iI]|[aA]/ && "IBOTC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[iI]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -4498,7 +4500,7 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   # both redistribute liabilities and allocated profits
   delta_profits = get_cost(ALLOCATED, now) - initial_allocation - x
   if (!(((delta_profits) <= Epsilon) && ((delta_profits) >= -Epsilon)))
-    update_member_liability(now, delta_profits)
+    update_member_liability_smsf(now, delta_profits)
 
   # Unallocated expenses/income
   adjust_cost(ALLOCATED, (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now), now)
@@ -4547,6 +4549,167 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
     printf "\tBalance     => %20.2f\n", balance
     assert((((balance) <= Epsilon) && ((balance) >= -Epsilon)), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
+}
+
+# A wrapper function updates allocated profits when required ()
+function update_profits_smsf(now,     delta_profits) {
+  # Compute the profits that need to be allocated to members
+  # These are the profits accumulated since the last time they were distributed to members
+  delta_profits = (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now)
+  if (!(((delta_profits) <= Epsilon) && ((delta_profits) >= -Epsilon))) {
+    # Update the Allocated Profits
+    adjust_cost(ALLOCATED, delta_profits, now, (0))
+
+    # Update the liabilities
+    update_member_liability_smsf(now, delta_profits)
+  }
+}
+
+# Update a member liability
+# This can be (i)   a contribution - specified member, taxable or tax-free
+#          or (ii)  a benefit - specified member
+#          or (iii) allocation amongst members - no specificiation
+#          or (iv)  allocation to or from the reserve - no specification
+# This function keeps the member liability up to date for a SMSF
+#
+function update_member_liability_smsf(now, amount, a,
+                                      share, taxable_share,
+                                      member_id, member_account,
+                                      target_account,
+                                      sum_total, x, sum_share) {
+  # Update the member liabilities with their share of the income/expenses
+  # The proportions only change when a contribution is received
+  # or a benefit paid;
+  # plus there is no legislation specifying the precise method of proportioning
+  # but this seems reasonable
+  #   Income / Expenses are made in proportion to net contributions made
+  #   Contributions are assigned to the member
+  #   Benefits are paid proportionate to  the member's balance - so security prices influence this
+
+  # In the various cases the following is passed in
+  # Case (i)   :   account_name, now, amount
+  # Case (ii)  :   account_name, now, amount
+  # Case (iii) :   now, amount
+  # Case (iv)  :   now, amount
+
+  # Note if a taxable share is driven negative the value should be transferred from the tax-free share
+
+  # Get the appropriate member account
+  if ("" == a)
+    member_id = ""
+  else # This will be an account - but when not a CONTRIBUTION it will be a parent account
+    member_id = get_member_name(a, now, amount)
+
+
+
+  # Allocation to the liability accounts
+  # Either no id is given - distribute amongst all accounts
+  # Or a parent account - distribute amongst its offspring
+  # Or a specific account - distribute solely to that account
+  taxable_share = sum_total = sum_share = 0
+
+  # Normalize amounts
+  if (member_id in Member_Liability) { # Exact match - a contribution
+    # Adjust the liability
+    adjust_cost(member_id, - amount, now)
+    if (member_id ~ /TAXABLE/)
+      taxable_share = 1.0
+
+
+  } else { # Get totals
+    # We still get the share from each account
+    # Don't use the accumulated totals because (rarely) a negative account balance will break the proportioning
+    # Also since  the order of transactions on a particular day is not defined use just_before() to compute proportions
+    for (member_account in Member_Liability)
+      if (!member_id || is_ancestor(member_id, member_account)) {
+        share[member_account] = x = get_cost(member_account, ((now) - 1))
+        sum_total += x
+
+        # Compute what fraction of the allocation was taxable
+        if (member_account ~ /TAXABLE/)
+          taxable_share += x
+      }
+
+    # Normalize taxable share
+    taxable_share /= sum_total
+
+    # There are two possibilities here -
+    #   No member id => profit/loss everything goes to/from TAXABLE accounts
+    #   A parent id  => proportioning rule applies
+    # Update the liabilities - but only the target accounts
+    for (member_account in share) {
+      x = share[member_account] / sum_total
+
+      # Target account
+      if (!member_id)
+        target_account = Member_Liability[member_account]
+      else
+        target_account = member_account
+
+      # Adjust the liability
+      adjust_cost(target_account, - x * amount, now)
+
+    } # End of exact share
+
+    # Tidy up
+    delete share
+  } # End of allocation
+
+
+
+  # return proportion that was taxable
+  return taxable_share
+}
+
+# Obtain the member account
+function get_member_name(a, now, x,   member_name, member_account, target_account, subclass, contribution_tax) {
+  # This obtains the liability account that needs to be modified
+  # In more detail INCOME.CONTRIBUTION.SUBCLASS:NAME.SUFFIX => LIABILITY.MEMBER.NAME:NAME.SUBCLASS
+  # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
+  # In fact        X.Y:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
+
+  # Get the member name
+  member_name = get_name_component(Leaf[a], 1) # first component
+
+  # A member liability account can only be created by a contribution
+  if (((a) ~ ("^" ( "INCOME.CONTRIBUTION") "[.:]"))) {
+    # Identify the "subclass" - use Parent_Name because it is always available
+    subclass = get_name_component(Parent_Name[a], 0) # last component
+
+    # If a link is made in a "MEMBER" array to each members liabilities
+    # then there is no need to identify this as a member liability in the
+    # account name
+    member_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.%s", member_name, member_name, subclass))
+
+    # Ensure that this member is noted in the Member_Liability array
+    if (!(member_account in Member_Liability)) {
+      # Need to ensure that the target TAXABLE account is created
+      # The target account can actually be the same as the member_account
+      target_account = Member_Liability[member_account] = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.TAXABLE", member_name, member_name))
+
+      # Check the target account is included too
+      if (!(target_account in Member_Liability))
+        Member_Liability[target_account] = target_account
+    } else # Get the target account so we check if contribution tax should be computed
+      target_account = Member_Liability[member_account]
+
+    # This will change the LIABILITIES and EXPENSES equally
+    if (target_account == member_account) {
+      # This is a TAXABLE account
+      contribution_tax = get_tax(now, Tax_Bands, x) # Always one band so ok to ignore other income
+
+      # Save the tax expenses and adjust the liability
+      adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)
+      adjust_cost(target_account,  contribution_tax, now)
+    }
+  } else {
+    # Return the parent account
+    member_account = "*LIABILITY.MEMBER." member_name
+    assert(member_account in Parent_Name, "<" $0 "> Unknown account <" member_account ">")
+  }
+
+  # Return the account
+  return member_account
 }
 
 
@@ -4906,6 +5069,8 @@ function import_csv_data(array, symbol, name,
   # These functions are not dependent on currency
   Balance_Profits_Function  = "balance_journal"
   Check_Balance_Function  = "check_balance"
+  Update_Profits_Function = "update_profits"
+  Update_Member_Function  = "update_member_liability"
 
   # Initialize local tax variables
   @Initialize_Tax_Function()
@@ -5264,7 +5429,7 @@ function read_input_record(   t, n, a, threshold) {
   assert(2 == n || 0 == n, sprintf("<%s> - syntax error %d accounts found in transaction", $0, n))
 
   # If the transaction is already parsed simply print it out
-  if (t < ((Last_State) - 1)) {
+  if (t < ((Last_State) + 1)) {
     if (2 == n)
       print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], units, amount)
   } else if (2 == n) {
@@ -5333,10 +5498,10 @@ function parse_transaction(now, a, b, units, amount,
     set_cost(MARKET_CHANGES, sum_market_gains(((now) - 1)), ((now) - 1))
 
     # This will change proportions so update the profits first
-    update_profits(now)
+    @Update_Profits_Function(now)
 
     # Expense must be account b
-    amount_taxed = amount * update_member_liability(now, -amount, b)
+    amount_taxed = amount * @Update_Member_Function(now, -amount, b)
     if (!((b) ~ ("[.:]" ( "TAXABLE") "(_|$)")) && !((b) ~ ("[.:]" ( "TAX-FREE") "(_|$)"))) {
       # Naming convention
       #
@@ -5468,10 +5633,10 @@ function parse_transaction(now, a, b, units, amount,
     # A SMSF member contribution
     if (((a) ~ ("^" ( "INCOME.CONTRIBUTION") "[.:]"))) {
       # This will change proportions so update the profits first
-      update_profits(now)
+      @Update_Profits_Function(now)
 
       # Drop the INCOME prefix
-      update_member_liability(now, amount, a)
+      @Update_Member_Function(now, amount, a)
     }
   } else if (((b) ~ ("^" ( "EXPENSE.NON-DEDUCTIBLE.DIVIDEND") "[.:]"))) {
     # A franking entity (eg company) can distribute franking credits
@@ -5843,19 +6008,30 @@ function convert_term_account(a, now, maturity,       active_account, x, thresho
   return active_account
 }
 
-# A wrapper function updates allocated profits when required ()
-function update_profits(now,     delta_profits) {
-  # Compute the profits that need to be allocated to members
-  # These are the profits accumulated since the last time they were distributed to members
-  delta_profits = (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now)
-  if (!(((delta_profits) <= Epsilon) && ((delta_profits) >= -Epsilon))) {
-    # Update the Allocated Profits
-    adjust_cost(ALLOCATED, delta_profits, now, (0))
-
-    # Update the liabilities
-    update_member_liability(now, delta_profits)
-  }
+#
+function update_profits(now) {
+  # A No-op
+  return
 }
+
+function update_member_liability(now, delta_profits, a) {
+  # A no-op
+  return
+}
+
+# A wrapper function updates allocated profits when required ()
+# function update_profits(now,     delta_profits) {
+#   # Compute the profits that need to be allocated to members
+#   # These are the profits accumulated since the last time they were distributed to members
+#   delta_profits = accumulated_profits(now) - get_cost(ALLOCATED, now)
+#   if (!near_zero(delta_profits)) {
+#     # Update the Allocated Profits
+#     adjust_cost(ALLOCATED, delta_profits, now, FALSE)
+#
+#     # Update the liabilities
+#     update_member_liability(now, delta_profits)
+#   }
+# }
 
 # checking and setting
 # Syntax
@@ -5920,152 +6096,168 @@ function checkset(now, a, account, units, amount, is_check,
 
 }
 
-# Update a member liability
-# This can be (i)   a contribution - specified member, taxable or tax-free
-#          or (ii)  a benefit - specified member
-#          or (iii) allocation amongst members - no specificiation
-#          or (iv)  allocation to or from the reserve - no specification
-# This function keeps the member liability up to date for a SMSF
+# # Update a member liability
+# # This can be (i)   a contribution - specified member, taxable or tax-free
+# #          or (ii)  a benefit - specified member
+# #          or (iii) allocation amongst members - no specificiation
+# #          or (iv)  allocation to or from the reserve - no specification
+# # This function keeps the member liability up to date for a SMSF
+# #
+# function update_member_liability(now, amount, a,
+#                                       share, taxable_share,
+#                                       member_id, member_account,
+#                                       target_account,
+#                                       sum_total, x, sum_share) {
+#   # Update the member liabilities with their share of the income/expenses
+#   # The proportions only change when a contribution is received
+#   # or a benefit paid;
+#   # plus there is no legislation specifying the precise method of proportioning
+#   # but this seems reasonable
+#   #   Income / Expenses are made in proportion to net contributions made
+#   #   Contributions are assigned to the member
+#   #   Benefits are paid proportionate to  the member's balance - so security prices influence this
 #
-function update_member_liability(now, amount, a,
-                                      share, taxable_share,
-                                      member_id, member_account,
-                                      target_account,
-                                      sum_total, x, sum_share) {
-  # Update the member liabilities with their share of the income/expenses
-  # The proportions only change when a contribution is received
-  # or a benefit paid;
-  # plus there is no legislation specifying the precise method of proportioning
-  # but this seems reasonable
-  #   Income / Expenses are made in proportion to net contributions made
-  #   Contributions are assigned to the member
-  #   Benefits are paid proportionate to  the member's balance - so security prices influence this
-
-  # In the various cases the following is passed in
-  # Case (i)   :   account_name, now, amount
-  # Case (ii)  :   account_name, now, amount
-  # Case (iii) :   now, amount
-  # Case (iv)  :   now, amount
-
-  # Note if a taxable share is driven negative the value should be transferred from the tax-free share
-
-  # Get the appropriate member account
-  if ("" == a)
-    member_id = ""
-  else # This will be an account - but when not a CONTRIBUTION it will be a parent account
-    member_id = get_member_name(a, now, amount)
-
-
-
-  # Allocation to the liability accounts
-  # Either no id is given - distribute amongst all accounts
-  # Or a parent account - distribute amongst its offspring
-  # Or a specific account - distribute solely to that account
-  taxable_share = sum_total = sum_share = 0
-
-  # Normalize amounts
-  if (member_id in Member_Liability) { # Exact match - a contribution
-    # Adjust the liability
-    adjust_cost(member_id, - amount, now)
-    if (member_id ~ /TAXABLE/)
-      taxable_share = 1.0
-
-
-  } else { # Get totals
-    # We still get the share from each account
-    # Don't use the accumulated totals because (rarely) a negative account balance will break the proportioning
-    # Also since  the order of transactions on a particular day is not defined use just_before() to compute proportions
-    for (member_account in Member_Liability)
-      if (!member_id || is_ancestor(member_id, member_account)) {
-        share[member_account] = x = get_cost(member_account, ((now) - 1))
-        sum_total += x
-
-        # Compute what fraction of the allocation was taxable
-        if (member_account ~ /TAXABLE/)
-          taxable_share += x
-      }
-
-    # Normalize taxable share
-    taxable_share /= sum_total
-
-    # There are two possibilities here -
-    #   No member id => profit/loss everything goes to/from TAXABLE accounts
-    #   A parent id  => proportioning rule applies
-    # Update the liabilities - but only the target accounts
-    for (member_account in share) {
-      x = share[member_account] / sum_total
-
-      # Target account
-      if (!member_id)
-        target_account = Member_Liability[member_account]
-      else
-        target_account = member_account
-
-      # Adjust the liability
-      adjust_cost(target_account, - x * amount, now)
-
-    } # End of exact share
-
-    # Tidy up
-    delete share
-  } # End of allocation
-
-
-
-  # return proportion that was taxable
-  return taxable_share
-}
-
-# Obtain the member account
-function get_member_name(a, now, x,   member_name, member_account, target_account, subclass, contribution_tax) {
-  # This obtains the liability account that needs to be modified
-  # In more detail INCOME.CONTRIBUTION.SUBCLASS:NAME.SUFFIX => LIABILITY.MEMBER.NAME:NAME.SUBCLASS
-  # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
-  # In fact        X.Y:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
-
-  # Get the member name
-  member_name = get_name_component(Leaf[a], 1) # first component
-
-  # A member liability account can only be created by a contribution
-  if (((a) ~ ("^" ( "INCOME.CONTRIBUTION") "[.:]"))) {
-    # Identify the "subclass" - use Parent_Name because it is always available
-    subclass = get_name_component(Parent_Name[a], 0) # last component
-
-    # If a link is made in a "MEMBER" array to each members liabilities
-    # then there is no need to identify this as a member liability in the
-    # account name
-    member_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.%s", member_name, member_name, subclass))
-
-    # Ensure that this member is noted in the Member_Liability array
-    if (!(member_account in Member_Liability)) {
-      # Need to ensure that the target TAXABLE account is created
-      # The target account can actually be the same as the member_account
-      target_account = Member_Liability[member_account] = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.TAXABLE", member_name, member_name))
-
-      # Check the target account is included too
-      if (!(target_account in Member_Liability))
-        Member_Liability[target_account] = target_account
-    } else # Get the target account so we check if contribution tax should be computed
-      target_account = Member_Liability[member_account]
-
-    # This will change the LIABILITIES and EXPENSES equally
-    if (target_account == member_account) {
-      # This is a TAXABLE account
-      contribution_tax = get_tax(now, Tax_Bands, x) # Always one band so ok to ignore other income
-
-      # Save the tax expenses and adjust the liability
-      adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)
-      adjust_cost(target_account,  contribution_tax, now)
-    }
-  } else {
-    # Return the parent account
-    member_account = "*LIABILITY.MEMBER." member_name
-    assert(member_account in Parent_Name, "<" $0 "> Unknown account <" member_account ">")
-  }
-
-  # Return the account
-  return member_account
-}
+#   # In the various cases the following is passed in
+#   # Case (i)   :   account_name, now, amount
+#   # Case (ii)  :   account_name, now, amount
+#   # Case (iii) :   now, amount
+#   # Case (iv)  :   now, amount
+#
+#   # Note if a taxable share is driven negative the value should be transferred from the tax-free share
+#
+#   # Get the appropriate member account
+#   if ("" == a)
+#     member_id = ""
+#   else # This will be an account - but when not a CONTRIBUTION it will be a parent account
+#     member_id = get_member_name(a, now, amount)
+#
+# @ifeq LOG update_member_liability
+#   printf "Update Liabilities [%s]\n", get_date(now) > STDERR
+#   if (member_id)
+#     printf "\t%20s => %s\n", "Member id", member_id > STDERR
+#   printf "\tMember Shares\n" > STDERR
+# @endif # LOG
+#
+#   # Allocation to the liability accounts
+#   # Either no id is given - distribute amongst all accounts
+#   # Or a parent account - distribute amongst its offspring
+#   # Or a specific account - distribute solely to that account
+#   taxable_share = sum_total = sum_share = 0
+#
+#   # Normalize amounts
+#   if (member_id in Member_Liability) { # Exact match - a contribution
+#     # Adjust the liability
+#     adjust_cost(member_id, - amount, now)
+#     if (member_id ~ /TAXABLE/)
+#       taxable_share = 1.0
+#
+# @ifeq LOG update_member_liability
+#     sum_share = 1.0
+#     printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_id], sum_share, Leaf[member_id], print_cash(- amount) > STDERR
+# @endif # LOG
+#   } else { # Get totals
+#     # We still get the share from each account
+#     # Don't use the accumulated totals because (rarely) a negative account balance will break the proportioning
+#     # Also since  the order of transactions on a particular day is not defined use just_before() to compute proportions
+#     for (member_account in Member_Liability)
+#       if (!member_id || is_ancestor(member_id, member_account)) {
+#         share[member_account] = x = get_cost(member_account, just_before(now))
+#         sum_total += x
+#
+#         # Compute what fraction of the allocation was taxable
+#         if (member_account ~ /TAXABLE/)
+#           taxable_share += x
+#       }
+#
+#     # Normalize taxable share
+#     taxable_share /= sum_total
+#
+#     # There are two possibilities here -
+#     #   No member id => profit/loss everything goes to/from TAXABLE accounts
+#     #   A parent id  => proportioning rule applies
+#     # Update the liabilities - but only the target accounts
+#     for (member_account in share) {
+#       x = share[member_account] / sum_total
+#
+#       # Target account
+#       if (!member_id)
+#         target_account = Member_Liability[member_account]
+#       else
+#         target_account = member_account
+#
+#       # Adjust the liability
+#       adjust_cost(target_account, - x * amount, now)
+# @ifeq LOG update_member_liability
+#       sum_share += x
+#       printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_account], x, Leaf[target_account], print_cash(- x * amount) > STDERR
+#       if (get_cost(target_account, now) > 0)
+#         printf "\t\tNegative Balance in target account %16s => %14s\n", Leaf[target_account], print_cash(- get_cost(target_account, now)) > STDERR
+# @endif # LOG
+#     } # End of exact share
+#
+#     # Tidy up
+#     delete share
+#   } # End of allocation
+#
+# @ifeq LOG update_member_liability
+#   # Just debugging
+#   printf "\t%20s => %8.6f %16s => %14s\n", "Share", sum_share, "Total", print_cash(- amount) > STDERR
+# @endif # LOG
+#
+#   # return proportion that was taxable
+#   return taxable_share
+# }
+#
+# # Obtain the member account
+# function get_member_name(a, now, x,   member_name, member_account, target_account, subclass, contribution_tax) {
+#   # This obtains the liability account that needs to be modified
+#   # In more detail INCOME.CONTRIBUTION.SUBCLASS:NAME.SUFFIX => LIABILITY.MEMBER.NAME:NAME.SUBCLASS
+#   # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
+#   # In fact        X.Y:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
+#
+#   # Get the member name
+#   member_name = get_name_component(Leaf[a], 1) # first component
+#
+#   # A member liability account can only be created by a contribution
+#   if (is_class(a, "INCOME.CONTRIBUTION")) {
+#     # Identify the "subclass" - use Parent_Name because it is always available
+#     subclass = get_name_component(Parent_Name[a], 0) # last component
+#
+#     # If a link is made in a "MEMBER" array to each members liabilities
+#     # then there is no need to identify this as a member liability in the
+#     # account name
+#     member_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.%s", member_name, member_name, subclass))
+#
+#     # Ensure that this member is noted in the Member_Liability array
+#     if (!(member_account in Member_Liability)) {
+#       # Need to ensure that the target TAXABLE account is created
+#       # The target account can actually be the same as the member_account
+#       target_account = Member_Liability[member_account] = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.TAXABLE", member_name, member_name))
+#
+#       # Check the target account is included too
+#       if (!(target_account in Member_Liability))
+#         Member_Liability[target_account] = target_account
+#     } else # Get the target account so we check if contribution tax should be computed
+#       target_account = Member_Liability[member_account]
+#
+#     # This will change the LIABILITIES and EXPENSES equally
+#     if (target_account == member_account) {
+#       # This is a TAXABLE account
+#       contribution_tax = get_tax(now, Tax_Bands, x) # Always one band so ok to ignore other income
+#
+#       # Save the tax expenses and adjust the liability
+#       adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)
+#       adjust_cost(target_account,  contribution_tax, now)
+#     }
+#   } else {
+#     # Return the parent account
+#     member_account = "*LIABILITY.MEMBER." member_name
+#     assert(member_account in Parent_Name, "<" $0 "> Unknown account <" member_account ">")
+#   }
+#
+#   # Return the account
+#   return member_account
+# }
 
 # Final processing
 END {
