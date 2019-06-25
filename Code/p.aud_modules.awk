@@ -863,7 +863,7 @@ function imputation_report_aud(now, past, is_detailed,
   printf "%53s %26s\n", "$", "$" > reports_stream
 
   # Franking Account Balance at Start of Period
-  printf "Franking Account\n"
+  printf "Franking Account\n" > reports_stream
   printf "\t%24s%22s %26s\n\n", "Opening Balance",
             print_cash(get_cost(FRANKING, past)),
             print_cash(get_cost(FRANKING, more_past)) > reports_stream

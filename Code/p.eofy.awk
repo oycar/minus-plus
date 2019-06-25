@@ -428,7 +428,7 @@ function get_capital_gains(now, past, is_detailed,
 
     # Now consider the losses
     # Need to consider a maximum loss window beyond which losses will not be carried
-    cgt_losses = get_cost(CAPITAL_LOSSES, just_before(now)) - get_cost(CAPITAL_LOSSES, carry_forward_limit(now))
+    cgt_losses = -(get_cost(CAPITAL_LOSSES, just_before(now)) - get_cost(CAPITAL_LOSSES, carry_forward_limit(now)))
     if (CARRY_FORWARD_LIMIT)
       printf "\t%27s => %14s\n", "Losses Carried Forward Since", get_date(carry_forward_limit(now)) > reports_stream
     if (!near_zero(cgt_losses))
@@ -1112,7 +1112,7 @@ function print_dividend_qualification(now, past, is_detailed,
 # selector function
 function print_account_class(stream, heading, selector, class_name, blocked_class, income_function, now, now_past, past, past_past, print_all, sign,
   subclass, last_subclass,
-  x, account_income, did_print) { # account_sum, did_print) {
+  x, account_income, did_print) {
 
   # Bail out when nothing to print
   if (DEVNULL == stream)
