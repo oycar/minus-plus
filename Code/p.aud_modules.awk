@@ -36,7 +36,7 @@ BEGIN {
     set_epoch()
 
   # // Can set constants here
-  if ("" == Qualification_Window)
+  if (!Qualification_Window)
     EOFY_Window = Qualification_Window = 0
   else {
     Qualification_Window = 91 * ONE_DAY # seconds
@@ -211,7 +211,8 @@ function income_tax_aud(now, past, benefits,
 
   # taxable capital gains
   #
-  taxable_gains = get_cost(TAXABLE_SHORT, now) + (1.0 - rational_value(CGT_Discount)) * get_cost(TAXABLE_LONG, now)
+  taxable_gains = get_cost("*SPECIAL.TAXABLE.SHORT", now) + (1.0 - rational_value(CGT_Discount)) * get_cost("*SPECIAL.TAXABLE.LONG", now)
+
   if (near_zero(taxable_gains))
     taxable_gains = 0
   else {
@@ -220,9 +221,6 @@ function income_tax_aud(now, past, benefits,
     printf "%s\t%40s %32s\n", header, "Taxable Capital Gains", print_cash(-taxable_gains) > write_stream
     header = ""
   }
-
-  # Save the taxable gains
-  set_cost(TAXABLE_GAINS, taxable_gains, now)
 
   # Imputation Tax Offsets
   #

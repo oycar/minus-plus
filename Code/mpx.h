@@ -27,7 +27,7 @@ Lifetime Long_Name Maturity_Date Method_Name Number_Parcels \
 Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands \
 Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held "
 
-@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length \
+@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Carried_Loss_Limit Document_Root EOFY_Window FY_Day FY_Date FY_Length \
 FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED \
 Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
@@ -51,6 +51,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Output Date Formats
 @define MONTH_FORMAT ("%Y %b %d") # // 2010 Jun 10
 @define ISO_FORMAT   ("%F")       # // 2010-Jun-10
+@define YEAR_FORMAT  ("%Y") # // 2010
 
 # // Default Reports
 @define ALL_REPORTS ("a:b:c:d:f:m:o:q:t:z")
@@ -237,7 +238,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Unlimited goes all the way to the Epoch
 # // No need to compute the number of years exactly
 # // The carry forward and write back limits
-@define carry_forward_limit(t) ternary(CARRY_FORWARD_LIMIT, ((t) - CARRY_FORWARD_LIMIT), Epoch)
+@define carry_forward_limit(t) ternary((Carried_Loss_Limit + CARRY_FORWARD_LIMIT) < (t), ((t) - CARRY_FORWARD_LIMIT), Carried_Loss_Limit)
 @define write_back_limit(t) ternary(WRITE_BACK_LIMIT, ((t) - WRITE_BACK_LIMIT), Epoch)
 
 # // Multi-Line Macro

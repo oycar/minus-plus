@@ -511,11 +511,11 @@ function set_special_accounts() {
   FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
 
   # Keeping a record of taxable income, gains, losses
-  TAXABLE_GAINS    = initialize_account("SPECIAL.TAX:TAXABLE.GAINS")
+  #TAXABLE_GAINS    = initialize_account("SPECIAL.TAX:TAXABLE.GAINS")
   TAXABLE_INCOME   = initialize_account("SPECIAL.TAX:TAXABLE.INCOME")
   INCOME_TAX       = initialize_account("SPECIAL.TAX:INCOME.TAX")
-  TAXABLE_LONG     = initialize_account("SPECIAL.TAX:TAXABLE.LONG")
-  TAXABLE_SHORT    = initialize_account("SPECIAL.TAX:TAXABLE.SHORT")
+  #TAXABLE_LONG     = initialize_account("SPECIAL.TAX:TAXABLE.LONG")
+  #TAXABLE_SHORT    = initialize_account("SPECIAL.TAX:TAXABLE.SHORT")
 
   # Built in TAX accounts - debtor like
   WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
@@ -563,19 +563,19 @@ function set_special_accounts() {
 
   # Taxable capital gains are in special accounts
   # Tax Adjustments have potentially been applied to these quantities
-  LONG_GAINS    = initialize_account("SPECIAL.GAINS:LONG.GAINS")
-  LONG_LOSSES   = initialize_account("SPECIAL.LOSSES:LONG.LOSSES")
-  SHORT_GAINS   = initialize_account("SPECIAL.GAINS:SHORT.GAINS")
-  SHORT_LOSSES  = initialize_account("SPECIAL.LOSSES:SHORT.LOSSES")
+  LONG_GAINS    = initialize_account("SPECIAL.TAXABLE.LONG.GAINS:LONG.GAINS")
+  LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LONG.LOSSES:LONG.LOSSES")
+  SHORT_GAINS   = initialize_account("SPECIAL.TAXABLE.SHORT.GAINS:SHORT.GAINS")
+  SHORT_LOSSES  = initialize_account("SPECIAL.TAXABLE.SHORT.LOSSES:SHORT.LOSSES")
 
   # Taxable carried losses
-  TAX_LOSSES       = initialize_account("SPECIAL.LOSSES.CARRIED:TAX.LOSSES")
-  CAPITAL_LOSSES   = initialize_account("SPECIAL.LOSSES.CAPITAL:CAPITAL.LOSSES")
+  TAX_LOSSES       = initialize_account("SPECIAL.CARRIED:TAX.LOSSES")
+  CAPITAL_LOSSES   = initialize_account("SPECIAL.CARRIED:CAPITAL.LOSSES")
 
   #
   # Deferred Gains & Losses too (all long...)
-  DEFERRED_GAINS  = initialize_account("SPECIAL.GAINS:DEFERRED.GAINS")
-  DEFERRED_LOSSES = initialize_account("SPECIAL.LOSSES:DEFERRED.LOSSES")
+  DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
+  DEFERRED_LOSSES = initialize_account("SPECIAL.DEFERRED:DEFERRED.LOSSES")
 }
 
 #
@@ -987,7 +987,7 @@ function parse_transaction(now, a, b, units, amount,
 
   # A sale transaction
   if (units < 0) {
-    # The asset being sold must be "a" but if an equity must be "b"
+    # The asset being sold must be "a" but if equity must be "b"
     #
     correct_order = is_asset(a) && is_open(a, now)
     if (!correct_order) {
@@ -1459,6 +1459,10 @@ function checkset(now, a, account, units, amount, is_check,
       case "COST" :
         # Override the account cost -> this can cause the accounts not to balance!
         set_cost(account, amount, now)
+@ifeq LOG checkset
+        printf "%% SET %s[%11s] => %14s\n", account, get_date(now), print_cash(get_cost(account, now)) > STDERR
+        printf "%% SET %s[%11s] => %14s\n", Parent_Name[account], get_date(now), print_cash(get_cost(Parent_Name[account], now)) > STDERR
+@endif
       break
 
       default : assert(FALSE, sprintf("SET: I don't know how to set <%s> for account %s\n",

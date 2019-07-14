@@ -1938,7 +1938,7 @@ function set_months(   i, month_name, mon) {
 function set_epoch() {
   # The Epoch
   # A more practical Epoch
-  Epoch = mktime(EPOCH_START " 01 01 00 00 00", UTC)
+  Carried_Loss_Limit = Epoch = mktime(EPOCH_START " 01 01 00 00 00", UTC)
 
   # A distant Future
   Future = mktime(EPOCH_END " 12 31 00 00 00", UTC)

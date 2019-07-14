@@ -32,9 +32,10 @@
 @define MPX_ARRAYS (SHARED_ARRAYS " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
 @define MPX_SCALARS (SHARED_SCALARS " Balance_Profits_Function Check_Balance_Function ")
 
-@defeval CARRY_FORWARD_LIMIT  ("")
+@defeval CARRY_FORWARD_LIMIT  (0)
 @defeval WRITE_BACK_LIMIT     ("")
-#
+
+
 @elif JOURNAL_CURRENCY "USD"
 # // US Dollars
 # // Add localized State Variables & Scalars
@@ -43,4 +44,11 @@
 #
 @defeval CARRY_FORWARD_LIMIT  @eval (5 * 366 * ONE_DAY)
 @defeval WRITE_BACK_LIMIT     @eval (3 * 366 * ONE_DAY)
+@endif # // JOURNAL_CURRENCY
+
+# // A Macro to compute total taxable gains
+@ifeq JOURNAL_CURRENCY "AUD"
+@define total_taxable_gains(t) (get_cost("*SPECIAL.TAXABLE.SHORT", t) + (1.0 - rational_value(CGT_Discount)) * get_cost("*SPECIAL.TAXABLE.LONG", t))
+@else
+@define total_taxable_gains(t) (get_cost("*SPECIAL.TAXABLE", t))
 @endif # // JOURNAL_CURRENCY
