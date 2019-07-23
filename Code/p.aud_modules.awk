@@ -143,7 +143,7 @@ function initialize_tax_aud() {
 function income_tax_aud(now, past, benefits,
 
                                         write_stream,
-                                        taxable_gains,
+                                        taxable_gains, taxable_losses,
                                         market_changes,
                                         accounting_gains, accounting_losses,
                                         foreign_income, exempt_income,
@@ -211,8 +211,9 @@ function income_tax_aud(now, past, benefits,
 
   # taxable capital gains
   #
-  taxable_gains = get_cost("*SPECIAL.TAXABLE.SHORT", now) + (1.0 - rational_value(CGT_Discount)) * get_cost("*SPECIAL.TAXABLE.LONG", now)
-
+  #
+  # Australia ignores the distinction between long & short term losses
+  taxable_gains = get_cost(SHORT_GAINS, now) + (1.0 - rational_value(CGT_Discount)) * get_cost(LONG_GAINS, now)
   if (near_zero(taxable_gains))
     taxable_gains = 0
   else {
@@ -221,6 +222,7 @@ function income_tax_aud(now, past, benefits,
     printf "%s\t%40s %32s\n", header, "Taxable Capital Gains", print_cash(-taxable_gains) > write_stream
     header = ""
   }
+
 
   # Imputation Tax Offsets
   #
@@ -706,7 +708,7 @@ function income_tax_aud(now, past, benefits,
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
-  capital_losses = get_cost(CAPITAL_LOSSES, now)
+  capital_losses = get_cost(CARRIED_LOSSES, now)
   if (!near_zero(capital_losses))
     printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
@@ -786,6 +788,10 @@ function income_tax_aud(now, past, benefits,
   set_cost(PAYG, 0, now)
   set_cost(WITHOLDING, 0, now)
   set_cost(CONTRIBUTION_TAX, 0, now)
+
+  # Once taxable gains are set clear the gains
+  set_cost(SHORT_GAINS, 0, now)
+  set_cost(LONG_GAINS, 0, now)
 }
 
 #
