@@ -563,16 +563,10 @@ function set_special_accounts() {
 
   # Taxable capital gains are in special accounts
   # Tax Adjustments have potentially been applied to these quantities
-  LONG_GAINS    = initialize_account("SPECIAL.TAXABLE.LONG.GAINS:LONG.GAINS")
-  LONG_TAXED    = initialize_account("SPECIAL.TAXABLE.LONG.GAINS:LONG.TAXED")
-  LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LONG.LOSSES:LONG.LOSSES")
-
-  SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.SHORT.GAINS:SHORT.GAINS")
-  SHORT_TAXED    = initialize_account("SPECIAL.TAXABLE.SHORT.GAINS:SHORT.TAXED")
-  SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.SHORT.LOSSES:SHORT.LOSSES")
-  CARRIED_LOSSES = initialize_account("SPECIAL.TAXABLE.CARRIED:CARRIED.LOSSES")
-
-  ##OTHER_GAINS   = initialize_account("SPECIAL.TAXABLE.OTHER.GAINS:SHORT.GAINS")
+  LONG_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.LONG:LONG.GAINS")
+  LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG.LOSSES")
+  SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
+  SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
 
   # Taxable carried losses
   TAX_LOSSES       = initialize_account("SPECIAL.CARRIED:TAX.LOSSES")

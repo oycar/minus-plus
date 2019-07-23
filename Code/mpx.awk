@@ -2589,7 +2589,6 @@ function get_capital_gains(now, past, is_detailed,
     underline(44, 8, reports_stream)
     printf "\t%27s => %14s\n", "Net Accounting Gains", print_cash(- accounting_gains) > reports_stream
 
-
     # The taxable long & short gains
     # If there are other income gains (eg from distributions etc)
     # then the taxable gains will need adjustment
@@ -2608,7 +2607,7 @@ function get_capital_gains(now, past, is_detailed,
 
     # short gains & losses
     taxable_short_gains   = income_short_gains + get_cost(SHORT_GAINS, ((now) - 1))
-    taxable_short_losses  = get_cost(CARRIED_LOSSES, ((now) - 1)) + get_cost(SHORT_LOSSES, ((now) - 1))
+    taxable_short_losses  = get_cost(SHORT_LOSSES, ((now) - 1))
 
     # The taxable gains and losses
     printf "\t%27s => %14s\n",   "Long Taxable Gains", print_cash(- taxable_long_gains) > reports_stream
@@ -2627,9 +2626,10 @@ function get_capital_gains(now, past, is_detailed,
     }
 
     # Finally the losses
-    printf "\t%27s => %14s\n", "Total Capital Losses", print_cash(taxable_short_losses + taxable_long_losses) > reports_stream
     printf "\t%27s => %14s\n", "Long Capital Losses", print_cash(taxable_long_losses) > reports_stream
-    printf "\t%27s => %14s\n\n", "Short Capital Losses", print_cash(taxable_short_losses) > reports_stream
+    printf "\t%27s => %14s\n\n", "Short Capital Losses", print_cash(taxable_short_losses - carried_losses) > reports_stream
+    underline(44, 8, reports_stream)
+    printf "\t%27s => %14s\n", "Total Capital Losses", print_cash(taxable_short_losses + taxable_long_losses) > reports_stream
 
     # Apply long & short losses separately
     # This is not strictly necessary in all cases but useful
@@ -2753,8 +2753,7 @@ function apply_combined_losses(now, reports_stream,
   }
 
   # Save losses
-  set_cost(CARRIED_LOSSES, losses, now)
-  set_cost(SHORT_LOSSES, 0, now)
+  set_cost(SHORT_LOSSES, losses, now)
   set_cost(LONG_LOSSES, 0, now)
 
   # Save taxable short & long gains
@@ -4386,7 +4385,7 @@ function income_tax_aud(now, past, benefits,
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
-  capital_losses = get_cost(CARRIED_LOSSES, now)
+  capital_losses = get_cost(SHORT_LOSSES, now)
   if (!(((capital_losses) <= Epsilon) && ((capital_losses) >= -Epsilon)))
     printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
@@ -5373,16 +5372,10 @@ function set_special_accounts() {
 
   # Taxable capital gains are in special accounts
   # Tax Adjustments have potentially been applied to these quantities
-  LONG_GAINS    = initialize_account("SPECIAL.TAXABLE.LONG.GAINS:LONG.GAINS")
-  LONG_TAXED    = initialize_account("SPECIAL.TAXABLE.LONG.GAINS:LONG.TAXED")
-  LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LONG.LOSSES:LONG.LOSSES")
-
-  SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.SHORT.GAINS:SHORT.GAINS")
-  SHORT_TAXED    = initialize_account("SPECIAL.TAXABLE.SHORT.GAINS:SHORT.TAXED")
-  SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.SHORT.LOSSES:SHORT.LOSSES")
-  CARRIED_LOSSES = initialize_account("SPECIAL.TAXABLE.CARRIED:CARRIED.LOSSES")
-
-  ##OTHER_GAINS   = initialize_account("SPECIAL.TAXABLE.OTHER.GAINS:SHORT.GAINS")
+  LONG_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.LONG:LONG.GAINS")
+  LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG.LOSSES")
+  SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
+  SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
 
   # Taxable carried losses
   TAX_LOSSES       = initialize_account("SPECIAL.CARRIED:TAX.LOSSES")

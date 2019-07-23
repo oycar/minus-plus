@@ -406,7 +406,6 @@ function get_capital_gains(now, past, is_detailed,
     underline(44, 8, reports_stream)
     printf "\t%27s => %14s\n", "Net Accounting Gains", print_cash(- accounting_gains) > reports_stream
 
-
     # The taxable long & short gains
     # If there are other income gains (eg from distributions etc)
     # then the taxable gains will need adjustment
@@ -425,7 +424,7 @@ function get_capital_gains(now, past, is_detailed,
 
     # short gains & losses
     taxable_short_gains   = income_short_gains + get_cost(SHORT_GAINS, just_before(now))
-    taxable_short_losses  = get_cost(CARRIED_LOSSES, just_before(now)) + get_cost(SHORT_LOSSES, just_before(now))
+    taxable_short_losses  = get_cost(SHORT_LOSSES, just_before(now))
 
     # The taxable gains and losses
     printf "\t%27s => %14s\n",   "Long Taxable Gains", print_cash(- taxable_long_gains) > reports_stream
@@ -444,9 +443,10 @@ function get_capital_gains(now, past, is_detailed,
     }
 
     # Finally the losses
-    printf "\t%27s => %14s\n", "Total Capital Losses", print_cash(taxable_short_losses + taxable_long_losses) > reports_stream
     printf "\t%27s => %14s\n", "Long Capital Losses", print_cash(taxable_long_losses) > reports_stream
-    printf "\t%27s => %14s\n\n", "Short Capital Losses", print_cash(taxable_short_losses) > reports_stream
+    printf "\t%27s => %14s\n\n", "Short Capital Losses", print_cash(taxable_short_losses - carried_losses) > reports_stream
+    underline(44, 8, reports_stream)
+    printf "\t%27s => %14s\n", "Total Capital Losses", print_cash(taxable_short_losses + taxable_long_losses) > reports_stream
 
     # Apply long & short losses separately
     # This is not strictly necessary in all cases but useful
@@ -467,7 +467,7 @@ function get_capital_gains(now, past, is_detailed,
     # }
 
     # All done
-    underline(43, 8, reports_stream)
+    underline(44, 8, reports_stream)
     print "\n" > reports_stream
 }
 
@@ -570,8 +570,7 @@ function apply_combined_losses(now, reports_stream,
   }
 
   # Save losses
-  set_cost(CARRIED_LOSSES, losses, now)
-  set_cost(SHORT_LOSSES, 0, now)
+  set_cost(SHORT_LOSSES, losses, now)
   set_cost(LONG_LOSSES, 0, now)
 
   # Save taxable short & long gains

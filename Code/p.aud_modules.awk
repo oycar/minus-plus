@@ -708,7 +708,7 @@ function income_tax_aud(now, past, benefits,
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
-  capital_losses = get_cost(CARRIED_LOSSES, now)
+  capital_losses = get_cost(SHORT_LOSSES, now)
   if (!near_zero(capital_losses))
     printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
