@@ -202,7 +202,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 @define leap_year(y) (((y) % 4 == 0 && (y) % 100 != 0) || (y) % 400 == 0)
 @define next_year(t) ((t) + one_year(t,  1))
-@define last_year(t) ((t) + one_year(t, -1))
+@define last_year(t) ((t) - one_year(t, -1))
 @define get_year_number(t) (strftime("%Y", (t), UTC) + 0)
 @define get_day_number(t)  (strftime("%j", (t), UTC) + 0)
 @define YYMMDD_date(x) (substr((x), 1, 2) "-" substr((x), 3, 2) "-" substr((x), 5, 2))
@@ -238,7 +238,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Unlimited goes all the way to the Epoch
 # // No need to compute the number of years exactly
 # // The carry forward and write back limits
-@define carry_forward_limit(t) ternary((Carried_Loss_Limit + CARRY_FORWARD_LIMIT) < (t), ((t) - CARRY_FORWARD_LIMIT), Carried_Loss_Limit)
+# // @define carry_forward_limit(t) ternary(CARRY_FORWARD_LIMIT) < (t), ((t) - CARRY_FORWARD_LIMIT), Carried_Loss_Limit)
 @define write_back_limit(t) ternary(WRITE_BACK_LIMIT, ((t) - WRITE_BACK_LIMIT), Epoch)
 
 # // Multi-Line Macro

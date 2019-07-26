@@ -511,11 +511,8 @@ function set_special_accounts() {
   FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
 
   # Keeping a record of taxable income, gains, losses
-  #TAXABLE_GAINS    = initialize_account("SPECIAL.TAX:TAXABLE.GAINS")
   TAXABLE_INCOME   = initialize_account("SPECIAL.TAX:TAXABLE.INCOME")
   INCOME_TAX       = initialize_account("SPECIAL.TAX:INCOME.TAX")
-  #TAXABLE_LONG     = initialize_account("SPECIAL.TAX:TAXABLE.LONG")
-  #TAXABLE_SHORT    = initialize_account("SPECIAL.TAX:TAXABLE.SHORT")
 
   # Built in TAX accounts - debtor like
   WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
@@ -560,6 +557,8 @@ function set_special_accounts() {
   # Extra capital gains accounts which can be manipulated independently of asset revaluations
   INCOME_LONG        = initialize_account("INCOME.GAINS:INCOME.LONG")
   INCOME_SHORT       = initialize_account("INCOME.GAINS:INCOME.SHORT")
+  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES:EXPENSE.LONG")
+  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES:EXPENSE.SHORT")
 
   # Taxable capital gains are in special accounts
   # Tax Adjustments have potentially been applied to these quantities
@@ -567,6 +566,7 @@ function set_special_accounts() {
   LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG.LOSSES")
   SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
   SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
+  CARRIED_LOSSES = initialize_account("SPECIAL.CARRIED:CARRIED.LOSSES")
 
   # Taxable carried losses
   TAX_LOSSES       = initialize_account("SPECIAL.CARRIED:TAX.LOSSES")

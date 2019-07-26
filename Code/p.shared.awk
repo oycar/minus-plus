@@ -861,30 +861,31 @@ function yesterday(time, hour) {
 }
 
 # Length of year ending / starting (now)
-function one_year(now, sense,     n, year, day, sum) {
-  # Sense == n is forward n years
-  # Sense == -n is back n years
+function one_year(now, sense,     year, day, sum) {
+  # By default one year backward!
+  sense = ternary(!sense, -1, sense)
+  # Sense > 0 is forward sense years
+  # Sense < 0 is back sense years
 
   # Get the day number
   day = get_day_number(now)
 
   # Which Calendar year is this?
   year = get_year_number(now)
-  if (sense > 0) {
-    n = sense
+  if (sense > 0)
     year += sense
-  } else
-    n = - sense
+  else
+    sense = - sense
 
   # Go back n years
   sum = 0
-  while (n -- > 0) {
+  while (sense -- > 0) {
     sum += get_year_length(year, day)
     year --
   }
 
   # Get the length in seconds
-  return sense * ONE_DAY * sum
+  return ONE_DAY * sum
 }
 
 # Useful account filters

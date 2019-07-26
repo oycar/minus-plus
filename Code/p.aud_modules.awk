@@ -143,7 +143,7 @@ function initialize_tax_aud() {
 function income_tax_aud(now, past, benefits,
 
                                         write_stream,
-                                        taxable_gains, taxable_losses,
+                                        taxable_gains, carried_losses,
                                         market_changes,
                                         accounting_gains, accounting_losses,
                                         foreign_income, exempt_income,
@@ -213,16 +213,22 @@ function income_tax_aud(now, past, benefits,
   #
   #
   # Australia ignores the distinction between long & short term losses
-  taxable_gains = get_cost(SHORT_GAINS, now) + (1.0 - rational_value(CGT_Discount)) * get_cost(LONG_GAINS, now)
-  if (near_zero(taxable_gains))
-    taxable_gains = 0
-  else {
+  taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  if (below_zero(taxable_gains)) {
     # Gains are a negative number
     other_income -= taxable_gains
     printf "%s\t%40s %32s\n", header, "Taxable Capital Gains", print_cash(-taxable_gains) > write_stream
     header = ""
+    carried_losses = 0
+  } else {
+    # A loss or negligible
+    # Record this loss
+    carried_losses = taxable_gains
+    taxable_gains = 0
   }
 
+  # Save the loss
+  set_cost(CARRIED_LOSSES, carried_losses, now)
 
   # Imputation Tax Offsets
   #
@@ -279,9 +285,9 @@ function income_tax_aud(now, past, benefits,
   }
 
   # Finally LIC Deductions (if eligible)
-  # LIC credits 1/3 for SMSF
-  #             1/2 for individual
-  #             0/3 for company
+  # LIC deductions 1/3 for SMSF
+  #                1/2 for individual
+  #                0/3 for company
   lic_deductions = - rational_value(LIC_Allowance) * (get_cost(LIC_CREDITS, now) - get_cost(LIC_CREDITS, past))
 
   # Always apply allowance at this point to catch explicit allocations to LIC
@@ -708,7 +714,7 @@ function income_tax_aud(now, past, benefits,
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
-  capital_losses = get_cost(SHORT_LOSSES, now)
+  capital_losses = get_cost(CARRIED_LOSSES, now)
   if (!near_zero(capital_losses))
     printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
@@ -788,11 +794,95 @@ function income_tax_aud(now, past, benefits,
   set_cost(PAYG, 0, now)
   set_cost(WITHOLDING, 0, now)
   set_cost(CONTRIBUTION_TAX, 0, now)
-
-  # Once taxable gains are set clear the gains
-  set_cost(SHORT_GAINS, 0, now)
-  set_cost(LONG_GAINS, 0, now)
 }
+
+
+## This should become jurisdiction specific
+## There are complications with the discounting
+function get_taxable_gains(now, losses,
+
+                           discount, long_gains, short_gains) {
+  # There are two uses for this function
+  # One is to get the net combined gains & losses disregarding carried losses
+  # The other is to compute the actual taxable gains which (in Australia) can be discounted
+  if ("" == losses)
+    # When no lossses are passed in get the net gains & losses
+    discount = losses = 0
+  else
+    discount = rational_value(CGT_Discount)
+
+  # This function computes the taxable gains
+  # It works for partioned long & short gains
+  # And also for deferred gains when all such gains are long
+  losses     += get_cost(LONG_LOSSES, now) + get_cost(SHORT_LOSSES, now)
+  long_gains  = get_cost(LONG_GAINS, now)
+  short_gains = get_cost(SHORT_GAINS, now)
+
+  # Suppress negligible losses
+  losses      = yield_positive(losses, 0)
+
+  # Summarize starting point
+@ifeq LOG get_gains
+  printf "\nTaxable Gains Application of Combined Losses\n" > STDERR
+  printf "\tDate        => %14s\n", get_date(now) > STDERR
+  printf "\tLong  Gains => %14s\n", print_cash(-long_gains)
+  printf "\tShort Gains => %14s\n", print_cash(-short_gains)
+  printf "\tLosses      => %14s\n", print_cash(losses)
+
+@endif # LOG
+  # Apply the losses - most favourable order is to apply them to other gains first
+  # A loss > 0
+  # A gain < 0
+  # Australian scheme & US Scheme are same
+  # once short & long losses are disregarded
+  if (!below_zero(losses + short_gains + long_gains)) {
+    # More carried losses generated
+    losses += short_gains + long_gains
+
+    # Zero negligible losses
+    if (near_zero(losses))
+      losses = 0
+@ifeq LOG get_gains
+    else {
+      printf "\n\tOverall Taxable Loss\n" > STDERR
+      printf "\t%27s => %14s\n", "Taxable Losses", print_cash(losses) > STDERR
+    }
+@endif
+    # Zero the gains
+    short_gains = long_gains = 0
+  } else if (!below_zero(losses + short_gains)) {
+    # This can happen if when the losses are insufficient to
+    # remove all the long gains
+    losses += short_gains # reduce losses
+    long_gains += losses  # apply them against long gains
+
+    # But not a long term loss
+    losses = short_gains = 0
+@ifeq LOG get_gains
+    printf "\n\tOnly Long Gains\n" > reports_stream
+    printf "\t%27s => %14s\n", "Long Gains", print_cash(- long_gains) > STDERR
+@endif
+  } else {
+    # Long and Short Gains
+    short_gains += losses # Reduce short gains
+    losses = 0
+@ifeq LOG get_gains
+    printf "\n\tBoth Short & Long Gains\n" > STDERR
+    printf "\t%27s => %14s\n", "Long Gains", print_cash(- long_gains) > STDERR
+    printf "\t%27s => %14s\n", "Short Gains", print_cash(- short_gains) > STDERR
+@endif
+  }
+
+
+  # Return either taxable gains or carried losses
+  # if there are losses then the taxable gains are zero & vice-versa
+  if (above_zero(losses))
+    return losses
+  else # Taxable gains (may be zero)
+    return short_gains + (1.0 - discount) * long_gains
+}
+
+
 
 #
 #
