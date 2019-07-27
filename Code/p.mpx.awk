@@ -377,6 +377,10 @@ function import_csv_data(array, symbol, name,
   if (Start_Journal)
     next
 
+  # Ensure agreement of Last_Record with Last_State
+  if (Last_Record < Last_State)
+    Last_Record = Last_State
+
   # Flag this
   Start_Journal = TRUE
 

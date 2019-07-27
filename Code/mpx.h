@@ -27,7 +27,7 @@ Lifetime Long_Name Maturity_Date Method_Name Number_Parcels \
 Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands \
 Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held "
 
-@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Carried_Loss_Limit Document_Root EOFY_Window FY_Day FY_Date FY_Length \
+@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length \
 FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED \
 Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
@@ -236,9 +236,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 # // Capital Loss Window
 # // Unlimited goes all the way to the Epoch
-# // No need to compute the number of years exactly
-# // The carry forward and write back limits
-# // @define carry_forward_limit(t) ternary(CARRY_FORWARD_LIMIT) < (t), ((t) - CARRY_FORWARD_LIMIT), Carried_Loss_Limit)
+# // The write back limit
 @define write_back_limit(t) ternary(WRITE_BACK_LIMIT, ((t) - WRITE_BACK_LIMIT), Epoch)
 
 # // Multi-Line Macro

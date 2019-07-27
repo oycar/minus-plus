@@ -186,7 +186,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                      asset_width, "Asset",
                      10, "Units", 14, "Cost", 11, "From", 12, to_label, 11, "Price", 16, proceeds_label,
                      13, "Reduced", 14, "Adjusted", 15, "Accounting", 9, "Type", 18, "Taxable" > reports_stream
-              underline(152 + asset_width, 6, reports_stream)
+              underline(151 + asset_width, 6, reports_stream)
             }
 
             # print Name
@@ -347,7 +347,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
   # Final line
   if (!is_detailed)
-    underline(164, 6, reports_stream)
+    underline(166, 6, reports_stream)
   printf "\n" > reports_stream
 
   # Stack the gains & losses
@@ -481,8 +481,6 @@ function get_capital_gains(now, past, is_detailed,
 function apply_losses(now, reports_stream, label,
                            gains, losses, save_gains, save_losses) {
   # It works for partioned long & short gains
-  # And also for deferred gains when all such gains are long
-  #losses = ternary(losses, losses, 0)
 
   # Summarize starting point
   underline(44, 8, reports_stream)
@@ -494,7 +492,7 @@ function apply_losses(now, reports_stream, label,
   gains  += losses # Net gains / losses
 
   # Carried losses generated
-  if (!below_zero(gains + losses)) {
+  if (!below_zero(gains)) {
     # No overall gains
     # There could be a loss in this scenario
     losses = yield_positive(gains, 0)
