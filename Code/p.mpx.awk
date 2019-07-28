@@ -570,6 +570,7 @@ function set_special_accounts() {
   LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG.LOSSES")
   SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
   SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
+  WRITTEN_BACK   = initialize_account("SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK")
   CARRIED_LOSSES = initialize_account("SPECIAL.CARRIED:CARRIED.LOSSES")
 
   # Taxable carried losses

@@ -237,7 +237,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Capital Loss Window
 # // Unlimited goes all the way to the Epoch
 # // The write back limit
-@define write_back_limit(t) ternary(WRITE_BACK_LIMIT, ((t) - WRITE_BACK_LIMIT), Epoch)
+@define write_back_limit(t) ternary(WRITE_BACK_LIMIT, (t - one_year(t, WRITE_BACK_LIMIT)), Epoch)
 
 # // Multi-Line Macro
 @define filter_block(key, data, start, end) for (key in data) {\

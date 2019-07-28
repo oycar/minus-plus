@@ -32,10 +32,9 @@
 @define MPX_ARRAYS (SHARED_ARRAYS " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
 @define MPX_SCALARS (SHARED_SCALARS " Balance_Profits_Function Check_Balance_Function ")
 
-# // Carry Forward Limit in Years
+# // Carry Forward & Write Back Limits in Years
 @defeval CARRY_FORWARD_LIMIT  (0)
-@defeval WRITE_BACK_LIMIT     ("")
-
+@defeval WRITE_BACK_LIMIT     (0)
 
 @elif JOURNAL_CURRENCY "USD"
 # // US Dollars
@@ -44,7 +43,7 @@
 @define MPX_SCALARS (SHARED_SCALARS "")
 #
 @defeval CARRY_FORWARD_LIMIT  (5)
-@defeval WRITE_BACK_LIMIT     @eval (3 * 366 * ONE_DAY)
+@defeval WRITE_BACK_LIMIT     (3)
 @endif # // JOURNAL_CURRENCY
 
 # // A Macro to compute total taxable gains

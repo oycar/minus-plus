@@ -102,6 +102,8 @@ END {
 
 
 
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -294,8 +296,7 @@ END {
 
 
 
-# // Carry Forward Limit in Years
-
+# // Carry Forward & Write Back Limits in Years
 
 
 
@@ -2557,7 +2558,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2645,15 +2646,6 @@ function get_capital_gains(now, past, is_detailed,
     # This is not strictly necessary in all cases but useful
     apply_losses(now, reports_stream, "Long",  taxable_long_gains,  taxable_long_losses,  LONG_GAINS,  LONG_LOSSES)
     apply_losses(now, reports_stream, "Short", taxable_short_gains, taxable_short_losses, SHORT_GAINS, SHORT_LOSSES)
-
-    # # Losses might sometimes be written back against earlier gains
-    # if (WRITE_BACK_LIMIT && !near_zero(carried_losses)) {
-    #   # Try writing back losses
-    #   printf "\n\t%27s => %14s\n", "Write Back Losses Available", print_cash(carried_losses) > reports_stream
-    #
-    #   # Rewrite refundable offsets to just before now so they can be zeroed later at a distinct timestamp
-    #   carried_losses = write_back_losses(just_before(now), last_year(now), write_back_limit(now), carried_losses, reports_stream)
-    # }
 
     # All done
     underline(44, 8, reports_stream)
@@ -2762,7 +2754,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2807,7 +2799,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2947,7 +2939,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3082,7 +3074,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3155,7 +3147,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[fF]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3288,7 +3280,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3544,13 +3536,13 @@ function not_current_class(a, class_name, blocked_class) {
 function write_back_losses(future_time, now, limit, available_losses, reports_stream,
 
                            income_tax, taxable_income, tax_refund,
-                           taxable_gains, gains_written_off) {
+                           taxable_gains, gains_written_back) {
   #
   # Oldest losses are dealt with first
   # a recursive routine is easy - this could also be flattened into a loop
   #
   # This rewrites existing values but should be ok for repeated calls since
-  # after first call one or both values are zero and unamendable
+  # after first call one or both values are zero and usnamendable
   #
   # This works by adjusting consituent gains
   # In particular it treats written back losses as LONG losses
@@ -3563,7 +3555,8 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
       return 0
 
     # Record the process
-    # This won't work
+    # that adjusts the gains ONLY in this function
+    # So SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK
     taxable_gains  = get_cost("*SPECIAL.TAXABLE", now)
     printf "\t%27s => %13s\n", "Write Back", get_date(now) > reports_stream
     printf "\t%27s => %14s\n", "Gains", print_cash(- taxable_gains) > reports_stream
@@ -3577,8 +3570,8 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
         # More losses than gains
         available_losses += taxable_gains
 
-        # Record gains written off
-        gains_written_off = taxable_gains
+        # Record gains written back
+        gains_written_back = taxable_gains
 
         # Reset taxable gains
         taxable_gains = 0
@@ -3586,18 +3579,18 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
         # More gains than losses
         taxable_gains += available_losses
 
-        # Record gains written off
-        gains_written_off = - available_losses
+        # Record gains written back
+        gains_written_back = - available_losses
 
         # Reset available losses
         available_losses = 0
       }
 
       # This generates a change in the total income tax - the tax refund
-      tax_refund = get_tax(now, Tax_Bands, get_cost(TAXABLE_INCOME, now) + gains_written_off) - get_cost(INCOME_TAX, now)
+      tax_refund = get_tax(now, Tax_Bands, get_cost(TAXABLE_INCOME, now) + gains_written_back) - get_cost(INCOME_TAX, now)
 
-      # Overwrite taxable gains
-      set_cost(TAXABLE_GAINS, taxable_gains, now)
+      # Update taxable gains
+      set_cost(WRITTEN_BACK, - gains_written_back, now)
 
       # The refund is a simple refundable offset at the future time
       if (((tax_refund) < -Epsilon))
@@ -3784,7 +3777,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -3849,6 +3842,16 @@ function income_tax_aud(now, past, benefits,
     # Record this loss
     carried_losses = taxable_gains
     taxable_gains = 0
+  }
+
+  # Losses might sometimes be written back against earlier gains
+  # In practice this is always FALSE for Australia
+  if ((0) && !(((carried_losses) <= Epsilon) && ((carried_losses) >= -Epsilon))) {
+    # Try writing back losses
+    printf "\n\t%27s => %14s\n", "Write Back Losses Available", print_cash(carried_losses) > write_stream
+
+    # Rewrite refundable offsets to just before now so they can be zeroed later at a distinct timestamp
+    carried_losses = write_back_losses(((now) - 1), ((now) - one_year(now, -1)), (((0))?( (now - one_year(now, (0)))):( Epoch)), carried_losses, write_stream)
   }
 
   # Save the loss
@@ -4337,9 +4340,6 @@ function income_tax_aud(now, past, benefits,
     carry_offsets = 0
   set_cost(CARRY_OFFSETS, -carry_offsets, now)
 
-  # Refundable offsets were (well) refunded so reset them too
-  #set_cost(REFUNDABLE_OFFSETS, 0, now)
-
   # Now we need Deferred Tax - the hypothetical liability that would be due if all
   # assets were liquidated today
   deferred_gains = get_cost(DEFERRED_GAINS, now)
@@ -4428,7 +4428,6 @@ function get_taxable_gains(now, losses,
 
   }
 
-
   # Return either taxable gains or carried losses
   # if there are losses then the taxable gains are zero & vice-versa
   if (((losses) >  Epsilon))
@@ -4436,7 +4435,6 @@ function get_taxable_gains(now, losses,
   else # Taxable gains (may be zero)
     return short_gains + (1.0 - discount) * long_gains
 }
-
 
 
 #
@@ -4490,7 +4488,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5356,6 +5354,7 @@ function set_special_accounts() {
   LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG.LOSSES")
   SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
   SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
+  WRITTEN_BACK   = initialize_account("SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK")
   CARRIED_LOSSES = initialize_account("SPECIAL.CARRIED:CARRIED.LOSSES")
 
   # Taxable carried losses

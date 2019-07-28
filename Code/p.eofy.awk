@@ -463,15 +463,6 @@ function get_capital_gains(now, past, is_detailed,
     apply_losses(now, reports_stream, "Long",  taxable_long_gains,  taxable_long_losses,  LONG_GAINS,  LONG_LOSSES)
     apply_losses(now, reports_stream, "Short", taxable_short_gains, taxable_short_losses, SHORT_GAINS, SHORT_LOSSES)
 
-    # # Losses might sometimes be written back against earlier gains
-    # if (WRITE_BACK_LIMIT && !near_zero(carried_losses)) {
-    #   # Try writing back losses
-    #   printf "\n\t%27s => %14s\n", "Write Back Losses Available", print_cash(carried_losses) > reports_stream
-    #
-    #   # Rewrite refundable offsets to just before now so they can be zeroed later at a distinct timestamp
-    #   carried_losses = write_back_losses(just_before(now), last_year(now), write_back_limit(now), carried_losses, reports_stream)
-    # }
-
     # All done
     underline(44, 8, reports_stream)
     print "\n" > reports_stream
@@ -1383,13 +1374,13 @@ function not_current_class(a, class_name, blocked_class) {
 function write_back_losses(future_time, now, limit, available_losses, reports_stream,
 
                            income_tax, taxable_income, tax_refund,
-                           taxable_gains, gains_written_off) {
+                           taxable_gains, gains_written_back) {
   #
   # Oldest losses are dealt with first
   # a recursive routine is easy - this could also be flattened into a loop
   #
   # This rewrites existing values but should be ok for repeated calls since
-  # after first call one or both values are zero and unamendable
+  # after first call one or both values are zero and usnamendable
   #
   # This works by adjusting consituent gains
   # In particular it treats written back losses as LONG losses
@@ -1402,7 +1393,8 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
       return 0
 
     # Record the process
-    # This won't work
+    # that adjusts the gains ONLY in this function
+    # So SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK
     taxable_gains  = get_cost("*SPECIAL.TAXABLE", now)
     printf "\t%27s => %13s\n", "Write Back", get_date(now) > reports_stream
     printf "\t%27s => %14s\n", "Gains", print_cash(- taxable_gains) > reports_stream
@@ -1416,8 +1408,8 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
         # More losses than gains
         available_losses += taxable_gains
 
-        # Record gains written off
-        gains_written_off = taxable_gains
+        # Record gains written back
+        gains_written_back = taxable_gains
 
         # Reset taxable gains
         taxable_gains = 0
@@ -1425,18 +1417,18 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
         # More gains than losses
         taxable_gains += available_losses
 
-        # Record gains written off
-        gains_written_off = - available_losses
+        # Record gains written back
+        gains_written_back = - available_losses
 
         # Reset available losses
         available_losses = 0
       }
 
       # This generates a change in the total income tax - the tax refund
-      tax_refund = get_tax(now, Tax_Bands, get_cost(TAXABLE_INCOME, now) + gains_written_off) - get_cost(INCOME_TAX, now)
+      tax_refund = get_tax(now, Tax_Bands, get_cost(TAXABLE_INCOME, now) + gains_written_back) - get_cost(INCOME_TAX, now)
 
-      # Overwrite taxable gains
-      set_cost(TAXABLE_GAINS, taxable_gains, now)
+      # Update taxable gains
+      set_cost(WRITTEN_BACK, - gains_written_back, now)
 
       # The refund is a simple refundable offset at the future time
       if (below_zero(tax_refund))

@@ -227,6 +227,16 @@ function income_tax_aud(now, past, benefits,
     taxable_gains = 0
   }
 
+  # Losses might sometimes be written back against earlier gains
+  # In practice this is always FALSE for Australia
+  if (WRITE_BACK_LIMIT && !near_zero(carried_losses)) {
+    # Try writing back losses
+    printf "\n\t%27s => %14s\n", "Write Back Losses Available", print_cash(carried_losses) > write_stream
+
+    # Rewrite refundable offsets to just before now so they can be zeroed later at a distinct timestamp
+    carried_losses = write_back_losses(just_before(now), last_year(now), write_back_limit(now), carried_losses, write_stream)
+  }
+
   # Save the loss
   set_cost(CARRIED_LOSSES, carried_losses, now)
 
@@ -754,9 +764,6 @@ function income_tax_aud(now, past, benefits,
     carry_offsets = 0
   set_cost(CARRY_OFFSETS, -carry_offsets, now)
 
-  # Refundable offsets were (well) refunded so reset them too
-  #set_cost(REFUNDABLE_OFFSETS, 0, now)
-
   # Now we need Deferred Tax - the hypothetical liability that would be due if all
   # assets were liquidated today
   deferred_gains = get_cost(DEFERRED_GAINS, now)
@@ -873,7 +880,6 @@ function get_taxable_gains(now, losses,
 @endif
   }
 
-
   # Return either taxable gains or carried losses
   # if there are losses then the taxable gains are zero & vice-versa
   if (above_zero(losses))
@@ -881,7 +887,6 @@ function get_taxable_gains(now, losses,
   else # Taxable gains (may be zero)
     return short_gains + (1.0 - discount) * long_gains
 }
-
 
 
 #
