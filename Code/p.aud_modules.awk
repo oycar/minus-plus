@@ -229,7 +229,7 @@ function income_tax_aud(now, past, benefits,
 
   # Losses might sometimes be written back against earlier gains
   # In practice this is always FALSE for Australia
-  if (WRITE_BACK_LIMIT && !near_zero(carried_losses)) {
+  if (WRITE_BACK_LIMIT && not_zero(carried_losses)) {
     # Try writing back losses
     printf "\n\t%27s => %14s\n", "Write Back Losses Available", print_cash(carried_losses) > write_stream
 

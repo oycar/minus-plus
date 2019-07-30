@@ -45,10 +45,3 @@
 @defeval CARRY_FORWARD_LIMIT  (5)
 @defeval WRITE_BACK_LIMIT     (3)
 @endif # // JOURNAL_CURRENCY
-
-# // A Macro to compute total taxable gains
-@ifeq JOURNAL_CURRENCY "AUD"
-@define total_taxable_gains(t) (get_cost("*SPECIAL.TAXABLE.SHORT", t) + (1.0 - rational_value(CGT_Discount)) * get_cost("*SPECIAL.TAXABLE.LONG", t))
-@else
-@define total_taxable_gains(t) (get_cost("*SPECIAL.TAXABLE", t))
-@endif # // JOURNAL_CURRENCY
