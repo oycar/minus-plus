@@ -29,18 +29,19 @@
 #// Extra definitions for AUD
 #// Add localized State Variables & Scalars
 # // Add localized State Variables & Scalars
-@define MPX_ARRAYS (SHARED_ARRAYS " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
+@define MPX_ARRAYS (SHARED_ARRAYS " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
 @define MPX_SCALARS (SHARED_SCALARS " Balance_Profits_Function Check_Balance_Function ")
 
-@defeval CARRY_FORWARD_LIMIT  ("")
-@defeval WRITE_BACK_LIMIT     ("")
-#
+# // Carry Forward & Write Back Limits in Years
+@defeval CARRY_FORWARD_LIMIT  (0)
+@defeval WRITE_BACK_LIMIT     (0)
+
 @elif JOURNAL_CURRENCY "USD"
 # // US Dollars
 # // Add localized State Variables & Scalars
 @define MPX_ARRAYS (SHARED_ARRAYS " Capital_Gains_Tax_Bands ")
 @define MPX_SCALARS (SHARED_SCALARS "")
 #
-@defeval CARRY_FORWARD_LIMIT  @eval (5 * 366 * ONE_DAY)
-@defeval WRITE_BACK_LIMIT     @eval (3 * 366 * ONE_DAY)
+@defeval CARRY_FORWARD_LIMIT  (5)
+@defeval WRITE_BACK_LIMIT     (3)
 @endif # // JOURNAL_CURRENCY

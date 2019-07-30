@@ -26,12 +26,17 @@ BEGIN {
   make_array(GST_Rate)
   make_array(LIC_Allowance)
   make_array(Low_Income_Offset)
+  make_array(Middle_Income_Offset)
   make_array(Medicare_Levy)
   make_array(Member_Liability)
   make_array(Reserve_Rate)
 
+  # The Epoch
+  if ("" == Epoch)
+    set_epoch()
+
   # // Can set constants here
-  if ("" == Qualification_Window)
+  if (!Qualification_Window)
     EOFY_Window = Qualification_Window = 0
   else {
     Qualification_Window = 91 * ONE_DAY # seconds
@@ -62,23 +67,19 @@ BEGIN {
   #  The Default Medicare Levy
   Medicare_Levy[Epoch][0] = 0.00
 
-  # The default low income offset
+  # The default low and middle income offsets
   Low_Income_Offset[Epoch][0] = 0.00
+  Middle_Income_Offset[Epoch][0] = 0.00
 
-  # Other special accounts
-  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
+  # # Other special accounts
+  # FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
 
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
   #
-  # # Franking Credits
-  # FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
-  # FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
-  # # Other tax credits, offsets & deductions
-  # LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
-
-  # Franking deficit
-  FRANKING_DEFICIT   = initialize_account("SPECIAL.OFFSET.FRANKING_DEFICIT:FRANKING.OFFSETS")
+  #
+  # # Franking deficit
+  # FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # For super funds the amount claimable is sometimes reduced to 75%
   Reduced_GST   = 0.75
@@ -108,6 +109,8 @@ function initialize_tax_aud() {
     # Special versions of functions for SMSFs
     Check_Balance_Function   = "check_balance_smsf"
     Balance_Profits_Function = "balance_profits_smsf"
+    Update_Member_Function   = "update_member_liability_smsf"
+    Update_Profits_Function  = "update_profits_smsf"
 
     # Special accounts for SMSFs
     RESERVE   = initialize_account("LIABILITY.RESERVE:INVESTMENT.RESERVE")
@@ -140,7 +143,7 @@ function initialize_tax_aud() {
 function income_tax_aud(now, past, benefits,
 
                                         write_stream,
-                                        taxable_gains,
+                                        taxable_gains, carried_losses,
                                         market_changes,
                                         accounting_gains, accounting_losses,
                                         foreign_income, exempt_income,
@@ -152,8 +155,9 @@ function income_tax_aud(now, past, benefits,
                                         tax_owed, tax_paid, tax_due, tax_with, tax_cont, income_tax,
                                         franking_offsets, foreign_offsets, franking_balance,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
+                                        low_income_offset, middle_income_offset,
                                         taxable_income,
-                                        medicare_levy, extra_levy, x, header) {
+                                        medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
   write_stream = report_tax(EOFY)
@@ -207,24 +211,40 @@ function income_tax_aud(now, past, benefits,
 
   # taxable capital gains
   #
-  taxable_gains = get_cost(TAXABLE_SHORT, now) + (1.0 - rational_value(CGT_Discount)) * get_cost(TAXABLE_LONG, now)
-  if (near_zero(taxable_gains))
-    taxable_gains = 0
-  else {
+  #
+  # Australia ignores the distinction between long & short term losses
+  taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  if (below_zero(taxable_gains)) {
     # Gains are a negative number
     other_income -= taxable_gains
     printf "%s\t%40s %32s\n", header, "Taxable Capital Gains", print_cash(-taxable_gains) > write_stream
     header = ""
+    carried_losses = 0
+  } else {
+    # A loss or negligible
+    # Record this loss
+    carried_losses = taxable_gains
+    taxable_gains = 0
   }
 
-  # Save the taxable gains
-  set_cost(TAXABLE_GAINS, taxable_gains, now)
+  # Losses might sometimes be written back against earlier gains
+  # In practice this is always FALSE for Australia
+  if (WRITE_BACK_LIMIT && not_zero(carried_losses)) {
+    # Try writing back losses
+    printf "\n\t%27s => %14s\n", "Write Back Losses Available", print_cash(carried_losses) > write_stream
+
+    # Rewrite refundable offsets to just before now so they can be zeroed later at a distinct timestamp
+    carried_losses = write_back_losses(just_before(now), last_year(now), write_back_limit(now), carried_losses, write_stream)
+  }
+
+  # Save the loss
+  set_cost(CARRIED_LOSSES, carried_losses, now)
 
   # Imputation Tax Offsets
   #
 
   # Tax credits received during this FY
-  franking_offsets = - (get_cost("*SPECIAL.OFFSET.FRANKING", now) - get_cost("*SPECIAL.OFFSET.FRANKING", past))
+  franking_offsets = - (get_cost("*SPECIAL.FRANKING.OFFSET", now) - get_cost("*SPECIAL.FRANKING.OFFSET", past))
   if (!near_zero(franking_offsets)) {
     other_income += franking_offsets
     printf "%s\t%40s %32s\n", header, "Franking Offsets", print_cash(franking_offsets) > write_stream
@@ -275,9 +295,9 @@ function income_tax_aud(now, past, benefits,
   }
 
   # Finally LIC Deductions (if eligible)
-  # LIC credits 1/3 for SMSF
-  #             1/2 for individual
-  #             0/3 for company
+  # LIC deductions 1/3 for SMSF
+  #                1/2 for individual
+  #                0/3 for company
   lic_deductions = - rational_value(LIC_Allowance) * (get_cost(LIC_CREDITS, now) - get_cost(LIC_CREDITS, past))
 
   # Always apply allowance at this point to catch explicit allocations to LIC
@@ -439,25 +459,26 @@ function income_tax_aud(now, past, benefits,
     foreign_offsets = 0
 
   # No Carry Offsets (Class C)
-  # The low income tax offset depends on income
+  # The low income and middle income tax offsets depend on income
   if (is_individual) {
-    x = get_tax(now, Low_Income_Offset, taxable_income)
+    low_income_offset = get_tax(now, Low_Income_Offset, taxable_income)
+    middle_income_offset = get_tax(now, Middle_Income_Offset, taxable_income)
 
     # This is an Australian no-carry offset computed from the taxable income
-    if (!near_zero(x)) {
-      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(x) > write_stream
+@ifeq LOG income_tax
+    if (not_zero(low_income_offset)) {
+      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(low_income_offset) > write_stream
       header = ""
     }
-
-    # Get the other no_carry offsets
-    no_carry_offsets = -(get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
-    if (!near_zero(no_carry_offsets)) {
-      printf "%s\t%40s %32s\n", header, "Other No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
+    if (not_zero(middle_income_offset)) {
+      printf "%s\t%40s %32s\n", header, "Middle Income Tax Offset", print_cash(middle_income_offset) > write_stream
       header = ""
     }
+@endif
 
-    # No need to adjust cost - since it will not be retained
-    no_carry_offsets += x
+    # Set the no_carry offsets
+    no_carry_offsets = low_income_offset + middle_income_offset
+    no_carry_offsets -= (get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
   } else
     # Just get the total change in the offset
     no_carry_offsets = -(get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
@@ -466,20 +487,22 @@ function income_tax_aud(now, past, benefits,
   no_carry_offsets += foreign_offsets
 
   # The no-carry offset
-  if (!near_zero(no_carry_offsets))
-    printf "\t%40s %32s\n", "Total No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
+  if (not_zero(no_carry_offsets)) {
+    printf "%s\t%40s %32s\n", header, "Total No-Carry Offsets", print_cash(no_carry_offsets) > write_stream
+    header = ""
+  }
 
   # Other offsets
   # The carry offset (Class D)
-  carry_offsets = - get_cost(CARRY_OFFSETS, now)
+  carry_offsets = -(get_cost(CARRY_OFFSETS, now) - get_cost(CARRY_OFFSETS, past))
+  #carry_offsets = - get_cost(CARRY_OFFSETS, now)
   if (!near_zero(carry_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
   }
-  printf "\n" > write_stream
 
   # The refundable offset (Class E)
-  refundable_offsets = - get_cost(REFUNDABLE_OFFSETS, now)
+  refundable_offsets = - (get_cost(REFUNDABLE_OFFSETS, now) - get_cost(REFUNDABLE_OFFSETS, past))
   if (!near_zero(refundable_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
     header = ""
@@ -672,6 +695,13 @@ function income_tax_aud(now, past, benefits,
     tax_owed += medicare_levy
   }
 
+  # Any other levys
+  tax_levy = - get_cost("*LIABILITY.CURRENT.LEVY", just_before(now))
+  if (not_zero(tax_levy)) {
+    printf "\t%40s %32s\n", "Tax Levies", print_cash(tax_levy) > write_stream
+    tax_owed += tax_levy
+  }
+
   if (!near_zero(tax_paid))
     printf "\t%40s %32s\n", "Income Tax Distributions Paid", print_cash(tax_paid) > write_stream
   if (!near_zero(tax_with))
@@ -694,7 +724,7 @@ function income_tax_aud(now, past, benefits,
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
-  capital_losses = get_cost(CAPITAL_LOSSES, now)
+  capital_losses = get_cost(CARRIED_LOSSES, now)
   if (!near_zero(capital_losses))
     printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
@@ -733,9 +763,6 @@ function income_tax_aud(now, past, benefits,
   else
     carry_offsets = 0
   set_cost(CARRY_OFFSETS, -carry_offsets, now)
-
-  # Refundable offsets were (well) refunded so reset them too
-  set_cost(REFUNDABLE_OFFSETS, 0, now)
 
   # Now we need Deferred Tax - the hypothetical liability that would be due if all
   # assets were liquidated today
@@ -776,6 +803,92 @@ function income_tax_aud(now, past, benefits,
   set_cost(CONTRIBUTION_TAX, 0, now)
 }
 
+
+## This should become jurisdiction specific
+## There are complications with the discounting
+function get_taxable_gains(now, losses,
+
+                           discount, long_gains, short_gains) {
+  # There are two uses for this function
+  # One is to get the net combined gains & losses disregarding carried losses
+  # The other is to compute the actual taxable gains which (in Australia) can be discounted
+  if ("" == losses)
+    # When no lossses are passed in get the net gains & losses
+    discount = losses = 0
+  else
+    discount = rational_value(CGT_Discount)
+
+  # This function computes the taxable gains
+  # It works for partioned long & short gains
+  # And also for deferred gains when all such gains are long
+  losses     += get_cost(LONG_LOSSES, now) + get_cost(SHORT_LOSSES, now)
+  long_gains  = get_cost(LONG_GAINS, now)
+  short_gains = get_cost(SHORT_GAINS, now)
+
+  # Suppress negligible losses
+  losses      = yield_positive(losses, 0)
+
+  # Summarize starting point
+@ifeq LOG get_gains
+  printf "\nTaxable Gains Application of Combined Losses\n" > STDERR
+  printf "\tDate        => %14s\n", get_date(now) > STDERR
+  printf "\tLong  Gains => %14s\n", print_cash(-long_gains)
+  printf "\tShort Gains => %14s\n", print_cash(-short_gains)
+  printf "\tLosses      => %14s\n", print_cash(losses)
+
+@endif # LOG
+  # Apply the losses - most favourable order is to apply them to other gains first
+  # A loss > 0
+  # A gain < 0
+  # Australian scheme & US Scheme are same
+  # once short & long losses are disregarded
+  if (!below_zero(losses + short_gains + long_gains)) {
+    # More carried losses generated
+    losses += short_gains + long_gains
+
+    # Zero negligible losses
+    if (near_zero(losses))
+      losses = 0
+@ifeq LOG get_gains
+    else {
+      printf "\n\tOverall Taxable Loss\n" > STDERR
+      printf "\t%27s => %14s\n", "Taxable Losses", print_cash(losses) > STDERR
+    }
+@endif
+    # Zero the gains
+    short_gains = long_gains = 0
+  } else if (!below_zero(losses + short_gains)) {
+    # This can happen if when the losses are insufficient to
+    # remove all the long gains
+    losses += short_gains # reduce losses
+    long_gains += losses  # apply them against long gains
+
+    # But not a long term loss
+    losses = short_gains = 0
+@ifeq LOG get_gains
+    printf "\n\tOnly Long Gains\n" > reports_stream
+    printf "\t%27s => %14s\n", "Long Gains", print_cash(- long_gains) > STDERR
+@endif
+  } else {
+    # Long and Short Gains
+    short_gains += losses # Reduce short gains
+    losses = 0
+@ifeq LOG get_gains
+    printf "\n\tBoth Short & Long Gains\n" > STDERR
+    printf "\t%27s => %14s\n", "Long Gains", print_cash(- long_gains) > STDERR
+    printf "\t%27s => %14s\n", "Short Gains", print_cash(- short_gains) > STDERR
+@endif
+  }
+
+  # Return either taxable gains or carried losses
+  # if there are losses then the taxable gains are zero & vice-versa
+  if (above_zero(losses))
+    return losses
+  else # Taxable gains (may be zero)
+    return short_gains + (1.0 - discount) * long_gains
+}
+
+
 #
 #
 ## Dividend Qualification Function
@@ -796,7 +909,7 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     imputation_credits = get_delta_cost(Tax_Credits[underlying_asset], now)
     if (!near_zero(imputation_credits)) {
       # Create an unqualified account
-      unqualified_account = initialize_account("SPECIAL.OFFSET.FRANKING.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
+      unqualified_account = initialize_account("SPECIAL.FRANKING.OFFSET.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
 
       # The adjustment
       unqualified *= imputation_credits
@@ -823,3 +936,72 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     } # No credits at time now
   } # No tax credits for this account
 } # All done
+
+
+#
+#
+## Imputation Report Function
+##
+function imputation_report_aud(now, past, is_detailed,
+                              reports_stream, more_past, label, x, offset_class) {
+  # Set arguments
+  more_past = last_year(past)
+  is_detailed = ("" == is_detailed) ? 1 : 2
+
+  # Show imputation report
+  # The reports_stream is the pipe to write the schedule out to
+  reports_stream = report_imputation(EOFY)
+
+  # Let's go
+  printf "%s\n", Journal_Title > reports_stream
+  printf "Statement of Imputation Credits\n" > reports_stream
+
+  printf "For the year ending %s\n", get_date(yesterday(now)) > reports_stream
+  underline(81, 0, reports_stream)
+  printf "%53s %26s\n", strftime("%Y", now, UTC), strftime("%Y", past, UTC) > reports_stream
+  printf "%53s %26s\n", "$", "$" > reports_stream
+
+  # Franking Account Balance at Start of Period
+  printf "Franking Account\n" > reports_stream
+  printf "\t%24s%22s %26s\n\n", "Opening Balance",
+            print_cash(get_cost(FRANKING, past)),
+            print_cash(get_cost(FRANKING, more_past)) > reports_stream
+
+  # Franking offsets
+  offset_class = "SPECIAL.FRANKING.OFFSET"
+
+  # If detailed print tax credits
+  label = sprintf("Franking Offsets Received\n")
+  label = print_account_class(reports_stream, label, "select_class", offset_class, "", "get_cost", now, past, past, more_past, is_detailed, -1)
+  # Print a nice line
+  if (!label) {
+    print_line(past, reports_stream)
+    x = get_cost("*" offset_class, past)
+    printf "\t%24s%22s %26s\n\n", "Total Tax Offsets",
+              print_cash(x - get_cost("*" offset_class, now)),
+              print_cash(get_cost("*" offset_class, more_past) - x) > reports_stream
+  }
+
+  # Show the franking credits earned through tax payments
+  print_line(past, reports_stream)
+  x = get_cost(FRANKING_STAMPED, past)
+  printf "\t%24s%22s %26s\n\n", "Net Franked Tax Payments",
+    print_cash(x - get_cost(FRANKING_STAMPED, now)),
+    print_cash(get_cost(FRANKING_STAMPED, more_past) - x) > reports_stream
+
+  # Franking Credits Disbursed
+  print_line(past, reports_stream)
+  x = get_cost(FRANKING_PAID, past)
+  printf "\t%24s%22s %26s\n\n", "Franking Credits Paid",
+    print_cash(x - get_cost(FRANKING_PAID, now)),
+    print_cash(get_cost(FRANKING_PAID, more_past) - x) > reports_stream
+
+  # The balance
+  print_line(past, reports_stream)
+  x = get_cost(FRANKING, past)
+  printf "\t%24s%22s %26s\n\n", "Closing Balance",
+    print_cash(get_cost(FRANKING, now)),
+    print_cash(get_cost(FRANKING, past)) > reports_stream
+
+  printf "\n\n\n" > reports_stream
+}

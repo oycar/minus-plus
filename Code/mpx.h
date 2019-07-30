@@ -2,7 +2,6 @@
 @define MPX_H
 @include "assert.awk"
 
-
 # // Control Logging
 @ifeq LOG 0
 @undef LOG
@@ -23,13 +22,13 @@
 @define DEVNULL "/dev/null"
 
 # //
-@define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Leaf_Count \
+@define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf \
 Lifetime Long_Name Maturity_Date Method_Name Number_Parcels \
 Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands \
 Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held "
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length \
-FY_Time Journal_Currency Journal_Title Journal_Type Last_Time Qualification_Window ALLOCATED \
+FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED \
 Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 # // Some constants
@@ -52,6 +51,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Output Date Formats
 @define MONTH_FORMAT ("%Y %b %d") # // 2010 Jun 10
 @define ISO_FORMAT   ("%F")       # // 2010-Jun-10
+@define YEAR_FORMAT  ("%Y") # // 2010
 
 # // Default Reports
 @define ALL_REPORTS ("a:b:c:d:f:m:o:q:t:z")
@@ -61,14 +61,15 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define   SHOW_REPORTS "bcot"
 @endif # // SHOW_REPORTS
 
-@define report_balance(s)   ternary(SHOW_REPORTS ~ /[bB]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_capital(s)   ternary(SHOW_REPORTS ~ /[cC]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_deferred(s)  ternary(SHOW_REPORTS ~ /[dD]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_fixed(s)     ternary(SHOW_REPORTS ~ /[fF]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_market(s)    ternary(SHOW_REPORTS ~ /[mM]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_operating(s) ternary(SHOW_REPORTS ~ /[oO]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_dividend(s)  ternary(SHOW_REPORTS ~ /[qQ]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_tax(s)       ternary(SHOW_REPORTS ~ /[tT]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_balance(s)    ternary(SHOW_REPORTS ~ /[bB]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_capital(s)    ternary(SHOW_REPORTS ~ /[cC]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_deferred(s)   ternary(SHOW_REPORTS ~ /[dD]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_fixed(s)      ternary(SHOW_REPORTS ~ /[fF]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_imputation(s) ternary(SHOW_REPORTS ~ /[iI]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_market(s)     ternary(SHOW_REPORTS ~ /[mM]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_operating(s)  ternary(SHOW_REPORTS ~ /[oO]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_dividend(s)   ternary(SHOW_REPORTS ~ /[qQ]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_tax(s)        ternary(SHOW_REPORTS ~ /[tT]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
 
 # // Default Asset Prefix for Price Lists
 @define ASSET_PREFIX ("ASSET.CAPITAL.SHARES")
@@ -83,7 +84,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define ONE_HOUR           (3600)
 @define ONE_WEEK    @eval (7 * ONE_DAY)
 @define ONE_YEAR    @eval (366 * ONE_DAY)
-@define CGT_PERIOD    @eval (366 * ONE_DAY)
+@define CGT_PERIOD  @eval (366 * ONE_DAY)
 # // Day Number For Feb 29
 @define FEB29                (60)
 @define FY_DATE        ("Jul-01")
@@ -97,6 +98,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 @define add_field(s, field) ternary("" == s, field, ternary("" == field, s, (s ", " field)))
 @define find_entry(array, now) ternary(__MPX_KEY__ = find_key(array, now), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
+@define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
 #
 # // Useful shorthands for various kinds of accounts
@@ -136,7 +138,6 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 
 # //
-@define find_entry(array, now) ternary(__MPX_H_TEMP__ = find_key(array, now), array[__MPX_H_TEMP__], ternary(0 == __MPX_H_TEMP__, array[0], 0))
 @define is_star(a) ((a) ~ /^*/)
 @define is_individual (Journal_Type ~ /^IND$/)
 @define is_smsf (Journal_Type ~ /^SMSF$/)
@@ -201,7 +202,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 @define leap_year(y) (((y) % 4 == 0 && (y) % 100 != 0) || (y) % 400 == 0)
 @define next_year(t) ((t) + one_year(t,  1))
-@define last_year(t) ((t) + one_year(t, -1))
+@define last_year(t) ((t) - one_year(t, -1))
 @define get_year_number(t) (strftime("%Y", (t), UTC) + 0)
 @define get_day_number(t)  (strftime("%j", (t), UTC) + 0)
 @define YYMMDD_date(x) (substr((x), 1, 2) "-" substr((x), 3, 2) "-" substr((x), 5, 2))
@@ -235,10 +236,8 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 # // Capital Loss Window
 # // Unlimited goes all the way to the Epoch
-# // No need to compute the number of years exactly
-# // The carry forward and write back limits
-@define carry_forward_limit(t) ternary(CARRY_FORWARD_LIMIT, ((t) - CARRY_FORWARD_LIMIT), Epoch)
-@define write_back_limit(t) ternary(WRITE_BACK_LIMIT, ((t) - WRITE_BACK_LIMIT), Epoch)
+# // The write back limit
+@define write_back_limit(t) ternary(WRITE_BACK_LIMIT, (t - one_year(t, WRITE_BACK_LIMIT)), Epoch)
 
 # // Multi-Line Macro
 @define filter_block(key, data, start, end) for (key in data) {\

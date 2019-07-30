@@ -34,7 +34,7 @@ MPXDIR=~/Cloudstation/Projects/Minus-Plus/Code
 
 # Usage
 USAGE="Usage: $(basename $0) [-a: show-account-transactions] [-c: journal-currency] [-e export-format] [-f: financial-year] [-i mpx-information-and-copyright-notice]\
- [-l: log-function] [-p: write-price-file] [-q: dividend-qualification-window] [-s show-all-transactions]\
+ [-l: log-function] [-p: write-price-file] [-q: dividend-qualification-window] [-s: stop-time]\
  [-v write-variable-1,write_variable-2,...] [-w: write-state-file] [-x show-extra-detail] [-z preprocess_only]\
  [-ABCDFMOQTZ extra-report-toggles] <data-import-file> <state-file> <journal-file>"
 
@@ -50,7 +50,7 @@ write_file=0
 write_variables=""
 preprocess_only=false
 qualify_window=0
-Show_All=0
+stop_time=""
 Show_Extra=0
 Show_Reports="" # Default reports
 
@@ -62,27 +62,21 @@ journal_currency="AUD"
 shopt -s expand_aliases
 alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
 
-# Interpret options 
-while getopts ":a:c:ef:il:p:q:sv:w:xzABCDFMOQTZ" opt; do
+# Interpret options
+while getopts ":a:c:ef:il:p:q:s:v:w:xzABCDFIMOQTZ" opt; do
     case $opt in
 
-    a)
-      account_name=$OPTARG
-      ;;
+    a) account_name=$OPTARG;;
 
     c) # AUD is the default
-      journal_currency=${OPTARG}
-      ;;
+      journal_currency=${OPTARG};;
 
-    e)
-      # Export format transactions
+    e) # Export format transactions
       date_format="%d/%m/%Y"
-      Export_Format=1
-      ;;
+      Export_Format=1;;
 
     f) # Financial year
-      financial_year=$OPTARG
-      ;;
+      financial_year=$OPTARG;;
 
     i) # Information
    printf "mpx - Minus-Plus command line accounting and financial reporting\n\
@@ -101,67 +95,56 @@ GNU General Public License for more details.\n\
 You should have received a copy of the GNU General Public License\n\
 along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
       echo "$USAGE" >&2
-      exit 1
-      ;;
+      exit 1;;
 
     l) # Logging / debugging
-      log_function=$OPTARG
-    ;;
+      log_function=$OPTARG;;
 
     p) # This is a price file
       write_variables="Price"
       wfile $OPTARG
-      write_file=$OPTARG
-      ;;
+      write_file=$OPTARG;;
 
     q) # Dividend Qualification
-      qualify_window=$OPTARG
-      ;;
+      qualify_window=${OPTARG};;
 
     # Skinning a cat another way
-    A) Show_Reports+="A";;
+    A) Show_Reports="A";;
     B) Show_Reports+="B";;
     C) Show_Reports+="C";;
     D) Show_Reports+="D";;
     F) Show_Reports+="F";;
+    I) Show_Reports+="I";;
     M) Show_Reports+="M";;
     O) Show_Reports+="O";;
     Q) Show_Reports+="Q";;
     T) Show_Reports+="T";;
-    Z) Show_Reports+="Z";;
+    Z) Show_Reports="Z";;
 
 
-    s) # show all transactions
-      Show_All=true
-      ;;
+    s) # stop time
+      stop_time="${OPTARG}"
+      echo "Stop Time => ${stop_time}";;
 
     v) # Generalized variable selection
-      write_variables="${OPTARG}"
-    ;;
+      write_variables="${OPTARG}";;
 
     w) #   Write state to this file
       wfile $OPTARG
-      write_file=$OPTARG
-      ;;
+      write_file=$OPTARG;;
 
-    x)
-      Show_Extra=1
-      ;;
+    x)  Show_Extra=1;;
 
-    z)
-      preprocess_only=true
-      ;;
+    z)  preprocess_only=true;;
 
     \?)
       echo "Invalid option => $OPTARG" >&2
       echo "$USAGE" >&2
-      exit 1
-      ;;
+      exit 1;;
     :)
       echo "$OPTARG requires an argument." >&2
       echo "$USAGE" >&2
-      exit 1
-      ;;
+      exit 1;;
     esac
   done
 
@@ -190,7 +173,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   if [ "$preprocess_only" == "false" ]; then
     # Go back to original directory
     cd "${current_directory}"
-    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v FY=${financial_year} -v Show_Account=${account_name} -v Show_All=${Show_All} -v Show_Extra=${Show_Extra} -v Qualification_Window=${qualify_window} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
+    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v FY=${financial_year} -v Show_Account=${account_name} -v Show_Extra=${Show_Extra} -v Qualification_Window=${qualify_window} -v Stop_Time=${stop_time} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
   fi
 
 exit 0;

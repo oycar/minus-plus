@@ -36,7 +36,10 @@
 ##
 ## The journal entries can begin now
 ## To start processing we need
-START_JOURNAL, 2008 Jan 21
+START_JOURNAL
+
+## And set the financial year
+SET_FINANCIAL_YEAR, 2008
 
 ##
 ## The date syntax is somewhat flexible; other legal formats for the start date above include
@@ -151,7 +154,7 @@ SET_BANDS, Tax_Bands, 0.30
 ## if the dividends are to be associated with the underlying asset it is best to let Minus-Plus pick the short hand name; which is simply
 ## DIV.SHORT.NAME for asset SHORT.NAME. This association is required when dividend payments need to be qualified for preferential tax treatment.
 ##
-## The dividend intorudices another optional field, this time the imputation or franking credit associated with the payment of $663.02, namely $284.15. This
+## The dividend introduces another optional field, this time the imputation or franking credit associated with the payment of $663.02, namely $284.15. This
 ## is tax offset (or credit) will be important for compiling the tax return later.
 
 2008 Mar 19,          CASH,        ESAVER,          0,      663.00, # Transfer to ESAVER

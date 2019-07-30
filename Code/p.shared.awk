@@ -21,7 +21,7 @@
 @include "mpx.h"
 
 # get the most relevant ex-dividend date
-function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) {
+function get_exdividend_date(a, now,   value, key, discrepancy) {
 
   # We start at the time "now" in the accounts
   # Which should be equal to or shortly after the
@@ -30,30 +30,26 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
   # search back to find the earlier entries
   # since Payment_Date[ex_dividend_date] => now-ish
   if (a in Payment_Date) {
-    # Get the most recent key - this is an ex-dividend date
-    exdividend_key = find_key(Payment_Date[a], now)
 
-    # The payment date that corresponds to this key
-    value = Payment_Date[a][exdividend_key]
+    # Get the most recent payment date
+    value = find_entry(Payment_Date[a], now)
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
     if (value > now) {
       Read_Date_Error = "Payment date is later than current date"
       return DATE_ERROR
-    }
-    else if (near_zero(discrepancy))
-      return exdividend_key
+    } else if (near_zero(discrepancy))
+      return found_key
 
     # Some times dividends are paid out of order, for example
     # a special or buyback dividend might have an extra
     # long qualification period - so look ahead more dividends
     # until the discrepancy increases
     #
-    key = exdividend_key
+    key = found_key
     while (key) {
-      key = find_key(Payment_Date[a], just_before(key))
-      value = Payment_Date[a][key]
+      value = find_entry(Payment_Date[a], just_before(key))
       if ((now - value) > discrepancy)
         # A worse match
         break
@@ -61,19 +57,20 @@ function get_exdividend_date(a, now,   value, key, exdividend_key, discrepancy) 
       # A better match
       discrepancy = now - value
       if (near_zero(discrepancy))
-        return key
+        return found_key
 
       # Save  this match
-      exdividend_key = key
+      key = found_key
     }
 
-    # Best match was exdividend_key
+    # Best match was key
     if (discrepancy > ONE_WEEK) {
       Read_Date_Error = "Failed to find a payment date within one week of current date"
       return DATE_ERROR
     }
 
-    return exdividend_key
+    # Return it
+    return key
   }
 
   # Failed to find a qualification date
@@ -402,10 +399,10 @@ function ctrim(s, left_c, right_c,      string) {
   return s
 }
 
-# Is a number between two others? (allow boundary cases to be inside)
-function is_between(x, low, high) {
-  return  (x - low) * (x - high) <= 0
-}
+# # Is a number between two others? (allow boundary cases to be inside)
+# function is_between(x, low, high) {
+#   return  (x - low) * (x - high) <= 0
+# }
 
 # Clear global values ready to read a new input record
 function new_line() {
@@ -864,30 +861,31 @@ function yesterday(time, hour) {
 }
 
 # Length of year ending / starting (now)
-function one_year(now, sense,     n, year, day, sum) {
-  # Sense == n is forward n years
-  # Sense == -n is back n years
+function one_year(now, sense,     year, day, sum) {
+  # By default one year backward!
+  sense = ternary(!sense, -1, sense)
+  # Sense > 0 is forward sense years
+  # Sense < 0 is back sense years
 
   # Get the day number
   day = get_day_number(now)
 
   # Which Calendar year is this?
   year = get_year_number(now)
-  if (sense > 0) {
-    n = sense
+  if (sense > 0)
     year += sense
-  } else
-    n = - sense
+  else
+    sense = - sense
 
   # Go back n years
   sum = 0
-  while (n -- > 0) {
+  while (sense -- > 0) {
     sum += get_year_length(year, day)
     year --
   }
 
   # Get the length in seconds
-  return sense * ONE_DAY * sum
+  return ONE_DAY * sum
 }
 
 # Useful account filters
@@ -984,10 +982,6 @@ function match_account(a, show_name) {
   # A particular account matches
   if (show_name == a)
     return a
-
-  # On the first call the long name might not have been set
-  #if (show_name == get_key(Leaf, a))
-  #  return a
 
   # If the class name is another account it does not match
   if (show_name in Leaf)
@@ -1151,26 +1145,6 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,  
 @endif # LOG
 } # End of adjust_parcel_cost
 
-# # The idea of the "cost" of the account
-# # This is the same as the reduced cost
-# function get_cost(a, now,      i, sum_cost) {
-#   # Initial cost
-#   sum_cost = 0
-#
-#   # Adjustments for units bought
-#   if (is_unitized(a)) {
-#     for (i = 0; i < Number_Parcels[a]; i ++) {
-#       if (Held_From[a][i] > now) # All further transactions occured after (now)
-#         break # All done
-#       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-#         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
-#     }
-#   } else if (a in Cost_Basis) # Cash-like
-#     sum_cost = find_entry(Cost_Basis[a], now)
-#
-#   return sum_cost
-# }
-
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
 function get_cost(a, now,     i, sum_cost) {
@@ -1333,7 +1307,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 # Print out transactions
 # Generalize for the case of a single entry transaction
 function print_transaction(now, comments, a, b, u, amount, fields, n_field,     matched) {
-  if (!Show_All && (now < Start_Time || now > Stop_Time))
+  if (now > Stop_Time)
     return
 
   # Are we matching particular accounts?
@@ -1421,7 +1395,7 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf(", %11.2f", get_cost(matched, now))
+      string = string sprintf(", %14s", print_cash(get_cost(matched, now)))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)
@@ -1468,7 +1442,7 @@ function initialize_account(account_name,     class_name, array, p, n,
 
   # Either an uninitialized long name OR a short name
   if (account_name in Long_Name)
-    return Long_Name[overload_name(account_name)]
+    return Long_Name[account_name]
 
   # Special cases exist which could mean this is not an uninitialized long name
   # Is this a new long name or an optional string?
@@ -1491,36 +1465,16 @@ function initialize_account(account_name,     class_name, array, p, n,
   #    Long[D] => A.B.C:D
   # but we passed in account_name => "A.B.Z:D"?
   #
-  # Actually let's allow this - but only in very restricted cases
-  # the leaves will be distinguished and
-  # a reference to an ambiguous leaf will be taken to refer to the
-  # most recent definition
-  #   This allows dynamic reassigment of leaf pointers
-  #   But the accounts' must have consistent classes
-  #
+  # Actually let's allow this - but only in very restricted casee of the account never having been used
+  # This might be possible some day...
   leaf_name = array[2]
-
   if ((leaf_name in Long_Name)) {
     if (Leaf[Long_Name[leaf_name]] == leaf_name) {
       # If the existing account is new (unused) it can be deleted
-      if (is_new(Long_Name[leaf_name]))
-        delete Long_Name[leaf_name]
-      else {
-        #
-        # Are the accounts compatible?
-        # Parent names must match OR convert X.TERM => X.CURRENT
-        # Mapping leaf_name => new leaf_name
-        p = Long_Name[leaf_name]
-        assert(is_term(p) && is_current(account_name),
-          sprintf("Can't overload %s => %s - can only map TERM => CURRENT", account_name, p))
+      assert(is_new(Long_Name[leaf_name]), sprintf("Account name %s: Leaf name[%s] => %s is already taken", account_name, leaf_name, Long_Name[leaf_name]))
 
-        # Check to see if  the Show_Account is being overloaded - which is why check was not needed earlier
-        if (Show_Account == p)
-          Show_Account = account_name
-
-        # Overload the leaf name
-        leaf_name = overload_name(leaf_name, 1)
-      }
+      # Must be a new (unused) name
+      delete Long_Name[leaf_name]
     }
   }
 
@@ -1829,30 +1783,6 @@ function url_init(   i) {
     URL_Lookup[sprintf("%c", i)] = i
 }
 
-# Get a long account name from a  possibly overloaded leaf name
-#
-# Overloading
-#   This is useful when an account class changes
-#   IN practice a very rare eventuality
-#
-function overload_name(leaf_name, overload) {
-  # Overload a name when reqested
-  overload = ternary(overload, 1, 0)
-
-  # If this leaf name is overloaded get the most recent version
-  if (leaf_name in Leaf_Count)
-    overload += Leaf_Count[leaf_name]
-
-  # Is the name overloaded?
-  if (overload) {
-    Leaf_Count[leaf_name] = overload
-    leaf_name = leaf_name "_" overload
-  }
-
-  # Return leaf name
-  return leaf_name
-}
-
 # urlencode a string
 function url_encode(string,     c, chars, url, i) {
   # Get an array holding the characters
@@ -2003,6 +1933,16 @@ function set_months(   i, month_name, mon) {
   }
 
   delete month_name
+}
+
+# Set a default epoch & future
+function set_epoch() {
+  # The Epoch
+  # A more practical Epoch
+  Carried_Loss_Limit = Epoch = mktime(EPOCH_START " 01 01 00 00 00", UTC)
+
+  # A distant Future
+  Future = mktime(EPOCH_END " 12 31 00 00 00", UTC)
 }
 
 # Get the time stamp m months in the  future
