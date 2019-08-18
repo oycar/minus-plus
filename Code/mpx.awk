@@ -302,11 +302,6 @@ END {
 
 
 
-# // A Macro to compute total taxable gains
-
-
-
-
 
 
 # // Capital Loss Window
@@ -1941,13 +1936,15 @@ function get_tax(now, bands, total_income,
 function get_taxable_income(now, tax_left,
                                  total_income, band_width, band_tax,
                                  current_key, last_threshold, threshold) {
-  # Which band is the income in?
-  if ((((tax_left) <= Epsilon) && ((tax_left) >= -Epsilon)))
-    return 0 # Could be any amount less than the tax free threshold
-
   # Now get the tax due on the whole sum
   current_key = find_key(Tax_Bands, now)
   last_threshold = 0
+
+  # When the tax left is zero or negative it must be the first band
+  if (!((tax_left) >  Epsilon))
+    return tax_left / Tax_Bands[current_key][last_threshold]
+
+  # Now get the tax due on the whole sum
   total_income = 0
   for (threshold in Tax_Bands[current_key]) {
     # The last band's width
@@ -3846,7 +3843,7 @@ function income_tax_aud(now, past, benefits,
 
   # Losses might sometimes be written back against earlier gains
   # In practice this is always FALSE for Australia
-  if ((0) && !(((carried_losses) <= Epsilon) && ((carried_losses) >= -Epsilon))) {
+  if ((0) && (((carried_losses) > Epsilon) || ((carried_losses) < -Epsilon))) {
     # Try writing back losses
     printf "\n\t%27s => %14s\n", "Write Back Losses Available", print_cash(carried_losses) > write_stream
 
@@ -4156,7 +4153,11 @@ function income_tax_aud(now, past, benefits,
 
   } # End of if any attempt to apply non-refundable assets
 
-  # Now apply refundable offsets - but note if used these will not generate a tax loss
+  # What happens when the tax owed is negative??
+
+
+
+  # Now apply refundable offsets - but note these will not generate a tax loss - since they are refunded :)
   if (((refundable_offsets) >  Epsilon)) {
     tax_owed -= refundable_offsets
     printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > write_stream
@@ -4228,7 +4229,18 @@ function income_tax_aud(now, past, benefits,
     # On the other hand remaining franking offsets will generate tax loss
     # Even when tax_owed == 0
     # so do catch  the case of  tax_owed < Epsilon
-    tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
+
+    ## Check this section?
+    ## This does not seem correct
+    # When an extra loss is made - tax_owed is negative - the extra losses
+    # correspond to how much extra income would have been needed to have
+    # zero tax owing exactly
+    # But there are no bands below zero income so a simpler calculation should be used
+
+    tax_losses -= get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
+
+    #tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
+
 
   }
 
@@ -6130,20 +6142,6 @@ function update_member_liability(now, delta_profits, a) {
   return
 }
 
-# A wrapper function updates allocated profits when required ()
-# function update_profits(now,     delta_profits) {
-#   # Compute the profits that need to be allocated to members
-#   # These are the profits accumulated since the last time they were distributed to members
-#   delta_profits = accumulated_profits(now) - get_cost(ALLOCATED, now)
-#   if (!near_zero(delta_profits)) {
-#     # Update the Allocated Profits
-#     adjust_cost(ALLOCATED, delta_profits, now, FALSE)
-#
-#     # Update the liabilities
-#     update_member_liability(now, delta_profits)
-#   }
-# }
-
 # checking and setting
 # Syntax
 # date, COST, ACCOUNT, ....
@@ -6207,169 +6205,6 @@ function checkset(now, a, account, units, amount, is_check,
   }
 
 }
-
-# # Update a member liability
-# # This can be (i)   a contribution - specified member, taxable or tax-free
-# #          or (ii)  a benefit - specified member
-# #          or (iii) allocation amongst members - no specificiation
-# #          or (iv)  allocation to or from the reserve - no specification
-# # This function keeps the member liability up to date for a SMSF
-# #
-# function update_member_liability(now, amount, a,
-#                                       share, taxable_share,
-#                                       member_id, member_account,
-#                                       target_account,
-#                                       sum_total, x, sum_share) {
-#   # Update the member liabilities with their share of the income/expenses
-#   # The proportions only change when a contribution is received
-#   # or a benefit paid;
-#   # plus there is no legislation specifying the precise method of proportioning
-#   # but this seems reasonable
-#   #   Income / Expenses are made in proportion to net contributions made
-#   #   Contributions are assigned to the member
-#   #   Benefits are paid proportionate to  the member's balance - so security prices influence this
-#
-#   # In the various cases the following is passed in
-#   # Case (i)   :   account_name, now, amount
-#   # Case (ii)  :   account_name, now, amount
-#   # Case (iii) :   now, amount
-#   # Case (iv)  :   now, amount
-#
-#   # Note if a taxable share is driven negative the value should be transferred from the tax-free share
-#
-#   # Get the appropriate member account
-#   if ("" == a)
-#     member_id = ""
-#   else # This will be an account - but when not a CONTRIBUTION it will be a parent account
-#     member_id = get_member_name(a, now, amount)
-#
-# @ifeq LOG update_member_liability
-#   printf "Update Liabilities [%s]\n", get_date(now) > STDERR
-#   if (member_id)
-#     printf "\t%20s => %s\n", "Member id", member_id > STDERR
-#   printf "\tMember Shares\n" > STDERR
-# @endif # LOG
-#
-#   # Allocation to the liability accounts
-#   # Either no id is given - distribute amongst all accounts
-#   # Or a parent account - distribute amongst its offspring
-#   # Or a specific account - distribute solely to that account
-#   taxable_share = sum_total = sum_share = 0
-#
-#   # Normalize amounts
-#   if (member_id in Member_Liability) { # Exact match - a contribution
-#     # Adjust the liability
-#     adjust_cost(member_id, - amount, now)
-#     if (member_id ~ /TAXABLE/)
-#       taxable_share = 1.0
-#
-# @ifeq LOG update_member_liability
-#     sum_share = 1.0
-#     printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_id], sum_share, Leaf[member_id], print_cash(- amount) > STDERR
-# @endif # LOG
-#   } else { # Get totals
-#     # We still get the share from each account
-#     # Don't use the accumulated totals because (rarely) a negative account balance will break the proportioning
-#     # Also since  the order of transactions on a particular day is not defined use just_before() to compute proportions
-#     for (member_account in Member_Liability)
-#       if (!member_id || is_ancestor(member_id, member_account)) {
-#         share[member_account] = x = get_cost(member_account, just_before(now))
-#         sum_total += x
-#
-#         # Compute what fraction of the allocation was taxable
-#         if (member_account ~ /TAXABLE/)
-#           taxable_share += x
-#       }
-#
-#     # Normalize taxable share
-#     taxable_share /= sum_total
-#
-#     # There are two possibilities here -
-#     #   No member id => profit/loss everything goes to/from TAXABLE accounts
-#     #   A parent id  => proportioning rule applies
-#     # Update the liabilities - but only the target accounts
-#     for (member_account in share) {
-#       x = share[member_account] / sum_total
-#
-#       # Target account
-#       if (!member_id)
-#         target_account = Member_Liability[member_account]
-#       else
-#         target_account = member_account
-#
-#       # Adjust the liability
-#       adjust_cost(target_account, - x * amount, now)
-# @ifeq LOG update_member_liability
-#       sum_share += x
-#       printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_account], x, Leaf[target_account], print_cash(- x * amount) > STDERR
-#       if (get_cost(target_account, now) > 0)
-#         printf "\t\tNegative Balance in target account %16s => %14s\n", Leaf[target_account], print_cash(- get_cost(target_account, now)) > STDERR
-# @endif # LOG
-#     } # End of exact share
-#
-#     # Tidy up
-#     delete share
-#   } # End of allocation
-#
-# @ifeq LOG update_member_liability
-#   # Just debugging
-#   printf "\t%20s => %8.6f %16s => %14s\n", "Share", sum_share, "Total", print_cash(- amount) > STDERR
-# @endif # LOG
-#
-#   # return proportion that was taxable
-#   return taxable_share
-# }
-#
-# # Obtain the member account
-# function get_member_name(a, now, x,   member_name, member_account, target_account, subclass, contribution_tax) {
-#   # This obtains the liability account that needs to be modified
-#   # In more detail INCOME.CONTRIBUTION.SUBCLASS:NAME.SUFFIX => LIABILITY.MEMBER.NAME:NAME.SUBCLASS
-#   # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
-#   # In fact        X.Y:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
-#
-#   # Get the member name
-#   member_name = get_name_component(Leaf[a], 1) # first component
-#
-#   # A member liability account can only be created by a contribution
-#   if (is_class(a, "INCOME.CONTRIBUTION")) {
-#     # Identify the "subclass" - use Parent_Name because it is always available
-#     subclass = get_name_component(Parent_Name[a], 0) # last component
-#
-#     # If a link is made in a "MEMBER" array to each members liabilities
-#     # then there is no need to identify this as a member liability in the
-#     # account name
-#     member_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.%s", member_name, member_name, subclass))
-#
-#     # Ensure that this member is noted in the Member_Liability array
-#     if (!(member_account in Member_Liability)) {
-#       # Need to ensure that the target TAXABLE account is created
-#       # The target account can actually be the same as the member_account
-#       target_account = Member_Liability[member_account] = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.TAXABLE", member_name, member_name))
-#
-#       # Check the target account is included too
-#       if (!(target_account in Member_Liability))
-#         Member_Liability[target_account] = target_account
-#     } else # Get the target account so we check if contribution tax should be computed
-#       target_account = Member_Liability[member_account]
-#
-#     # This will change the LIABILITIES and EXPENSES equally
-#     if (target_account == member_account) {
-#       # This is a TAXABLE account
-#       contribution_tax = get_tax(now, Tax_Bands, x) # Always one band so ok to ignore other income
-#
-#       # Save the tax expenses and adjust the liability
-#       adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)
-#       adjust_cost(target_account,  contribution_tax, now)
-#     }
-#   } else {
-#     # Return the parent account
-#     member_account = "*LIABILITY.MEMBER." member_name
-#     assert(member_account in Parent_Name, "<" $0 "> Unknown account <" member_account ">")
-#   }
-#
-#   # Return the account
-#   return member_account
-# }
 
 # Final processing
 END {

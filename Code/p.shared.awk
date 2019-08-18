@@ -1734,13 +1734,15 @@ function get_tax(now, bands, total_income,
 function get_taxable_income(now, tax_left,
                                  total_income, band_width, band_tax,
                                  current_key, last_threshold, threshold) {
-  # Which band is the income in?
-  if (near_zero(tax_left))
-    return 0 # Could be any amount less than the tax free threshold
-
   # Now get the tax due on the whole sum
   current_key = find_key(Tax_Bands, now)
   last_threshold = 0
+
+  # When the tax left is zero or negative it must be the first band
+  if (!above_zero(tax_left))
+    return tax_left / Tax_Bands[current_key][last_threshold]
+
+  # Now get the tax due on the whole sum
   total_income = 0
   for (threshold in Tax_Bands[current_key]) {
     # The last band's width

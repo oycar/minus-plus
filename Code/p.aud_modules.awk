@@ -564,7 +564,11 @@ function income_tax_aud(now, past, benefits,
 @endif
   } # End of if any attempt to apply non-refundable assets
 
-  # Now apply refundable offsets - but note if used these will not generate a tax loss
+  # What happens when the tax owed is negative??
+
+
+
+  # Now apply refundable offsets - but note these will not generate a tax loss - since they are refunded :)
   if (above_zero(refundable_offsets)) {
     tax_owed -= refundable_offsets
     printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > write_stream
@@ -640,17 +644,16 @@ function income_tax_aud(now, past, benefits,
 
   # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
   } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
-    # To be clear refundable offsets can generate a tax refund
-    # so tax_owed < 0 BUT this will be repaid so will not
-    # generate a tax loss
-    #
-    # On the other hand remaining franking offsets will generate tax loss
-    # Even when tax_owed == 0
-    # so do catch  the case of  tax_owed < Epsilon
-    tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
+    # This is a bit tricky
+    # (unused) franking offsets may still be present here
+    # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
+    # so adjust the tax losses accordingly
+    # -- so does this work for an individual or smsf?
+    tax_losses -= get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
 @ifeq LOG income_tax
     printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > write_stream
 @endif
+
   }
 
   # The carried tax losses
