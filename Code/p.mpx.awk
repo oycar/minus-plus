@@ -61,6 +61,9 @@ BEGIN {
   make_array(Real_Value)
   make_array(account_sum)
 
+  # An array to hold document strings
+  make_array(Documents)
+
   # And a gains stack
   make_array(Gains_Stack)
   Long_Gains_Key   = "Long Gains  "
@@ -769,9 +772,6 @@ function read_input_record(   t, n, a, threshold) {
       print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], units, amount)
   } else if (2 == n) {
     parse_transaction(t, Account[1], Account[2], units, amount)
-
-    # Were totals changed by this transaction?
-    #@Check_Balance_Function(t)
   } else # A zero entry line - a null transaction or a comment in the journal
     print_transaction(t, Comments)
 
@@ -1274,10 +1274,6 @@ function parse_transaction(now, a, b, units, amount,
     adjust_cost(a, -amount, now)
     adjust_cost(b,  amount, now)
 
-    # Catch manual depreciation
-    #if (is_fixed(a))
-    #  allocate_costs(a, now)
-
     # Record the transaction
     print_transaction(now, Comments, a, b, Write_Units, amount, fields, number_fields)
   }
@@ -1361,25 +1357,12 @@ function convert_term_account(a, now, maturity,       active_account, x, thresho
     printf "\n" > STDERR
 @endif
   } else if (is_term(a)) {
-    # Need to rename account
-    # TERM => CURRENT
-    #active_account = gensub(/(\.TERM)([.:])/, ".CURRENT\\2", 1, a)
-
-    # Create the new account is necessary
-    #active_account = initialize_account(active_account)
-
-    # Now create a synthetic transaction
-    # DATE, A, ACTIVE_ACCOUNT, 0, COST(A), # ....
-    #set_cost(active_account, get_cost(a, just_before(now)), now)
-    #set_cost(a, 0, now)
-
     # Need to identify this as a current account
     if (a in Maturity_Date)
       delete Maturity_Date[a]
 @ifeq LOG convert_term_account
     printf "\tRelabelled account => %s\n", a > STDERR
     printf "\tCurrent Account [%s] => %d\n", a, is_current(a) > STDERR
-    ##printf "\t\t Cost     => %s\n", print_cash(get_cost(active_account, now)) > STDERR
 @endif
   }
 

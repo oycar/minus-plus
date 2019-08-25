@@ -399,11 +399,6 @@ function ctrim(s, left_c, right_c,      string) {
   return s
 }
 
-# # Is a number between two others? (allow boundary cases to be inside)
-# function is_between(x, low, high) {
-#   return  (x - low) * (x - high) <= 0
-# }
-
 # Clear global values ready to read a new input record
 function new_line() {
   Extra_Timestamp = DATE_ERROR
@@ -415,7 +410,7 @@ function new_line() {
   GST_Claimable = 0
   Depreciation_Type = ""
   Comments = ""
-  Documents = ""
+
   Account[1] = Account[2] = ""
 }
 
@@ -435,7 +430,7 @@ function print_cash(x,   precision) {
 # Possible record styles
 # Journal styles (date format is somewhat flexible)
 #      2017 Aug 24, AMH.DIV, AMH.ASX, 3072, 2703.96, [1025.64,] [1655.49], # DRP & LIC
-function parse_line(now,    current_field, i, j, x, number_accounts) {
+function parse_line(now,    i, j, x, number_accounts) {
   #
   # The record may be
   #     Double Entry => two accounts
@@ -484,7 +479,7 @@ function parse_line(now,    current_field, i, j, x, number_accounts) {
   #   units < 0 => SELL cost element I
   #
   #  A blank or zero
-  #    units == 0 => Cost Base elelment II (the default)
+  #    units == 0 => Cost Base element II (the default)
   #
   #  A string  (roman numbers I to V are meaningful but could be anything without brackets)
   #    units == I   => Cost Base element I
@@ -589,12 +584,99 @@ function parse_line(now,    current_field, i, j, x, number_accounts) {
   if (Comments !~ /^#/)
     Comments = add_field("# ", Comments)
 
-  # A document name is added as a final comment
-  Comments = add_field(Comments, Documents)
+  # Documents can be added as comments
+  # Some special document names are supported
+  # So for example [<Buy>] expands to ABC Buy YYYY Mon
+  # and            [<Chess.x>] expands to ABC Chess YYYY Mon DD
+  for (x in Documents) {
+    delete Documents[x]
+
+    # Parse this document name
+    i = parse_document_name(x, now)
+
+    # Add the parsed name to the comments
+    Comments = add_field(Comments, i)
+  }
 
   # All done - return record type
   return number_accounts
 }
+
+
+# A document name may contain a filetype suffix
+function parse_document_name(x, now,    prefix, suffix, s, array) {
+
+  # Catch special strings
+  # Format is =STRING.SUFFIX=
+  #
+  # Where suffix is optional
+  #
+  # So =BUY=
+  # or =buy.02=
+  s = ctrim(x, "=")
+  if (s != x) {
+    # Split the code name
+    # Use name component because we want the capture all the components apart from the first
+    if (split(s, array, "[.:]") > 1)
+      suffix = get_name_component(s, 2, -1, array)
+    else
+      suffix = ""
+    prefix = tolower(get_name_component(s, 1, 1, array))
+
+    #   <String>
+    #   Sell
+    #   Div
+    #   Dist
+    #   Chess
+    ##
+    #
+    switch (prefix) {
+      case "buy" :
+      case "sell":
+      case "chess":
+        # Which account?
+        if (units < 0 || "SELL" == Write_Units)
+          x = get_name_component(Leaf[Account[1]], 1)
+        else
+          x = get_name_component(Leaf[Account[2]], 1)
+      break;;
+
+      case "div":
+      case "dividend":
+      case "dist":
+      case "distribution":
+      case "int":
+      case "interest":
+      case "income":
+        if (is_linked(Account[1]))
+          x = get_name_component(Leaf[Account[1]], 2)
+        else
+          x = get_name_component(Leaf[Account[1]], 1)
+        break;;
+
+      case "expense":
+        x = get_name_component(Leaf[Account[2]], 1)
+        break;;
+      default: # no match
+        x = prefix
+        break;;
+    }
+
+    # Was there a  match
+    if (x != prefix)
+      ##x = x " " toupper(substr(prefix, 1, 1)) substr(prefix, 2)
+      x = x " " cap_string(prefix)
+
+    # Add the date
+    x = x " " get_date(now, SHORT_FORMAT)
+    if (suffix)
+      x = x " " suffix
+  } # Not a special string
+
+  # return a URL version
+  return url_document_name(x)
+}
+
 
 # Parse optional value
 function parse_optional_value(field,     value) {
@@ -678,23 +760,21 @@ function parse_optional_string(field, save_document,    string, x) {
     return string
   }
 
-  # Only save the document name if non trivial and if requested
-  if ("" != string && "" != save_document) {
-    # Add any document names
-    if (!(string in Document_Name))
-      Document_Name[string] = parse_document_name(string)
-
-    # Add to Documents
-    Documents = add_field(Documents, Document_Name[string])
-  }
+  # A document name if we get here - save this
+  # An empty string means the input string is [] => use default string
+  # First version - replicate earlier behaviour
+  if ("" != string && "" != save_document)
+    # Can only have one example of each unique string...
+    if (!(string in Documents))
+      Documents[string] = string
 
   # All done
   return ""
 }
 
+# Get a version of a document name that can be used as a url
+function url_document_name(string,   filename, filetype, z, i, n) {
 
-# A document name may contain a filetype suffix
-function parse_document_name(string,    filename, filetype, z, i, n) {
   # How many dotted fields?
   n = split(string, z, ".")
 
@@ -1546,7 +1626,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     #
     # (DIV|DIST|FOR).LEAF => LEAF
     #
-    if (is_linked(leaf_name)) {
+    if (is_linked(account_name)) {
       # Probably a better way to do this using a regex
       linked_name = get_name_component(leaf_name, 2, -1)
 
@@ -1559,7 +1639,6 @@ function initialize_account(account_name,     class_name, array, p, n,
       printf "\tLinked Account[%s] => %s\n", linked_name, Underlying_Asset[account_name] > STDERR
 @endif
     }
-
   }
 
   # Initialize account with common entries

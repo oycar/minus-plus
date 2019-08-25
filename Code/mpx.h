@@ -51,7 +51,8 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Output Date Formats
 @define MONTH_FORMAT ("%Y %b %d") # // 2010 Jun 10
 @define ISO_FORMAT   ("%F")       # // 2010-Jun-10
-@define YEAR_FORMAT  ("%Y") # // 2010
+@define YEAR_FORMAT  ("%Y")       # // 2010
+@define SHORT_FORMAT ("%Y %b")    # // 2010 Jun
 
 # // Default Reports
 @define ALL_REPORTS ("a:b:c:d:f:m:o:q:t:z")
@@ -129,7 +130,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR).LEAF => LEAF
-@define is_linked(a) ((a) ~ /^(DIV|DIST|FOR)\./)
+@define is_linked(a) ((Leaf[a]) ~ /^(DIV|DIST|FOR)\./)
 
 
 # // char code lookup
@@ -229,6 +230,9 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Control precise timings of costs
 @define just_before(t) ((t) - 1)
 @define just_after(t)  ((t) + 1)
+
+# // Formatting
+@define cap_string(s) ternary(s, (toupper(substr(s, 1, 1)) substr(s, 2)), (s)) 
 
 # // Include currency definitions
 @include "currency.h"
