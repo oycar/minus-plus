@@ -573,7 +573,7 @@ function parse_line(now,    i, j, x, number_accounts) {
 
       # Treat as a comment
       if (x)
-        Comments = add_field(Comments, x)
+        Comments = add_field(Comments, x, ", ")
     }
 
     # Increment i
@@ -582,7 +582,7 @@ function parse_line(now,    i, j, x, number_accounts) {
 
   # Comments should be signified with an octothorpe
   if (Comments !~ /^#/)
-    Comments = add_field("# ", Comments)
+    Comments = add_field("# ", Comments, ", ")
 
   # Documents can be added as comments
   # Some special document names are supported
@@ -595,7 +595,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     i = parse_document_name(x, now)
 
     # Add the parsed name to the comments
-    Comments = add_field(Comments, i)
+    Comments = add_field(Comments, i, ", ")
   }
 
   # All done - return record type
@@ -604,77 +604,99 @@ function parse_line(now,    i, j, x, number_accounts) {
 
 
 # A document name may contain a filetype suffix
-function parse_document_name(x, now,    prefix, suffix, s, array) {
+function parse_document_name(name, now,    prefix, suffix, account_name, array, suffix_set) {
 
-  # Catch special strings
-  # Format is =STRING.SUFFIX=
+  # Looks for special strings followed by  literal string
   #
-  # Where suffix is optional
+  #   [B:literal]
+  #   [S:literal]
+  #   [H:literal]
+  #   [I:literal]
+  #   [E:literal]
+  #   [:literal]
   #
-  # So =BUY=
-  # or =buy.02=
-  s = ctrim(x, "=")
-  if (s != x) {
+  # A full stop can replace the colon
+  #
+
     # Split the code name
     # Use name component because we want the capture all the components apart from the first
-    if (split(s, array, "[.:]") > 1)
-      suffix = get_name_component(s, 2, -1, array)
-    else
-      suffix = ""
-    prefix = tolower(get_name_component(s, 1, 1, array))
+    if (split(name, array, Document_Split) > 1) {
+      suffix = get_name_component(name, 2, -1, array)
+      suffix_set = TRUE
+    } else
+      suffix_set = FALSE
 
-    #   <String>
-    #   Sell
-    #   Div
-    #   Dist
-    #   Chess
-    ##
+    prefix = get_name_component(name, 1, 1, array)
+
     #
     switch (prefix) {
-      case "buy" :
-      case "sell":
-      case "chess":
-        # Which account?
-        if (units < 0 || "SELL" == Write_Units)
-          x = get_name_component(Leaf[Account[1]], 1)
-        else
-          x = get_name_component(Leaf[Account[2]], 1)
+      case "B" :
+      case "S":
+      case "H":
+
+        # Is this a buy, sell or holding statement?
+        if (units < 0 || "SELL" == Write_Units) {
+          prefix = ternary("H" == prefix, "Holding Statement", "Sell")
+          account_name = get_name_component(Leaf[Account[1]], 1)
+        } else {
+          prefix = ternary("H" == prefix, "Holding Statement", "Buy")
+          account_name = get_name_component(Leaf[Account[2]], 1)
+        }
+
+        # Add the date
+        prefix = prefix " " get_date(now, SHORT_FORMAT)
       break;;
 
-      case "div":
-      case "dividend":
-      case "dist":
-      case "distribution":
-      case "int":
-      case "interest":
-      case "income":
+      case "I":
+      case "D": # Income
         if (is_linked(Account[1]))
-          x = get_name_component(Leaf[Account[1]], 2)
+          account_name = get_name_component(Leaf[Account[1]], 2)
         else
-          x = get_name_component(Leaf[Account[1]], 1)
+          account_name = get_name_component(Leaf[Account[1]], 1)
+
+        # The second component of the account name
+        prefix = tolower(get_name_component(Account[1], 2)) " " get_date(now, SHORT_FORMAT)
         break;;
 
-      case "expense":
-        x = get_name_component(Leaf[Account[2]], 1)
-        break;;
-      default: # no match
-        x = prefix
-        break;;
-    }
+      case "C":
+      case "E": # Expense or Cost
+        account_name = get_name_component(Leaf[Account[2]], 1)
 
-    # Was there a  match
-    if (x != prefix)
-      ##x = x " " toupper(substr(prefix, 1, 1)) substr(prefix, 2)
-      x = x " " cap_string(prefix)
+        # The second component of the account name
+        prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, SHORT_FORMAT)
+        break;;
 
-    # Add the date
-    x = x " " get_date(now, SHORT_FORMAT)
-    if (suffix)
-      x = x " " suffix
-  } # Not a special string
+      default: # no match - assume this is a literal string
+        # When a distinct suffix is present add the date
+        if (suffix_set)
+          prefix = add_field(prefix, get_date(now, SHORT_FORMAT), " ")
+
+        account_name = ""
+        break;;
+    } # End of switch
+
+    # We have at this point
+    #
+    #  prefix => Type of transaction, eg Buy, Dividend etc
+    #  account_name => BHP, AUS_BOND etc
+    #  suffix => Literal string
+    #
+    #  Or
+    #
+    #  prefix => ""
+    #  account_name => ""
+    #  suffix => Literal string
+    #
+
+    # Is there an account name?
+    if ("" != account_name)
+      prefix = account_name " " cap_string(prefix)
+
+    # Final parsed document name
+    prefix = add_field(prefix, suffix)
 
   # return a URL version
-  return url_document_name(x)
+  return url_document_name(prefix)
 }
 
 
@@ -1049,7 +1071,7 @@ function get_name_component(name, i, number_components, array,    name_length, s
   }
 
   # All done - add a line of code for debugging/trapping
-  assert("" != s, sprintf("Requested component <%d> couldn't be found in %s", i, name))
+  # assert("" != s, sprintf("Requested component <%d> couldn't be found in %s", i, name))
   return s
 }
 

@@ -64,6 +64,9 @@ BEGIN {
   # An array to hold document strings
   make_array(Documents)
 
+  # A Document shortcut code
+  Document_Split = "[:]"
+
   # And a gains stack
   make_array(Gains_Stack)
   Long_Gains_Key   = "Long Gains  "

@@ -97,7 +97,6 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define ternary(a, b, c) ((a)?(b):(c))
 @define make_array(array)  ternary(SUBSEP in array,TRUE,FALSE)
 
-@define add_field(s, field) ternary("" == s, field, ternary("" == field, s, (s ", " field)))
 @define find_entry(array, now) ternary(__MPX_KEY__ = find_key(array, now), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
 @define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
@@ -232,7 +231,8 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define just_after(t)  ((t) + 1)
 
 # // Formatting
-@define cap_string(s) ternary(s, (toupper(substr(s, 1, 1)) substr(s, 2)), (s)) 
+@define cap_string(s) ternary(s, (toupper(substr(s, 1, 1)) substr(s, 2)), (s))
+@define add_field(s, field, c) ternary("" == s, field, ternary("" == field, s, (s c field)))
 
 # // Include currency definitions
 @include "currency.h"
