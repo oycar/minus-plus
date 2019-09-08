@@ -39,6 +39,8 @@ END {
         exit 1
 }
 
+@load "filefuncs"
+
 
 # // Control Logging
 
@@ -265,7 +267,6 @@ END {
 
 # // Formatting
 
-# // @define add_field(s, field) ternary("" == s, field, ternary("" == field, s, (s __MPX_FIELD_SEP__ field)))
 
 
 # // Include currency definitions
@@ -321,9 +322,11 @@ END {
 
 
 
-# // These two are not very readable
-# // @define get_cash_in(a, i, now) (ternary((now >= Held_From[(a)][(i)]), find_entry(Accounting_Cost[(a)][(i)][I], Held_From[(a)][(i)]), 0))
-# // @define get_cash_out(a, i, now) (ternary(is_sold(a, i, (now) + 1), find_entry(Accounting_Cost[(a)][(i)][0], (now)),0))
+# // A local array
+((SUBSEP in __MPX_ARRAY__)?((1)):((0)))
+
+# // This assumes that the file:// protocol is in use - for a network protocol this will not work - so assume document is available
+
 
 
 # p.shared.awk
@@ -915,21 +918,27 @@ function parse_line(now,    i, j, x, number_accounts) {
 # A document name may contain a filetype suffix
 function parse_document_name(name, now,    prefix, suffix, account_name, array, suffix_set) {
 
-  # Looks for special strings followed by  literal string
+  # Looks for special strings accompanied by a literal string
   #
-  #   [B:literal]
-  #   [S:literal]
-  #   [H:literal]
+  #   [B:literal] => Account Buy  (or Sell) YYYY Mon(literal)
+  #   [S:literal] => Account Sell (or Buy)
+  #   [H:literal] => Account Holding Statement
   #   [I:literal]
   #   [E:literal]
-  #   [:literal]
+  #   [:literal] => prepends the date
+  #   [literal:] => appends the date
+  #   [:]        => just the date
+  #   [literal]  => just the literal
   #
-  # A full stop can replace the colon
+  #  If the colon is needed in a string literal a different Document_Shortcut code can be set in the Journal file
   #
+  # <<, Document_Shortcut, =,>>
+  # 2008 Jun 30, INCOME.FOREIGN:FOR.PXUPA.ASX,          CASH,          0,      726.63, [PX:UPA Distribution=], # PX:UPA distribution
+  # <<, Document_Shortcut, :,>>
 
     # Split the code name
     # Use name component because we want the capture all the components apart from the first
-    if (split(name, array, "[.:]") > 1) {
+    if (split(name, array, Document_Shortcut) > 1) {
       suffix = get_name_component(name, 2, -1, array)
       suffix_set = (1)
     } else
@@ -956,21 +965,31 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
         prefix = prefix " " get_date(now, ("%Y %b")    )
       break;;
 
-      case "I": # Income
+      case "I":
+      case "D": # Income
         if (((Leaf[Account[1]]) ~ /^(DIV|DIST|FOR)\./))
           account_name = get_name_component(Leaf[Account[1]], 2)
         else
           account_name = get_name_component(Leaf[Account[1]], 1)
 
-        # The second component of the account name
-        prefix = tolower(get_name_component(Account[1], 2)) " " get_date(now, ("%Y %b")    )
+        # The second component of the account name (unless this is accrued income)
+        if (((Account[1]) ~ ("^" ( "ASSET.CURRENT.ACCRUED") "[.:]")))
+          prefix = "Distribution " get_date(now, ("%Y %b")    )
+        else
+          prefix = tolower(get_name_component(Account[1], 2)) " " get_date(now, ("%Y %b")    )
         break;;
 
-      case "E":
+      case "C":
+      case "E": # Expense or Cost
         account_name = get_name_component(Leaf[Account[2]], 1)
 
         # The second component of the account name
         prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, ("%Y %b")    )
+        break;;
+
+      case "T": # Annual Tax Statement
+        account_name = get_name_component(Leaf[Account[2]], 1)
+        prefix = "Annual Tax Statement " (strftime("%Y", (now), UTC) + 0)
         break;;
 
       default: # no match - assume this is a literal string
@@ -1002,10 +1021,36 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
     # Final parsed document name
     prefix = (("" == prefix)?(  suffix):( (("" ==  suffix)?( prefix):( (prefix   suffix)))))
 
-  # return a URL version
-  return url_document_name(prefix)
+    # Return either urlencoded version or the parsed name
+    # The parsed name indicates that the document is missing
+    return url_document_name(prefix)
 }
 
+# Get a version of a document name that can be used as a url
+function url_document_name(string,   filename, filetype, z, i, n) {
+
+  # How many dotted fields?
+  n = split(string, z, ".")
+
+  # If more than one last is treated as filetype
+  if (n > 1)
+    filetype = url_encode(z[n])
+  else # Default filetype
+    filetype = Document_Filetype
+
+  # Is this document missing?
+  if ((("file://" == Document_Protocol)?( stat(Document_Root string "." filetype, __MPX_ARRAY__)):( (0))))
+    # No such document - leave unconverted - this indicates that file is missing
+    return ("[[" string "]]")
+
+  # Process  the filename elements
+  filename = url_encode(z[1])
+  for (i = 2; i < n; i ++)
+    filename = filename "." url_encode(z[i])
+
+  # return result
+  return (Document_URI filename "." filetype)
+}
 
 # Parse optional value
 function parse_optional_value(field,     value) {
@@ -1101,26 +1146,7 @@ function parse_optional_string(field, save_document,    string, x) {
   return ""
 }
 
-# Get a version of a document name that can be used as a url
-function url_document_name(string,   filename, filetype, z, i, n) {
 
-  # How many dotted fields?
-  n = split(string, z, ".")
-
-  # If more than one last is treated as filetype
-  if (n > 1)
-    filetype = url_encode(z[n])
-  else # Default filetype
-    filetype = Document_Filetype
-
-  # Process  the filename elements
-  filename = url_encode(z[1])
-  for (i = 2; i < n; i ++)
-    filename = filename "." url_encode(z[i])
-
-  # return result
-  return Document_Root filename "." filetype
-}
 
 # Is units a numerical value?
 function parse_units(u, units,      len) {
@@ -2103,7 +2129,7 @@ function url_encode(string,     c, chars, url, i) {
     c = chars[i]
 
     # Just prepend plain vanilla characters
-	  if (c ~ /[0-9A-Za-z]/)
+	  if (c ~ /[0-9A-Za-z/\.]/)
 	    url = c url
 	  else # Get the hex code
 	    url = "%" sprintf("%02X", ((c in URL_Lookup)?( URL_Lookup[c]):( (0)))) url
@@ -4961,6 +4987,9 @@ BEGIN {
   # An array to hold document strings
   ((SUBSEP in Documents)?((1)):((0)))
 
+  # A Document shortcut code
+  Document_Shortcut = ":"
+
   # And a gains stack
   ((SUBSEP in Gains_Stack)?((1)):((0)))
   Long_Gains_Key   = "Long Gains  "
@@ -5051,7 +5080,8 @@ BEGIN {
   # Default Portfolio Name and document URI
   Journal_Title = "NEMO"
   Journal_Type = "IND"
-  Document_Root = "https:example.com/NEMO"
+  Document_Protocol = "https://"
+  Document_Root = "example.com/NEMO/"
 
   # Default currency
   Journal_Currency = "AUD"
@@ -5289,6 +5319,9 @@ function import_csv_data(array, symbol, name,
   Check_Balance_Function  = "check_balance"
   Update_Profits_Function = "update_profits"
   Update_Member_Function  = "update_member_liability"
+
+  # Set the URI document prefix
+  Document_URI = Document_Protocol url_encode(Document_Root)
 
   # Initialize local tax variables
   @Initialize_Tax_Function()

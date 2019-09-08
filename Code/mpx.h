@@ -1,6 +1,8 @@
 @ifndef MPX_H
 @define MPX_H
 @include "assert.awk"
+@load "filefuncs"
+
 
 # // Control Logging
 @ifeq LOG 0
@@ -257,7 +259,9 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define print_block(c, n, stream) if (TRUE) {while (n-- > 1) printf "%1s", c > stream; print c > stream}
 @define print_line(l, stream) ternary(l, underline(73, 8, stream), underline(47, 8, stream))
 
-# // These two are not very readable
-# // @define get_cash_in(a, i, now) (ternary((now >= Held_From[(a)][(i)]), find_entry(Accounting_Cost[(a)][(i)][I], Held_From[(a)][(i)]), 0))
-# // @define get_cash_out(a, i, now) (ternary(is_sold(a, i, (now) + 1), find_entry(Accounting_Cost[(a)][(i)][0], (now)),0))
+# // A local array
+make_array(__MPX_ARRAY__)
+
+# // This assumes that the file:// protocol is in use - for a network protocol this will not work - so assume document is available
+@define document_missing(name) ternary("file://" == Document_Protocol, stat(name, __MPX_ARRAY__), FALSE)
 @endif # !MPX_H

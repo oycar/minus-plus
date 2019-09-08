@@ -606,21 +606,27 @@ function parse_line(now,    i, j, x, number_accounts) {
 # A document name may contain a filetype suffix
 function parse_document_name(name, now,    prefix, suffix, account_name, array, suffix_set) {
 
-  # Looks for special strings followed by  literal string
+  # Looks for special strings accompanied by a literal string
   #
-  #   [B:literal]
-  #   [S:literal]
-  #   [H:literal]
+  #   [B:literal] => Account Buy  (or Sell) YYYY Mon(literal)
+  #   [S:literal] => Account Sell (or Buy)
+  #   [H:literal] => Account Holding Statement
   #   [I:literal]
   #   [E:literal]
-  #   [:literal]
+  #   [:literal] => prepends the date
+  #   [literal:] => appends the date
+  #   [:]        => just the date
+  #   [literal]  => just the literal
   #
-  # A full stop can replace the colon
+  #  If the colon is needed in a string literal a different Document_Shortcut code can be set in the Journal file
   #
+  # <<, Document_Shortcut, =,>>
+  # 2008 Jun 30, INCOME.FOREIGN:FOR.PXUPA.ASX,          CASH,          0,      726.63, [PX:UPA Distribution=], # PX:UPA distribution
+  # <<, Document_Shortcut, :,>>
 
     # Split the code name
     # Use name component because we want the capture all the components apart from the first
-    if (split(name, array, Document_Split) > 1) {
+    if (split(name, array, Document_Shortcut) > 1) {
       suffix = get_name_component(name, 2, -1, array)
       suffix_set = TRUE
     } else
@@ -654,8 +660,11 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
         else
           account_name = get_name_component(Leaf[Account[1]], 1)
 
-        # The second component of the account name
-        prefix = tolower(get_name_component(Account[1], 2)) " " get_date(now, SHORT_FORMAT)
+        # The second component of the account name (unless this is accrued income)
+        if (is_class(Account[1], "ASSET.CURRENT.ACCRUED"))
+          prefix = "Distribution " get_date(now, SHORT_FORMAT)
+        else
+          prefix = tolower(get_name_component(Account[1], 2)) " " get_date(now, SHORT_FORMAT)
         break;;
 
       case "C":
@@ -664,6 +673,11 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
 
         # The second component of the account name
         prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, SHORT_FORMAT)
+        break;;
+
+      case "T": # Annual Tax Statement
+        account_name = get_name_component(Leaf[Account[2]], 1)
+        prefix = "Annual Tax Statement " get_year_number(now)
         break;;
 
       default: # no match - assume this is a literal string
@@ -695,10 +709,36 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
     # Final parsed document name
     prefix = add_field(prefix, suffix)
 
-  # return a URL version
-  return url_document_name(prefix)
+    # Return either urlencoded version or the parsed name
+    # The parsed name indicates that the document is missing
+    return url_document_name(prefix)
 }
 
+# Get a version of a document name that can be used as a url
+function url_document_name(string,   filename, filetype, z, i, n) {
+
+  # How many dotted fields?
+  n = split(string, z, ".")
+
+  # If more than one last is treated as filetype
+  if (n > 1)
+    filetype = url_encode(z[n])
+  else # Default filetype
+    filetype = Document_Filetype
+
+  # Is this document missing?
+  if (document_missing(Document_Root string "." filetype))
+    # No such document - leave unconverted - this indicates that file is missing
+    return ("[[" string "]]")
+
+  # Process  the filename elements
+  filename = url_encode(z[1])
+  for (i = 2; i < n; i ++)
+    filename = filename "." url_encode(z[i])
+
+  # return result
+  return (Document_URI filename "." filetype)
+}
 
 # Parse optional value
 function parse_optional_value(field,     value) {
@@ -794,26 +834,7 @@ function parse_optional_string(field, save_document,    string, x) {
   return ""
 }
 
-# Get a version of a document name that can be used as a url
-function url_document_name(string,   filename, filetype, z, i, n) {
 
-  # How many dotted fields?
-  n = split(string, z, ".")
-
-  # If more than one last is treated as filetype
-  if (n > 1)
-    filetype = url_encode(z[n])
-  else # Default filetype
-    filetype = Document_Filetype
-
-  # Process  the filename elements
-  filename = url_encode(z[1])
-  for (i = 2; i < n; i ++)
-    filename = filename "." url_encode(z[i])
-
-  # return result
-  return Document_Root filename "." filetype
-}
 
 # Is units a numerical value?
 function parse_units(u, units,      len) {
@@ -1898,7 +1919,7 @@ function url_encode(string,     c, chars, url, i) {
     c = chars[i]
 
     # Just prepend plain vanilla characters
-	  if (c ~ /[0-9A-Za-z]/)
+	  if (c ~ /[0-9A-Za-z/\.]/)
 	    url = c url
 	  else # Get the hex code
 	    url = "%" sprintf("%02X", get_char(c)) url

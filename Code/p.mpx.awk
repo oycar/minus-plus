@@ -65,7 +65,7 @@ BEGIN {
   make_array(Documents)
 
   # A Document shortcut code
-  Document_Split = "[:]"
+  Document_Shortcut = ":"
 
   # And a gains stack
   make_array(Gains_Stack)
@@ -157,7 +157,8 @@ BEGIN {
   # Default Portfolio Name and document URI
   Journal_Title = "NEMO"
   Journal_Type = "IND"
-  Document_Root = "https:example.com/NEMO"
+  Document_Protocol = "https://"
+  Document_Root = "example.com/NEMO/"
 
   # Default currency
   Journal_Currency = JOURNAL_CURRENCY
@@ -404,6 +405,9 @@ function import_csv_data(array, symbol, name,
   Check_Balance_Function  = "check_balance"
   Update_Profits_Function = "update_profits"
   Update_Member_Function  = "update_member_liability"
+
+  # Set the URI document prefix
+  Document_URI = Document_Protocol url_encode(Document_Root)
 
   # Initialize local tax variables
   @Initialize_Tax_Function()
