@@ -109,17 +109,17 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
       qualify_window=${OPTARG};;
 
     # Skinning a cat another way
-    A) Show_Reports="A";;
-    B) Show_Reports+="B";;
-    C) Show_Reports+="C";;
-    D) Show_Reports+="D";;
-    F) Show_Reports+="F";;
-    I) Show_Reports+="I";;
-    M) Show_Reports+="M";;
-    O) Show_Reports+="O";;
-    Q) Show_Reports+="Q";;
-    T) Show_Reports+="T";;
-    Z) Show_Reports="Z";;
+    A) Show_Reports="A";;   # All
+    B) Show_Reports+="B";;  # Balance
+    C) Show_Reports+="C";;  # Capital Gains
+    D) Show_Reports+="D";;  # Deferred Gains
+    F) Show_Reports+="F";;  # Fixed Asset Depreciation
+    I) Show_Reports+="I";;  # Imputation
+    M) Show_Reports+="M";;  # Market Gains
+    O) Show_Reports+="O";;  # Operating Statement
+    Q) Show_Reports+="Q";;  # Qualified Dividends
+    T) Show_Reports+="T";;  # Tax Statement
+    Z) Show_Reports="Z";;   # Zero
 
 
     s) # stop time

@@ -105,8 +105,6 @@ END {
 
 
 
-
-
 # // Default Asset Prefix for Price Lists
 
 
@@ -983,8 +981,9 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
       case "E": # Expense or Cost
         account_name = get_name_component(Leaf[Account[2]], 1)
 
-        # The second component of the account name
-        prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, ("%Y %b")    )
+        # The second component of the account name is not used here...?
+        prefix = "Expense " get_date(now, ("%Y %b")    )
+        #prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, SHORT_FORMAT)
         break;;
 
       case "T": # Annual Tax Statement
@@ -2685,7 +2684,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("MC" ~ /[cC]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2871,7 +2870,6 @@ function get_carried_losses(past, limit,
   # This determines the carried losses
   set_cost(CARRIED_LOSSES, carried_losses, past)
   return carried_losses
-  #return get_cost(CARRIED_LOSSES, past)
 }
 
 # Compute the deferred gains
@@ -2881,7 +2879,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("MC" ~ /[dD]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2926,7 +2924,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MC" ~ /[oO]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3066,7 +3064,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MC" ~ /[bB]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3201,7 +3199,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("MC" ~ /[mM]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3274,7 +3272,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MC" ~ /[fF]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3407,7 +3405,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MC" ~ /[qQ]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3904,7 +3902,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("MC" ~ /[tT]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -3957,7 +3955,8 @@ function income_tax_aud(now, past, benefits,
   #
   #
   # Australia ignores the distinction between long & short term losses
-  taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  #taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  taxable_gains = get_taxable_gains(now, get_carried_losses(past, (0)))
   if (((taxable_gains) < -Epsilon)) {
     # Gains are a negative number
     other_income -= taxable_gains
@@ -4618,7 +4617,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MC" ~ /[iI]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

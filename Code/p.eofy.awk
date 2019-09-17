@@ -568,7 +568,6 @@ function get_carried_losses(past, limit,
   # This determines the carried losses
   set_cost(CARRIED_LOSSES, carried_losses, past)
   return carried_losses
-  #return get_cost(CARRIED_LOSSES, past)
 }
 
 # Compute the deferred gains

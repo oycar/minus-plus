@@ -671,8 +671,9 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
       case "E": # Expense or Cost
         account_name = get_name_component(Leaf[Account[2]], 1)
 
-        # The second component of the account name
-        prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, SHORT_FORMAT)
+        # The second component of the account name is not used here...?
+        prefix = "Expense " get_date(now, SHORT_FORMAT)
+        #prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, SHORT_FORMAT)
         break;;
 
       case "T": # Annual Tax Statement

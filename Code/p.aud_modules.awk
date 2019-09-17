@@ -213,7 +213,8 @@ function income_tax_aud(now, past, benefits,
   #
   #
   # Australia ignores the distinction between long & short term losses
-  taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  #taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  taxable_gains = get_taxable_gains(now, get_carried_losses(past, CARRY_FORWARD_LIMIT))
   if (below_zero(taxable_gains)) {
     # Gains are a negative number
     other_income -= taxable_gains
@@ -869,7 +870,7 @@ function get_taxable_gains(now, losses,
     # But not a long term loss
     losses = short_gains = 0
 @ifeq LOG get_gains
-    printf "\n\tOnly Long Gains\n" > reports_stream
+    printf "\n\tOnly Long Gains\n" > STDERR
     printf "\t%27s => %14s\n", "Long Gains", print_cash(- long_gains) > STDERR
 @endif
   } else {
