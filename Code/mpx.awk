@@ -105,6 +105,8 @@ END {
 
 
 
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -297,6 +299,7 @@ END {
 #// Extra definitions for AUD
 #// Add localized State Variables & Scalars
 # // Add localized State Variables & Scalars
+
 
 
 
@@ -2483,14 +2486,14 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           if (!gains_event) {
             # Two types of header
             if (is_detailed)
-              printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
+              printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                       asset_width, "Asset", 10, "Parcel",
                       7, "Units", 14, "Cost",
                       11, "From", 12, to_label,
                       11, "Price", 16, proceeds_label,
                       13, "Reduced", 14, "Adjusted",
                       15, "Accounting", 9, "Type",
-                      18, "Taxable", 15, "Per Unit" > reports_stream
+                      18, "Taxable", 16, "Per Unit" > reports_stream
             else if (no_header_printed) {
               printf "%*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
                      asset_width, "Asset",
@@ -2580,7 +2583,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           # Print out the parcel information
           if (is_detailed) {
             # If printing out in detail
-            printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
+            printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                  asset_width + 1, label,
                  7, p,
                  11, units,
@@ -2606,7 +2609,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       if (gains_event) {
         if (is_detailed)
           # Detailed format
-          underline(160 + asset_width, 6, reports_stream)
+          underline(175 + asset_width, 6, reports_stream)
 
         # The output starts here
         printf "%*s %*.3f %*s %*s   %*s %*s %*s %*s %*s ",
@@ -2684,7 +2687,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("MC" ~ /[cC]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2879,7 +2882,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("MC" ~ /[dD]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2924,7 +2927,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("MC" ~ /[oO]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3064,7 +3067,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("MC" ~ /[bB]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3199,7 +3202,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("MC" ~ /[mM]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3272,7 +3275,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("MC" ~ /[fF]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3405,7 +3408,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("MC" ~ /[qQ]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3777,13 +3780,13 @@ BEGIN {
   if ("" == Epoch)
     set_epoch()
 
-  # // Can set constants here
-  if (!Qualification_Window)
-    EOFY_Window = Qualification_Window = 0
-  else {
-    Qualification_Window = 91 * (86400) # seconds
-    EOFY_Window = 0.5 * (Qualification_Window - (86400))
-  }
+  # # // Can set constants here
+  # if (!Qualification_Window)
+  #   EOFY_Window = Qualification_Window = 0
+  # else {
+  #   Qualification_Window = 91 * ONE_DAY # seconds
+  #   EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
+  # }
 
   # Start of FY
   if ("" == FY_Date)
@@ -3902,7 +3905,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("MC" ~ /[tT]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4617,7 +4620,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("MC" ~ /[iI]|[aA]/ && "MC" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5318,6 +5321,26 @@ function import_csv_data(array, symbol, name,
   Check_Balance_Function  = "check_balance"
   Update_Profits_Function = "update_profits"
   Update_Member_Function  = "update_member_liability"
+
+  # Dividend Qualification Window - is recorded
+  # with the help of the auxilliary variable
+  # which sets an EOFY_Window
+  if ("" == EOFY_Window) {
+    # Dividend Qualification Window is not yet set
+    if ("" == Qualification_Window)
+      Qualification_Window = (91) # Units in days
+
+    # Qualification_Window is set, but since EOFY_Window is unset the units are days
+    Qualification_Window *= (86400)
+
+    # Still need to set EOFY_Window
+    if (Qualification_Window > (86400))
+      EOFY_Window = 0.5 * (Qualification_Window - (86400))
+    else
+      EOFY_Window = 0
+  } else
+    # Qualification_Window must be set
+    assert("" != Qualification_Window, "Qualification Window is undefined even though EOFY_Window <" EOFY_Window "> is set")
 
   # Set the URI document prefix
   Document_URI = Document_Protocol url_encode(Document_Root)

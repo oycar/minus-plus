@@ -24,13 +24,13 @@ BEGIN {
   make_array(Capital_Gains_Tax_Bands)
 
 
-  # // Can set constants here
-  if ("" == Qualification_Window)
-    EOFY_Window = Qualification_Window = 0
-  else {
-    Qualification_Window = 121 * ONE_DAY # seconds
-    EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
-  }
+  # # // Can set constants here
+  # if ("" == Qualification_Window)
+  #   EOFY_Window = Qualification_Window = 0
+  # else {
+  #   Qualification_Window = 121 * ONE_DAY # seconds
+  #   EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
+  # }
 
   # Start of FY - arbitrary date
   if ("" == FY_Date)

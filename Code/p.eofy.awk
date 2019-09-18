@@ -173,14 +173,14 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           if (!gains_event) {
             # Two types of header
             if (is_detailed)
-              printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
+              printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                       asset_width, "Asset", 10, "Parcel",
                       7, "Units", 14, "Cost",
                       11, "From", 12, to_label,
                       11, "Price", 16, proceeds_label,
                       13, "Reduced", 14, "Adjusted",
                       15, "Accounting", 9, "Type",
-                      18, "Taxable", 15, "Per Unit" > reports_stream
+                      18, "Taxable", 16, "Per Unit" > reports_stream
             else if (no_header_printed) {
               printf "%*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
                      asset_width, "Asset",
@@ -270,7 +270,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           # Print out the parcel information
           if (is_detailed) {
             # If printing out in detail
-            printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
+            printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                  asset_width + 1, label,
                  7, p,
                  11, units,
@@ -296,7 +296,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       if (gains_event) {
         if (is_detailed)
           # Detailed format
-          underline(160 + asset_width, 6, reports_stream)
+          underline(175 + asset_width, 6, reports_stream)
 
         # The output starts here
         printf "%*s %*.3f %*s %*s   %*s %*s %*s %*s %*s ",

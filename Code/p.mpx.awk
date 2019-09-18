@@ -406,6 +406,26 @@ function import_csv_data(array, symbol, name,
   Update_Profits_Function = "update_profits"
   Update_Member_Function  = "update_member_liability"
 
+  # Dividend Qualification Window - is recorded
+  # with the help of the auxilliary variable
+  # which sets an EOFY_Window
+  if ("" == EOFY_Window) {
+    # Dividend Qualification Window is not yet set
+    if ("" == Qualification_Window)
+      Qualification_Window = QUALIFICATION_WINDOW # Units in days
+
+    # Qualification_Window is set, but since EOFY_Window is unset the units are days
+    Qualification_Window *= ONE_DAY
+
+    # Still need to set EOFY_Window
+    if (Qualification_Window > ONE_DAY)
+      EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
+    else
+      EOFY_Window = 0
+  } else
+    # Qualification_Window must be set
+    assert("" != Qualification_Window, "Qualification Window is undefined even though EOFY_Window <" EOFY_Window "> is set")
+
   # Set the URI document prefix
   Document_URI = Document_Protocol url_encode(Document_Root)
 

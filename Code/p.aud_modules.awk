@@ -35,13 +35,13 @@ BEGIN {
   if ("" == Epoch)
     set_epoch()
 
-  # // Can set constants here
-  if (!Qualification_Window)
-    EOFY_Window = Qualification_Window = 0
-  else {
-    Qualification_Window = 91 * ONE_DAY # seconds
-    EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
-  }
+  # # // Can set constants here
+  # if (!Qualification_Window)
+  #   EOFY_Window = Qualification_Window = 0
+  # else {
+  #   Qualification_Window = 91 * ONE_DAY # seconds
+  #   EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
+  # }
 
   # Start of FY
   if ("" == FY_Date)
