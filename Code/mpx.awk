@@ -105,8 +105,6 @@ END {
 
 
 
-
-
 # // Default Asset Prefix for Price Lists
 
 
@@ -165,6 +163,9 @@ END {
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR).LEAF => LEAF
 
+
+
+# // The current value of an asset
 
 
 # // char code lookup
@@ -317,6 +318,7 @@ END {
 
 
 # // Multi-Line Macro
+# // Gets the entries in the data which lie within the [block] (including end points)
 
 
 # // Print a block of n identical characters
@@ -679,7 +681,7 @@ function maximum_entry(array, start_bracket, end_bracket,
   key = find_key(array, ((end_bracket) - 1))
   while (key > start_bracket) {
     # Save the maximum found
-    max = (((max)>( array[key]))?(max):( array[key]))
+    max = (((max) - ( array[key]) > 0)?(max):( array[key]))
 
     # Get the next key
     key = find_key(array, ((key) - 1))
@@ -1361,7 +1363,7 @@ function held_to(ac, now,     p, latest_sale) {
 
   for (p = 0; p < Number_Parcels[ac]; p++)
     if ((Held_Until[(a)][( p)] <= ( now)))
-      latest_sale = (((latest_sale)>( Held_Until[ac][p]))?(latest_sale):( Held_Until[ac][p]))
+      latest_sale = (((latest_sale) - ( Held_Until[ac][p]) > 0)?(latest_sale):( Held_Until[ac][p]))
     else if (Held_Until[ac][p] < Future) {
       # If the asset still held now?
       latest_sale = now
@@ -1928,6 +1930,128 @@ function initialize_account(account_name,     class_name, array, p, n,
 function unlink_account(a) {
   if (a in Leaf)
     delete Leaf[a]
+}
+
+
+#
+# Filter Data
+#
+# Filter out irrelevant data - data that is out-of-range
+# can arise from importing records
+#
+function filter_data(now, variable_names, show_details,    array_names, name) {
+  # Which data arrays are to be filtered
+  if (!split(variable_names, array_names, ","))
+    return # Nothing to filter
+
+  # Should we log
+
+
+  # Filter the data arrays
+  for (name in array_names)
+    filter_array(now, SYMTAB[array_names[name]], array_names[name], show_details)
+}
+
+# Handle each array in turn
+function filter_array(now, data_array, name, show_blocks,
+                           a, p, start_block, end_block, block_id,
+                           stack, key, first_key,
+                           earliest_key, latest_key) {
+
+  # Record the earlist and latest keys found
+  if (show_blocks) {
+    # Report on data held
+    print Journal_Title > "/dev/stderr"
+    printf "%s Data Held Report for Period Ending %s\n\n", name, get_date(now)  > "/dev/stderr"
+
+    earliest_key = Future
+    latest_key   = Epoch
+  }
+
+  # list holding "blocks" - ie non-overlapping holding periods
+  # Each block is preceeded and/or followed by "gaps"
+  for (a in Leaf)
+    if ((a in data_array) && ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/))
+      if ((Held_From[(a)][0] > Epoch)) {
+        # Get each parcel in turn and list the contiguous blocks of time held
+        start_block = Held_From[a][0]
+        end_block = Held_Until[a][0]
+        block_id = 0
+        for (p = 1; p < Number_Parcels[a]; p ++) {
+          # This starts a new holding block if the purchase date is after the current end date
+          if (((Held_From[a][p] -  end_block) > 0)) {
+            # Check the data against each block
+            for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
+
+            # Remove originals of copies data to speed up processing of remaining entries
+            for (key in stack)
+              delete data_array[a][key]
+
+            # A new block
+            block_id ++
+            start_block = Held_From[a][p]
+            end_block = Held_Until[a][p]
+          } else if (((Held_Until[a][p] -  end_block) > 0)) # extend the old block
+            end_block = Held_Until[a][p]
+
+          # If this parcel is open we have completed all possible blocks
+          if ((Held_Until[(a)][( p)] > ( now)))
+            break
+        } # End of each parcel p
+
+        # Check the data against each block
+        for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
+        if (show_blocks)
+          # Get first key
+          for (first_key in stack) {
+            # Record latest key
+            latest_key = (((latest_key) - ( first_key) > 0)?(latest_key):( first_key))
+            break
+          }
+
+        # Some simple formatting
+        if (Show_Extra && show_blocks)
+          printf "\n" > "/dev/stderr"
+
+        # Copy the kept items back
+        for (key in stack) {
+          data_array[a][key] = stack[key]
+
+          # Show this data when detailed reporting is enabled
+          if (Show_Extra && show_blocks)
+            printf "%22s\t %s => %s\n", Leaf[a], get_date(key), format_value(stack[key]) > "/dev/stderr"
+        }
+
+        # get last key and show range of keys
+        if (show_blocks && (key in stack)) {
+          if (key != first_key)
+            # More than one key
+            printf "%22s\t[%s, %s]\n", Leaf[a], get_date(key), get_date(first_key) > "/dev/stderr"
+          else if (!Show_Extra)
+            # Only one key in this block - already recorded if Show_Extra set
+            printf "%22s\t[%s]\n", Leaf[a], get_date(first_key) > "/dev/stderr"
+
+          # Record earliest key
+          earliest_key = (((earliest_key) - ( key) < 0)?(earliest_key):( key))
+        }
+
+        # Clean up
+        delete stack
+
+      } else {
+        # Never held!
+        if (show_blocks)
+          printf "%22s\tNever Held!\n", Leaf[a] > "/dev/stderr"
+
+        unlink_account(a)
+      }
+    # End of each asset a
+
+    # Final Summary
+    if (show_blocks) {
+      underline(44, 6, "/dev/stderr")
+      printf "%22s\t[%s, %s]\n\n", name, get_date(earliest_key), get_date(latest_key) > "/dev/stderr"
+    }
 }
 
 ##
@@ -2597,7 +2721,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                  14, print_cash(- gains),
                  14, description,
                  14, print_cash(- parcel_gains),
-                 14, print_cash(- parcel_gains / units, 4) > reports_stream
+                # 14, print_cash(- parcel_gains / units, 4) > reports_stream
+                 14, print_cash(parcel_cost / units, 4) > reports_stream
 
             # Clear label
             label = ""
@@ -2687,7 +2812,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("DT" ~ /[cC]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2882,7 +3007,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("DT" ~ /[dD]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2927,7 +3052,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("DT" ~ /[oO]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3067,7 +3192,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("DT" ~ /[bB]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3202,7 +3327,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("DT" ~ /[mM]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3275,7 +3400,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("DT" ~ /[fF]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3408,7 +3533,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("DT" ~ /[qQ]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3468,7 +3593,7 @@ function print_dividend_qualification(now, past, is_detailed,
         # If not all units are qualified need to check the second half of the Qualification Window
         if (!(((total_units - qualified_units) <= Epsilon) && ((total_units - qualified_units) >= -Epsilon))) {
           q = maximum_entry(Qualified_Units[underlying_asset], qualifying_date, qualifying_date + 0.5 * Qualification_Window)
-          qualified_units = (((q)>( qualified_units))?(q):( qualified_units))
+          qualified_units = (((q) - ( qualified_units) > 0)?(q):( qualified_units))
           qualified_fraction = qualified_units / total_units
 
           # Should never be greater than unity
@@ -3905,7 +4030,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("DT" ~ /[tT]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4620,7 +4745,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("DT" ~ /[iI]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5204,7 +5329,11 @@ BEGIN {
     # Currently importing Import_Array
     if (!index(Filter_Data, Import_Array_Name))
       # Make sure this array will be filtered
-      Filter_Data = Filter_Data " " Import_Array_Name
+      if ("" != Filter_Data)
+        Filter_Data = Filter_Data "," Import_Array_Name
+      else
+        Filter_Data = Import_Array_Name
+
 
 
 
@@ -6287,7 +6416,7 @@ function checkset(now, a, account, units, amount, is_check,
     switch(action) {
       case "VALUE" :
         assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[(account)])))
-        quantity = get_value(account, now); break
+        quantity = ((((account) ~ /^ASSET\.CAPITAL[.:]/))?( ((__MPX_KEY__ = find_key(Price[account],   now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[account],    now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0))))):( get_cost(account,  now))); break
       case "PRICE" :
         assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[(account)])))
         quantity = ((__MPX_KEY__ = find_key(Price[account],  now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))); break
@@ -6348,7 +6477,7 @@ END {
   # Delete empty accounts
   # Filter out data entries that were added by import CSV records
   # that do not overlap with the the holding period
-  filter_data(Last_Record)
+  filter_data(Last_Record, Filter_Data, (0))
 
   # Make sure any eofy transactions are recorded
   # This loop will happen at least once
@@ -6387,95 +6516,14 @@ END {
     if (!Write_Variables)
       printf "START_JOURNAL\n" > Write_State
   }
+
+  # Log data about selected variables
+  if (Write_Variables)
+    filter_data(Last_Record, Write_Variables, (1))
+
+  # Check
 } #// END
 #
-
-#
-# Filter Data
-#
-# Filter out irrelevant data - data that is out-of-range
-# can arise from importing records
-#
-function filter_data(now,      array_names, name) {
-  # Which data arrays are to be filtered
-  if (!split(Filter_Data, array_names, " "))
-    return # Nothing to filter
-
-  # Filter the data arrays
-  for (name in array_names)
-    filter_array(now, SYMTAB[array_names[name]], array_names[name])
-}
-
-# Handle each array in turn
-function filter_array(now, data_array, name,
-                           a, p, start_block, end_block, block_id,
-                           stack, key) {
-
-
-  # list holding "blocks" - ie non-overlapping holding periods
-  # Each block is preceeded and/or followed by "gaps"
-  for (a in Leaf)
-    if ((a in data_array) && ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/))
-      if ((Held_From[(a)][0] > Epoch)) {
-        # Get each parcel in turn and list the contiguous blocks of time held
-        start_block = Held_From[a][0]
-        end_block = Held_Until[a][0]
-        block_id = 0
-        for (p = 1; p < Number_Parcels[a]; p ++) {
-          # This starts a new holding block if the purchase date is after the current end date
-          if (((Held_From[a][p] -  end_block) > 0)) {
-            # Filter the old block
-
-
-            # # Check the data against each block
-            for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
-
-            # Remove anything kept to speed up processing
-            for (key in stack)
-              delete data_array[a][key]
-
-            # A new block
-            block_id ++
-            start_block = Held_From[a][p]
-            end_block = Held_Until[a][p]
-          } else if (((Held_Until[a][p] -  end_block) > 0)) # extend the old block
-            end_block = Held_Until[a][p]
-
-          # If this parcel is open we have completed all possible blocks
-          if ((Held_Until[(a)][( p)] > ( now)))
-            break
-        } # End of each parcel p
-
-        # The last holding block
-
-          # Check the data against each block
-          for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
-
-
-        # Copy the kept items back
-        for (key in stack)
-          data_array[a][key] = stack[key]
-        delete stack
-
-      } else {
-        # Never held!
-
-        unlink_account(a)
-      }
-
-
-    # End of each asset a
-}
-
-# The current value of an asset
-function get_value(a, now) {
-  # Depreciating assets are different
-  if (((a) ~ /^ASSET\.CAPITAL[.:]/))
-    return (((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))))
-
-  # Just the cost
-  return get_cost(a, now)
-}
 
 # Sell qualified units
 # This is trickier than ordinary units

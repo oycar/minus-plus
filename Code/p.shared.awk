@@ -1698,6 +1698,130 @@ function unlink_account(a) {
     delete Leaf[a]
 }
 
+
+#
+# Filter Data
+#
+# Filter out irrelevant data - data that is out-of-range
+# can arise from importing records
+#
+function filter_data(now, variable_names, show_details,    array_names, name) {
+  # Which data arrays are to be filtered
+  if (!split(variable_names, array_names, ","))
+    return # Nothing to filter
+
+  # Should we log
+@ifeq LOG filter_data
+   show_details = TRUE
+@endif
+
+  # Filter the data arrays
+  for (name in array_names)
+    filter_array(now, SYMTAB[array_names[name]], array_names[name], show_details)
+}
+
+# Handle each array in turn
+function filter_array(now, data_array, name, show_blocks,
+                           a, p, start_block, end_block, block_id,
+                           stack, key, first_key,
+                           earliest_key, latest_key) {
+
+  # Record the earlist and latest keys found
+  if (show_blocks) {
+    # Report on data held
+    print Journal_Title > STDERR
+    printf "%s Data Held Report for Period Ending %s\n\n", name, get_date(now)  > STDERR
+
+    earliest_key = Future
+    latest_key   = Epoch
+  }
+
+  # list holding "blocks" - ie non-overlapping holding periods
+  # Each block is preceeded and/or followed by "gaps"
+  for (a in Leaf)
+    if ((a in data_array) && is_unitized(a))
+      if (ever_held(a)) {
+        # Get each parcel in turn and list the contiguous blocks of time held
+        start_block = Held_From[a][0]
+        end_block = Held_Until[a][0]
+        block_id = 0
+        for (p = 1; p < Number_Parcels[a]; p ++) {
+          # This starts a new holding block if the purchase date is after the current end date
+          if (greater_than(Held_From[a][p], end_block)) {
+            # Check the data against each block
+            filter_block(key, data_array[a], start_block, end_block)
+
+            # Remove originals of copies data to speed up processing of remaining entries
+            for (key in stack)
+              delete data_array[a][key]
+
+            # A new block
+            block_id ++
+            start_block = Held_From[a][p]
+            end_block = Held_Until[a][p]
+          } else if (greater_than(Held_Until[a][p], end_block)) # extend the old block
+            end_block = Held_Until[a][p]
+
+          # If this parcel is open we have completed all possible blocks
+          if (is_unsold(a, p, now))
+            break
+        } # End of each parcel p
+
+        # Check the data against each block
+        filter_block(key, data_array[a], start_block, end_block)
+        if (show_blocks)
+          # Get first key
+          for (first_key in stack) {
+            # Record latest key
+            latest_key = max_value(latest_key, first_key)
+            break
+          }
+
+        # Some simple formatting
+        if (Show_Extra && show_blocks)
+          printf "\n" > STDERR
+
+        # Copy the kept items back
+        for (key in stack) {
+          data_array[a][key] = stack[key]
+
+          # Show this data when detailed reporting is enabled
+          if (Show_Extra && show_blocks)
+            printf "%22s\t %s => %s\n", Leaf[a], get_date(key), format_value(stack[key]) > STDERR
+        }
+
+        # get last key and show range of keys
+        if (show_blocks && (key in stack)) {
+          if (key != first_key)
+            # More than one key
+            printf "%22s\t[%s, %s]\n", Leaf[a], get_date(key), get_date(first_key) > STDERR
+          else if (!Show_Extra)
+            # Only one key in this block - already recorded if Show_Extra set
+            printf "%22s\t[%s]\n", Leaf[a], get_date(first_key) > STDERR
+
+          # Record earliest key
+          earliest_key = min_value(earliest_key, key)
+        }
+
+        # Clean up
+        delete stack
+
+      } else {
+        # Never held!
+        if (show_blocks)
+          printf "%22s\tNever Held!\n", Leaf[a] > STDERR
+
+        unlink_account(a)
+      }
+    # End of each asset a
+
+    # Final Summary
+    if (show_blocks) {
+      underline(44, 6, STDERR)
+      printf "%22s\t[%s, %s]\n\n", name, get_date(earliest_key), get_date(latest_key) > STDERR
+    }
+}
+
 ##
 ## Some tax functions
 

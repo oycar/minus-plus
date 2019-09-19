@@ -281,7 +281,11 @@ BEGIN {
     # Currently importing Import_Array
     if (!index(Filter_Data, Import_Array_Name))
       # Make sure this array will be filtered
-      Filter_Data = Filter_Data " " Import_Array_Name
+      if ("" != Filter_Data)
+        Filter_Data = Filter_Data "," Import_Array_Name
+      else
+        Filter_Data = Import_Array_Name
+
 
 @ifeq LOG import_record
     printf "Import %s\n",  Import_Array_Name > STDERR
@@ -1487,7 +1491,7 @@ END {
   # Delete empty accounts
   # Filter out data entries that were added by import CSV records
   # that do not overlap with the the holding period
-  filter_data(Last_Record)
+  filter_data(Last_Record, Filter_Data, FALSE)
 
   # Make sure any eofy transactions are recorded
   # This loop will happen at least once
@@ -1526,107 +1530,14 @@ END {
     if (!Write_Variables)
       printf "START_JOURNAL\n" > Write_State
   }
+
+  # Log data about selected variables
+  if (Write_Variables)
+    filter_data(Last_Record, Write_Variables, TRUE)
+
+  # Check
 } #// END
 #
-
-#
-# Filter Data
-#
-# Filter out irrelevant data - data that is out-of-range
-# can arise from importing records
-#
-function filter_data(now,      array_names, name) {
-  # Which data arrays are to be filtered
-  if (!split(Filter_Data, array_names, " "))
-    return # Nothing to filter
-
-  # Filter the data arrays
-  for (name in array_names)
-    filter_array(now, SYMTAB[array_names[name]], array_names[name])
-}
-
-# Handle each array in turn
-function filter_array(now, data_array, name,
-                           a, p, start_block, end_block, block_id,
-                           stack, key) {
-@ifeq LOG filter_data
- printf "Filter Data %s\n", name > STDERR
-@endif
-
-  # list holding "blocks" - ie non-overlapping holding periods
-  # Each block is preceeded and/or followed by "gaps"
-  for (a in Leaf)
-    if ((a in data_array) && is_unitized(a))
-      if (ever_held(a)) {
-        # Get each parcel in turn and list the contiguous blocks of time held
-        start_block = Held_From[a][0]
-        end_block = Held_Until[a][0]
-        block_id = 0
-        for (p = 1; p < Number_Parcels[a]; p ++) {
-          # This starts a new holding block if the purchase date is after the current end date
-          if (greater_than(Held_From[a][p], end_block)) {
-            # Filter the old block
-@ifeq LOG filter_data
-            # List this block
-            printf "%12s, %03d, %s, %s\n", Leaf[a], block_id, get_date(start_block), get_date(end_block) > STDERR
-@endif
-
-            # # Check the data against each block
-            filter_block(key, data_array[a], start_block, end_block)
-
-            # Remove anything kept to speed up processing
-            for (key in stack)
-              delete data_array[a][key]
-
-            # A new block
-            block_id ++
-            start_block = Held_From[a][p]
-            end_block = Held_Until[a][p]
-          } else if (greater_than(Held_Until[a][p], end_block)) # extend the old block
-            end_block = Held_Until[a][p]
-
-          # If this parcel is open we have completed all possible blocks
-          if (is_unsold(a, p, now))
-            break
-        } # End of each parcel p
-
-        # The last holding block
-@ifeq LOG filter_data
-          printf "%12s, %03d, %s, %s\n", Leaf[a], block_id, get_date(start_block), get_date(end_block) > STDERR
-@endif
-          # Check the data against each block
-          filter_block(key, data_array[a], start_block, end_block)
-
-@ifeq LOG filter_data
-        for (key in stack)
-          printf "\tKeep   => %s\n", get_date(key) > STDERR
-@endif
-        # Copy the kept items back
-        for (key in stack)
-          data_array[a][key] = stack[key]
-        delete stack
-
-      } else {
-        # Never held!
-@ifeq LOG filter_data
-        printf "%12s Never Held!\n", Leaf[a] > STDERR
-@endif
-        unlink_account(a)
-      }
-
-
-    # End of each asset a
-}
-
-# The current value of an asset
-function get_value(a, now) {
-  # Depreciating assets are different
-  if (is_capital(a))
-    return (find_entry(Price[a], now) * get_units(a, now))
-
-  # Just the cost
-  return get_cost(a, now)
-}
 
 # Sell qualified units
 # This is trickier than ordinary units

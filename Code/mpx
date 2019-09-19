@@ -36,7 +36,7 @@ MPXDIR=~/Cloudstation/Projects/Minus-Plus/Code
 USAGE="Usage: $(basename $0) [-a: show-account-transactions] [-c: journal-currency] [-e export-format] [-f: financial-year] [-i mpx-information-and-copyright-notice]\
  [-l: log-function] [-p: write-price-file] [-s: stop-time]\
  [-v write-variable-1,write_variable-2,...] [-w: write-state-file] [-x show-extra-detail] [-z preprocess_only]\
- [-ABCDFMOQTZ extra-report-toggles] <data-import-file> <state-file> <journal-file>"
+ [-ABCDFIMOQTZ extra-report-toggles] <data-import-file> <state-file> <journal-file>"
 
 # This is a simple front end for mpx
 # it handles arguments and runs the preprocessor
@@ -52,6 +52,7 @@ preprocess_only=false
 stop_time=""
 Show_Extra=0
 Show_Reports="" # Default reports
+fs=""
 
 # Default journal currency and type
 journal_currency="AUD"
@@ -123,7 +124,8 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
       echo "Stop Time => ${stop_time}";;
 
     v) # Generalized variable selection
-      write_variables="${OPTARG}";;
+      write_variables=${write_variables}${fs}${OPTARG}
+      fs=",";;
 
     w) #   Write state to this file
       wfile $OPTARG

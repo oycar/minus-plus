@@ -284,7 +284,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                  14, print_cash(- gains),
                  14, description,
                  14, print_cash(- parcel_gains),
-                 14, print_cash(- parcel_gains / units, 4) > reports_stream
+                 14, print_cash(parcel_cost / units, 4) > reports_stream
 
             # Clear label
             label = ""

@@ -134,6 +134,9 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define is_linked(a) ((Leaf[a]) ~ /^(DIV|DIST|FOR)\./)
 
 
+# // The current value of an asset
+@define get_value(a, now) ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))
+
 # // char code lookup
 @define get_char(c) ternary(c in URL_Lookup, URL_Lookup[c], (0))
 
@@ -224,8 +227,8 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 @define set_scalar(var,x) (SYMTAB[var] = x)
 @define abs_value(x) ternary((x) < 0, -(x),x)
-@define max_value(x,y) ternary((x)>(y),x,y)
-@define min_value(x,y) ternary((x)<(y),x,y)
+@define max_value(x,y) ternary((x) - (y) > 0,x,y)
+@define min_value(x,y) ternary((x) - (y) < 0,x,y)
 @define accumulated_profits(t) (get_cost("*INCOME.CONTRIBUTION",t) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",t) - get_cost("*INCOME",t) - get_cost("*EXPENSE",t))
 
 # // Control precise timings of costs
@@ -246,6 +249,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define write_back_limit(t) ternary(WRITE_BACK_LIMIT, (t - one_year(t, WRITE_BACK_LIMIT)), Epoch)
 
 # // Multi-Line Macro
+# // Gets the entries in the data which lie within the [block] (including end points)
 @define filter_block(key, data, start, end) for (key in data) {\
   if (key - end > 0)\
     continue;\
