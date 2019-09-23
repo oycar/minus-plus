@@ -2721,7 +2721,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                  14, print_cash(- gains),
                  14, description,
                  14, print_cash(- parcel_gains),
-                # 14, print_cash(- parcel_gains / units, 4) > reports_stream
                  14, print_cash(parcel_cost / units, 4) > reports_stream
 
             # Clear label
@@ -2812,7 +2811,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("DT" ~ /[cC]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -3007,7 +3006,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("DT" ~ /[dD]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -3052,7 +3051,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("DT" ~ /[oO]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3192,7 +3191,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("DT" ~ /[bB]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3327,7 +3326,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("DT" ~ /[mM]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3400,7 +3399,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("DT" ~ /[fF]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[fF]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3533,7 +3532,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("DT" ~ /[qQ]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3610,7 +3609,8 @@ function print_dividend_qualification(now, past, is_detailed,
         qualified_payment += qualified_fraction * payment
 
         # Make the appropriate changes for the current tax jurisdiction
-        @Dividend_Qualification_Function(a, underlying_asset, key, 1.0 - qualified_fraction)
+##        @Dividend_Qualification_Function(a, underlying_asset, key, 1.0 - qualified_fraction)
+        @Dividend_Qualification_Function(a, key, 1.0 - qualified_fraction)
 
         # Get the next key
         key = next_key
@@ -3947,9 +3947,6 @@ BEGIN {
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
   #
-  #
-  # # Franking deficit
-  # FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # For super funds the amount claimable is sometimes reduced to 75%
   Reduced_GST   = 0.75
@@ -4030,7 +4027,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("DT" ~ /[tT]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4698,8 +4695,10 @@ function get_taxable_gains(now, losses,
 #
 ## Dividend Qualification Function
 ##
-function dividend_qualification_aud(a, underlying_asset, now, unqualified,
+##function dividend_qualification_aud(a, underlying_asset, now, unqualified,
+function dividend_qualification_aud(a, now, unqualified,
 
+                                       underlying_asset,
                                        unqualified_account, imputation_credits) {
 
   # For Australia we need to adjust tax credits associated with an account
@@ -4709,9 +4708,11 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     return
 
   # Were there any tax credits anyway?
-  if (underlying_asset in Tax_Credits) {
+  if (a in Tax_Credits) {
+    underlying_asset = Underlying_Asset[a]
+
     # Get the Imputation credits associated with this transaction - and only this transaction
-    imputation_credits = (get_cost(Tax_Credits[underlying_asset],  now) - get_cost(Tax_Credits[underlying_asset], (( now) - 1)))
+    imputation_credits = (get_cost(Tax_Credits[a],  now) - get_cost(Tax_Credits[a], (( now) - 1)))
     if (!(((imputation_credits) <= Epsilon) && ((imputation_credits) >= -Epsilon))) {
       # Create an unqualified account
       unqualified_account = initialize_account("SPECIAL.FRANKING.OFFSET.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
@@ -4745,7 +4746,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("DT" ~ /[iI]|[aA]/ && "DT" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5620,6 +5621,7 @@ function set_special_accounts() {
 
   # Franking deficit offset
   # Other offsets stored in unique accounts with same branch name
+  #FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
   FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # Franking tax account - a creditor like account
@@ -5955,13 +5957,13 @@ function parse_transaction(now, a, b, units, amount,
     else
       underlying_asset = (0)
 
-    # Foreign or franking credits - could be made more general?
+    # Foreign or franking credits
     if (!(((tax_credits) <= Epsilon) && ((tax_credits) >= -Epsilon))) {
       # Keep an account of tax credits
       # We need the underlying asset to
       assert(underlying_asset, sprintf("Income account %s must have an underlying asset to receive tax credits", Leaf[a]))
-      if (underlying_asset in Tax_Credits)
-        credit_account = Tax_Credits[underlying_asset]
+      if (a in Tax_Credits)
+        credit_account = Tax_Credits[a]
       else {
         # Create tax credits account - just in time
         # Type of credits account depends on the underlying asset
@@ -5970,17 +5972,26 @@ function parse_transaction(now, a, b, units, amount,
         # INCOME.FOREIGN      => SPECIAL.FOREIGN.OFFSET
         #
         if (((a) ~ ("^" ( "INCOME.DIVIDEND") "[.:]")) || ((a) ~ ("^" ( "INCOME.DISTRIBUTION") "[.:]")))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
         else if (((a) ~ ("^" ( "INCOME.FOREIGN") "[.:]")))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FOREIGN.OFFSET:C_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.OFFSET.FOREIGN:C_TAX." Leaf[underlying_asset])
         else
           assert((0), sprintf("Can't link a tax credit account to income account %s", a))
       }
 
-      # Adjust franking account and credit account
-      adjust_cost(FRANKING, tax_credits, now)
+      # Adjust credit account
       adjust_cost(credit_account, - tax_credits, now)
-      print_transaction(now, ("# " Leaf[underlying_asset] " Tax Credits"), credit_account, FRANKING, 0, tax_credits)
+
+      # Adjust franking account when necessary
+      if (((a) ~ ("^" ( "INCOME.FOREIGN") "[.:]"))) {
+        # Foreign Credits
+        adjust_cost(NULL, tax_credits, now)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, 0, tax_credits)
+      } else {
+        # Frannking Credits
+        adjust_cost(FRANKING, tax_credits, now)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, 0, tax_credits)
+      }
     } else
       tax_credits = 0
 

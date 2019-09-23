@@ -1193,7 +1193,7 @@ function print_dividend_qualification(now, past, is_detailed,
         qualified_payment += qualified_fraction * payment
 
         # Make the appropriate changes for the current tax jurisdiction
-        @Dividend_Qualification_Function(a, underlying_asset, key, 1.0 - qualified_fraction)
+        @Dividend_Qualification_Function(a, key, 1.0 - qualified_fraction)
 
         # Get the next key
         key = next_key

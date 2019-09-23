@@ -579,6 +579,7 @@ function set_special_accounts() {
 
   # Franking deficit offset
   # Other offsets stored in unique accounts with same branch name
+  #FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
   FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # Franking tax account - a creditor like account
@@ -922,13 +923,13 @@ function parse_transaction(now, a, b, units, amount,
     else
       underlying_asset = FALSE
 
-    # Foreign or franking credits - could be made more general?
+    # Foreign or franking credits
     if (!near_zero(tax_credits)) {
       # Keep an account of tax credits
       # We need the underlying asset to
       assert(underlying_asset, sprintf("Income account %s must have an underlying asset to receive tax credits", Leaf[a]))
-      if (underlying_asset in Tax_Credits)
-        credit_account = Tax_Credits[underlying_asset]
+      if (a in Tax_Credits)
+        credit_account = Tax_Credits[a]
       else {
         # Create tax credits account - just in time
         # Type of credits account depends on the underlying asset
@@ -937,17 +938,26 @@ function parse_transaction(now, a, b, units, amount,
         # INCOME.FOREIGN      => SPECIAL.FOREIGN.OFFSET
         #
         if (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION"))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
         else if (is_class(a, "INCOME.FOREIGN"))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FOREIGN.OFFSET:C_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.OFFSET.FOREIGN:C_TAX." Leaf[underlying_asset])
         else
           assert(FALSE, sprintf("Can't link a tax credit account to income account %s", a))
       }
 
-      # Adjust franking account and credit account
-      adjust_cost(FRANKING, tax_credits, now)
+      # Adjust credit account
       adjust_cost(credit_account, - tax_credits, now)
-      print_transaction(now, ("# " Leaf[underlying_asset] " Tax Credits"), credit_account, FRANKING, 0, tax_credits)
+
+      # Adjust franking account when necessary
+      if (is_class(a, "INCOME.FOREIGN")) {
+        # Foreign Credits
+        adjust_cost(NULL, tax_credits, now)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, 0, tax_credits)
+      } else {
+        # Frannking Credits
+        adjust_cost(FRANKING, tax_credits, now)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, 0, tax_credits)
+      }
     } else
       tax_credits = 0
 

@@ -77,9 +77,6 @@ BEGIN {
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
   #
-  #
-  # # Franking deficit
-  # FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # For super funds the amount claimable is sometimes reduced to 75%
   Reduced_GST   = 0.75
@@ -897,8 +894,10 @@ function get_taxable_gains(now, losses,
 #
 ## Dividend Qualification Function
 ##
-function dividend_qualification_aud(a, underlying_asset, now, unqualified,
+##function dividend_qualification_aud(a, underlying_asset, now, unqualified,
+function dividend_qualification_aud(a, now, unqualified,
 
+                                       underlying_asset,
                                        unqualified_account, imputation_credits) {
 
   # For Australia we need to adjust tax credits associated with an account
@@ -908,9 +907,11 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     return
 
   # Were there any tax credits anyway?
-  if (underlying_asset in Tax_Credits) {
+  if (a in Tax_Credits) {
+    underlying_asset = Underlying_Asset[a]
+
     # Get the Imputation credits associated with this transaction - and only this transaction
-    imputation_credits = get_delta_cost(Tax_Credits[underlying_asset], now)
+    imputation_credits = get_delta_cost(Tax_Credits[a], now)
     if (!near_zero(imputation_credits)) {
       # Create an unqualified account
       unqualified_account = initialize_account("SPECIAL.FRANKING.OFFSET.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
@@ -919,9 +920,9 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
       unqualified *= imputation_credits
 @ifeq LOG dividend_qualification
       printf "Underlying Asset %s\n", Leaf[underlying_asset] > STDERR
-      printf "\tTax Credits %s[%s]      => %s\n", Leaf[Tax_Credits[underlying_asset]], get_date(now), print_cash(- imputation_credits) > STDERR
+      printf "\tTax Credits %s[%s]      => %s\n", Leaf[Tax_Credits[a]], get_date(now), print_cash(- imputation_credits) > STDERR
       printf "\tUnqualified Tax Credits => %s\n", print_cash(- unqualified) > STDERR
-      printf "\tTotal Tax Credits       => %s\n", print_cash(- get_cost(Tax_Credits[underlying_asset], now)) > STDERR
+      printf "\tTotal Tax Credits       => %s\n", print_cash(- get_cost(Tax_Credits[a], now)) > STDERR
       printf "\tFranking Balance        => %s\n", print_cash(get_cost(FRANKING, now)) > STDERR
       printf "\tTotal Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, now)) > STDERR
 @endif
