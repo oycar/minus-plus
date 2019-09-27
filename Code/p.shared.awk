@@ -399,11 +399,6 @@ function ctrim(s, left_c, right_c,      string) {
   return s
 }
 
-# # Is a number between two others? (allow boundary cases to be inside)
-# function is_between(x, low, high) {
-#   return  (x - low) * (x - high) <= 0
-# }
-
 # Clear global values ready to read a new input record
 function new_line() {
   Extra_Timestamp = DATE_ERROR
@@ -415,7 +410,7 @@ function new_line() {
   GST_Claimable = 0
   Depreciation_Type = ""
   Comments = ""
-  Documents = ""
+
   Account[1] = Account[2] = ""
 }
 
@@ -435,7 +430,7 @@ function print_cash(x,   precision) {
 # Possible record styles
 # Journal styles (date format is somewhat flexible)
 #      2017 Aug 24, AMH.DIV, AMH.ASX, 3072, 2703.96, [1025.64,] [1655.49], # DRP & LIC
-function parse_line(now,    current_field, i, j, x, number_accounts) {
+function parse_line(now,    i, j, x, number_accounts) {
   #
   # The record may be
   #     Double Entry => two accounts
@@ -484,7 +479,7 @@ function parse_line(now,    current_field, i, j, x, number_accounts) {
   #   units < 0 => SELL cost element I
   #
   #  A blank or zero
-  #    units == 0 => Cost Base elelment II (the default)
+  #    units == 0 => Cost Base element II (the default)
   #
   #  A string  (roman numbers I to V are meaningful but could be anything without brackets)
   #    units == I   => Cost Base element I
@@ -578,7 +573,7 @@ function parse_line(now,    current_field, i, j, x, number_accounts) {
 
       # Treat as a comment
       if (x)
-        Comments = add_field(Comments, x)
+        Comments = add_field(Comments, x, ", ")
     }
 
     # Increment i
@@ -587,13 +582,163 @@ function parse_line(now,    current_field, i, j, x, number_accounts) {
 
   # Comments should be signified with an octothorpe
   if (Comments !~ /^#/)
-    Comments = add_field("# ", Comments)
+    Comments = add_field("# ", Comments, ", ")
 
-  # A document name is added as a final comment
-  Comments = add_field(Comments, Documents)
+  # Documents can be added as comments
+  # Some special document names are supported
+  # So for example [<Buy>] expands to ABC Buy YYYY Mon
+  # and            [<Chess.x>] expands to ABC Chess YYYY Mon DD
+  for (x in Documents) {
+    delete Documents[x]
+
+    # Parse this document name
+    i = parse_document_name(x, now)
+
+    # Add the parsed name to the comments
+    Comments = add_field(Comments, i, ", ")
+  }
 
   # All done - return record type
   return number_accounts
+}
+
+
+# A document name may contain a filetype suffix
+function parse_document_name(name, now,    prefix, suffix, account_name, array, suffix_set) {
+
+  # Looks for special strings accompanied by a literal string
+  #
+  #   [B:literal] => Account Buy  (or Sell) YYYY Mon(literal)
+  #   [S:literal] => Account Sell (or Buy)
+  #   [H:literal] => Account Holding Statement
+  #   [I:literal]
+  #   [E:literal]
+  #   [:literal] => prepends the date
+  #   [literal:] => appends the date
+  #   [:]        => just the date
+  #   [literal]  => just the literal
+  #
+  #  If the colon is needed in a string literal a different Document_Shortcut code can be set in the Journal file
+  #
+  # <<, Document_Shortcut, =,>>
+  # 2008 Jun 30, INCOME.FOREIGN:FOR.PXUPA.ASX,          CASH,          0,      726.63, [PX:UPA Distribution=], # PX:UPA distribution
+  # <<, Document_Shortcut, :,>>
+
+    # Split the code name
+    # Use name component because we want the capture all the components apart from the first
+    if (split(name, array, Document_Shortcut) > 1) {
+      suffix = get_name_component(name, 2, -1, array)
+      suffix_set = TRUE
+    } else
+      suffix_set = FALSE
+
+    prefix = get_name_component(name, 1, 1, array)
+
+    #
+    switch (prefix) {
+      case "B" :
+      case "S":
+      case "H":
+
+        # Is this a buy, sell or holding statement?
+        if (units < 0 || "SELL" == Write_Units) {
+          prefix = ternary("H" == prefix, "Holding Statement", "Sell")
+          account_name = get_name_component(Leaf[Account[1]], 1)
+        } else {
+          prefix = ternary("H" == prefix, "Holding Statement", "Buy")
+          account_name = get_name_component(Leaf[Account[2]], 1)
+        }
+
+        # Add the date
+        prefix = prefix " " get_date(now, SHORT_FORMAT)
+      break;;
+
+      case "I":
+      case "D": # Income
+        if (is_linked(Account[1]))
+          account_name = get_name_component(Leaf[Account[1]], 2)
+        else
+          account_name = get_name_component(Leaf[Account[1]], 1)
+
+        # The second component of the account name (unless this is accrued income)
+        if (is_class(Account[1], "ASSET.CURRENT.ACCRUED"))
+          prefix = "Distribution " get_date(now, SHORT_FORMAT)
+        else
+          prefix = tolower(get_name_component(Account[1], 2)) " " get_date(now, SHORT_FORMAT)
+        break;;
+
+      case "C":
+      case "E": # Expense or Cost
+        account_name = get_name_component(Leaf[Account[2]], 1)
+
+        # The second component of the account name is not used here...?
+        prefix = "Expense " get_date(now, SHORT_FORMAT)
+        #prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, SHORT_FORMAT)
+        break;;
+
+      case "T": # Annual Tax Statement
+        account_name = get_name_component(Leaf[Account[2]], 1)
+        prefix = "Annual Tax Statement " get_year_number(now)
+        break;;
+
+      default: # no match - assume this is a literal string
+        # When a distinct suffix is present add the date
+        if (suffix_set)
+          prefix = add_field(prefix, get_date(now, SHORT_FORMAT), " ")
+
+        account_name = ""
+        break;;
+    } # End of switch
+
+    # We have at this point
+    #
+    #  prefix => Type of transaction, eg Buy, Dividend etc
+    #  account_name => BHP, AUS_BOND etc
+    #  suffix => Literal string
+    #
+    #  Or
+    #
+    #  prefix => ""
+    #  account_name => ""
+    #  suffix => Literal string
+    #
+
+    # Is there an account name?
+    if ("" != account_name)
+      prefix = account_name " " cap_string(prefix)
+
+    # Final parsed document name
+    prefix = add_field(prefix, suffix)
+
+    # Return either urlencoded version or the parsed name
+    # The parsed name indicates that the document is missing
+    return url_document_name(prefix)
+}
+
+# Get a version of a document name that can be used as a url
+function url_document_name(string,   filename, filetype, z, i, n) {
+
+  # How many dotted fields?
+  n = split(string, z, ".")
+
+  # If more than one last is treated as filetype
+  if (n > 1)
+    filetype = url_encode(z[n])
+  else # Default filetype
+    filetype = Document_Filetype
+
+  # Is this document missing?
+  if (document_missing(Document_Root string "." filetype))
+    # No such document - leave unconverted - this indicates that file is missing
+    return ("[[" string "]]")
+
+  # Process  the filename elements
+  filename = url_encode(z[1])
+  for (i = 2; i < n; i ++)
+    filename = filename "." url_encode(z[i])
+
+  # return result
+  return (Document_URI filename "." filetype)
 }
 
 # Parse optional value
@@ -678,40 +823,19 @@ function parse_optional_string(field, save_document,    string, x) {
     return string
   }
 
-  # Only save the document name if non trivial and if requested
-  if ("" != string && "" != save_document) {
-    # Add any document names
-    if (!(string in Document_Name))
-      Document_Name[string] = parse_document_name(string)
-
-    # Add to Documents
-    Documents = add_field(Documents, Document_Name[string])
-  }
+  # A document name if we get here - save this
+  # An empty string means the input string is [] => use default string
+  # First version - replicate earlier behaviour
+  if ("" != string && "" != save_document)
+    # Can only have one example of each unique string...
+    if (!(string in Documents))
+      Documents[string] = string
 
   # All done
   return ""
 }
 
 
-# A document name may contain a filetype suffix
-function parse_document_name(string,    filename, filetype, z, i, n) {
-  # How many dotted fields?
-  n = split(string, z, ".")
-
-  # If more than one last is treated as filetype
-  if (n > 1)
-    filetype = url_encode(z[n])
-  else # Default filetype
-    filetype = Document_Filetype
-
-  # Process  the filename elements
-  filename = url_encode(z[1])
-  for (i = 2; i < n; i ++)
-    filename = filename "." url_encode(z[i])
-
-  # return result
-  return Document_Root filename "." filetype
-}
 
 # Is units a numerical value?
 function parse_units(u, units,      len) {
@@ -969,7 +1093,7 @@ function get_name_component(name, i, number_components, array,    name_length, s
   }
 
   # All done - add a line of code for debugging/trapping
-  assert("" != s, sprintf("Requested component <%d> couldn't be found in %s", i, name))
+  # assert("" != s, sprintf("Requested component <%d> couldn't be found in %s", i, name))
   return s
 }
 
@@ -1517,6 +1641,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     # At a parcel's sale they determine taxable
     # capital gains and losses
     # Stored (as sums) by parcel, cost element and time
+    # eg Accounting_Cost[account][parcel][element][time]
     Accounting_Cost[account_name][0][0][SUBSEP] = 0
     zero_costs(Accounting_Cost[account_name][0], SUBSEP)
     for (p in Accounting_Cost[account_name][0])
@@ -1546,7 +1671,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     #
     # (DIV|DIST|FOR).LEAF => LEAF
     #
-    if (is_linked(leaf_name)) {
+    if (is_linked(account_name)) {
       # Probably a better way to do this using a regex
       linked_name = get_name_component(leaf_name, 2, -1)
 
@@ -1559,7 +1684,6 @@ function initialize_account(account_name,     class_name, array, p, n,
       printf "\tLinked Account[%s] => %s\n", linked_name, Underlying_Asset[account_name] > STDERR
 @endif
     }
-
   }
 
   # Initialize account with common entries
@@ -1573,6 +1697,130 @@ function initialize_account(account_name,     class_name, array, p, n,
 function unlink_account(a) {
   if (a in Leaf)
     delete Leaf[a]
+}
+
+
+#
+# Filter Data
+#
+# Filter out irrelevant data - data that is out-of-range
+# can arise from importing records
+#
+function filter_data(now, variable_names, show_details,    array_names, name) {
+  # Which data arrays are to be filtered
+  if (!split(variable_names, array_names, ","))
+    return # Nothing to filter
+
+  # Should we log
+@ifeq LOG filter_data
+   show_details = TRUE
+@endif
+
+  # Filter the data arrays
+  for (name in array_names)
+    filter_array(now, SYMTAB[array_names[name]], array_names[name], show_details)
+}
+
+# Handle each array in turn
+function filter_array(now, data_array, name, show_blocks,
+                           a, p, start_block, end_block, block_id,
+                           stack, key, first_key,
+                           earliest_key, latest_key) {
+
+  # Record the earlist and latest keys found
+  if (show_blocks) {
+    # Report on data held
+    print Journal_Title > STDERR
+    printf "%s Data Held Report for Period Ending %s\n\n", name, get_date(now)  > STDERR
+
+    earliest_key = Future
+    latest_key   = Epoch
+  }
+
+  # list holding "blocks" - ie non-overlapping holding periods
+  # Each block is preceeded and/or followed by "gaps"
+  for (a in Leaf)
+    if ((a in data_array) && is_unitized(a))
+      if (ever_held(a)) {
+        # Get each parcel in turn and list the contiguous blocks of time held
+        start_block = Held_From[a][0]
+        end_block = Held_Until[a][0]
+        block_id = 0
+        for (p = 1; p < Number_Parcels[a]; p ++) {
+          # This starts a new holding block if the purchase date is after the current end date
+          if (greater_than(Held_From[a][p], end_block)) {
+            # Check the data against each block
+            filter_block(key, data_array[a], start_block, end_block)
+
+            # Remove originals of copies data to speed up processing of remaining entries
+            for (key in stack)
+              delete data_array[a][key]
+
+            # A new block
+            block_id ++
+            start_block = Held_From[a][p]
+            end_block = Held_Until[a][p]
+          } else if (greater_than(Held_Until[a][p], end_block)) # extend the old block
+            end_block = Held_Until[a][p]
+
+          # If this parcel is open we have completed all possible blocks
+          if (is_unsold(a, p, now))
+            break
+        } # End of each parcel p
+
+        # Check the data against each block
+        filter_block(key, data_array[a], start_block, end_block)
+        if (show_blocks)
+          # Get first key
+          for (first_key in stack) {
+            # Record latest key
+            latest_key = max_value(latest_key, first_key)
+            break
+          }
+
+        # Some simple formatting
+        if (Show_Extra && show_blocks)
+          printf "\n" > STDERR
+
+        # Copy the kept items back
+        for (key in stack) {
+          data_array[a][key] = stack[key]
+
+          # Show this data when detailed reporting is enabled
+          if (Show_Extra && show_blocks)
+            printf "%22s\t %s => %s\n", Leaf[a], get_date(key), format_value(stack[key]) > STDERR
+        }
+
+        # get last key and show range of keys
+        if (show_blocks && (key in stack)) {
+          if (key != first_key)
+            # More than one key
+            printf "%22s\t[%s, %s]\n", Leaf[a], get_date(key), get_date(first_key) > STDERR
+          else if (!Show_Extra)
+            # Only one key in this block - already recorded if Show_Extra set
+            printf "%22s\t[%s]\n", Leaf[a], get_date(first_key) > STDERR
+
+          # Record earliest key
+          earliest_key = min_value(earliest_key, key)
+        }
+
+        # Clean up
+        delete stack
+
+      } else {
+        # Never held!
+        if (show_blocks)
+          printf "%22s\tNever Held!\n", Leaf[a] > STDERR
+
+        unlink_account(a)
+      }
+    # End of each asset a
+
+    # Final Summary
+    if (show_blocks) {
+      underline(44, 6, STDERR)
+      printf "%22s\t[%s, %s]\n\n", name, get_date(earliest_key), get_date(latest_key) > STDERR
+    }
 }
 
 ##
@@ -1734,13 +1982,15 @@ function get_tax(now, bands, total_income,
 function get_taxable_income(now, tax_left,
                                  total_income, band_width, band_tax,
                                  current_key, last_threshold, threshold) {
-  # Which band is the income in?
-  if (near_zero(tax_left))
-    return 0 # Could be any amount less than the tax free threshold
-
   # Now get the tax due on the whole sum
   current_key = find_key(Tax_Bands, now)
   last_threshold = 0
+
+  # When the tax left is zero or negative it must be the first band
+  if (!above_zero(tax_left))
+    return tax_left / Tax_Bands[current_key][last_threshold]
+
+  # Now get the tax due on the whole sum
   total_income = 0
   for (threshold in Tax_Bands[current_key]) {
     # The last band's width
@@ -1795,7 +2045,7 @@ function url_encode(string,     c, chars, url, i) {
     c = chars[i]
 
     # Just prepend plain vanilla characters
-	  if (c ~ /[0-9A-Za-z]/)
+	  if (c ~ /[0-9A-Za-z/\.]/)
 	    url = c url
 	  else # Get the hex code
 	    url = "%" sprintf("%02X", get_char(c)) url

@@ -1,6 +1,8 @@
 @ifndef MPX_H
 @define MPX_H
 @include "assert.awk"
+@load "filefuncs"
+
 
 # // Control Logging
 @ifeq LOG 0
@@ -51,7 +53,8 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 # // Output Date Formats
 @define MONTH_FORMAT ("%Y %b %d") # // 2010 Jun 10
 @define ISO_FORMAT   ("%F")       # // 2010-Jun-10
-@define YEAR_FORMAT  ("%Y") # // 2010
+@define YEAR_FORMAT  ("%Y")       # // 2010
+@define SHORT_FORMAT ("%Y %b")    # // 2010 Jun
 
 # // Default Reports
 @define ALL_REPORTS ("a:b:c:d:f:m:o:q:t:z")
@@ -96,7 +99,6 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define ternary(a, b, c) ((a)?(b):(c))
 @define make_array(array)  ternary(SUBSEP in array,TRUE,FALSE)
 
-@define add_field(s, field) ternary("" == s, field, ternary("" == field, s, (s ", " field)))
 @define find_entry(array, now) ternary(__MPX_KEY__ = find_key(array, now), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
 @define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
@@ -129,8 +131,11 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR).LEAF => LEAF
-@define is_linked(a) ((a) ~ /^(DIV|DIST|FOR)\./)
+@define is_linked(a) ((Leaf[a]) ~ /^(DIV|DIST|FOR)\./)
 
+
+# // The current value of an asset
+@define get_value(a, now) ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))
 
 # // char code lookup
 @define get_char(c) ternary(c in URL_Lookup, URL_Lookup[c], (0))
@@ -222,13 +227,17 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 @define set_scalar(var,x) (SYMTAB[var] = x)
 @define abs_value(x) ternary((x) < 0, -(x),x)
-@define max_value(x,y) ternary((x)>(y),x,y)
-@define min_value(x,y) ternary((x)<(y),x,y)
+@define max_value(x,y) ternary((x) - (y) > 0,x,y)
+@define min_value(x,y) ternary((x) - (y) < 0,x,y)
 @define accumulated_profits(t) (get_cost("*INCOME.CONTRIBUTION",t) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",t) - get_cost("*INCOME",t) - get_cost("*EXPENSE",t))
 
 # // Control precise timings of costs
 @define just_before(t) ((t) - 1)
 @define just_after(t)  ((t) + 1)
+
+# // Formatting
+@define cap_string(s) ternary(s, (toupper(substr(s, 1, 1)) substr(s, 2)), (s))
+@define add_field(s, field, c) ternary("" == s, field, ternary("" == field, s, (s c field)))
 
 # // Include currency definitions
 @include "currency.h"
@@ -240,6 +249,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define write_back_limit(t) ternary(WRITE_BACK_LIMIT, (t - one_year(t, WRITE_BACK_LIMIT)), Epoch)
 
 # // Multi-Line Macro
+# // Gets the entries in the data which lie within the [block] (including end points)
 @define filter_block(key, data, start, end) for (key in data) {\
   if (key - end > 0)\
     continue;\
@@ -253,7 +263,9 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define print_block(c, n, stream) if (TRUE) {while (n-- > 1) printf "%1s", c > stream; print c > stream}
 @define print_line(l, stream) ternary(l, underline(73, 8, stream), underline(47, 8, stream))
 
-# // These two are not very readable
-# // @define get_cash_in(a, i, now) (ternary((now >= Held_From[(a)][(i)]), find_entry(Accounting_Cost[(a)][(i)][I], Held_From[(a)][(i)]), 0))
-# // @define get_cash_out(a, i, now) (ternary(is_sold(a, i, (now) + 1), find_entry(Accounting_Cost[(a)][(i)][0], (now)),0))
+# // A local array
+make_array(__MPX_ARRAY__)
+
+# // This assumes that the file:// protocol is in use - for a network protocol this will not work - so assume document is available
+@define document_missing(name) ternary("file://" == Document_Protocol, stat(name, __MPX_ARRAY__), FALSE)
 @endif # !MPX_H

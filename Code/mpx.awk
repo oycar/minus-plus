@@ -39,6 +39,8 @@ END {
         exit 1
 }
 
+@load "filefuncs"
+
 
 # // Control Logging
 
@@ -86,12 +88,11 @@ END {
 
 
 
-# // Default Reports
-
 
 # // Default Reports
 
 
+# // Default Reports
 
 
 
@@ -132,7 +133,6 @@ END {
 
 
 
-
 #
 # // Useful shorthands for various kinds of accounts
 
@@ -163,6 +163,9 @@ END {
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR).LEAF => LEAF
 
+
+
+# // The current value of an asset
 
 
 # // char code lookup
@@ -263,6 +266,10 @@ END {
 
 
 
+# // Formatting
+
+
+
 # // Include currency definitions
 # // Include currency.h
 # // Currency specification
@@ -296,13 +303,9 @@ END {
 
 
 
+
 # // Carry Forward & Write Back Limits in Years
 
-
-
-
-
-# // A Macro to compute total taxable gains
 
 
 
@@ -315,15 +318,18 @@ END {
 
 
 # // Multi-Line Macro
+# // Gets the entries in the data which lie within the [block] (including end points)
 
 
 # // Print a block of n identical characters
 
 
 
-# // These two are not very readable
-# // @define get_cash_in(a, i, now) (ternary((now >= Held_From[(a)][(i)]), find_entry(Accounting_Cost[(a)][(i)][I], Held_From[(a)][(i)]), 0))
-# // @define get_cash_out(a, i, now) (ternary(is_sold(a, i, (now) + 1), find_entry(Accounting_Cost[(a)][(i)][0], (now)),0))
+# // A local array
+((SUBSEP in __MPX_ARRAY__)?((1)):((0)))
+
+# // This assumes that the file:// protocol is in use - for a network protocol this will not work - so assume document is available
+
 
 
 # p.shared.awk
@@ -675,7 +681,7 @@ function maximum_entry(array, start_bracket, end_bracket,
   key = find_key(array, ((end_bracket) - 1))
   while (key > start_bracket) {
     # Save the maximum found
-    max = (((max)>( array[key]))?(max):( array[key]))
+    max = (((max) - ( array[key]) > 0)?(max):( array[key]))
 
     # Get the next key
     key = find_key(array, ((key) - 1))
@@ -708,11 +714,6 @@ function ctrim(s, left_c, right_c,      string) {
   return s
 }
 
-# # Is a number between two others? (allow boundary cases to be inside)
-# function is_between(x, low, high) {
-#   return  (x - low) * (x - high) <= 0
-# }
-
 # Clear global values ready to read a new input record
 function new_line() {
   Extra_Timestamp = (-1)
@@ -724,7 +725,7 @@ function new_line() {
   GST_Claimable = 0
   Depreciation_Type = ""
   Comments = ""
-  Documents = ""
+
   Account[1] = Account[2] = ""
 }
 
@@ -744,7 +745,7 @@ function print_cash(x,   precision) {
 # Possible record styles
 # Journal styles (date format is somewhat flexible)
 #      2017 Aug 24, AMH.DIV, AMH.ASX, 3072, 2703.96, [1025.64,] [1655.49], # DRP & LIC
-function parse_line(now,    current_field, i, j, x, number_accounts) {
+function parse_line(now,    i, j, x, number_accounts) {
   #
   # The record may be
   #     Double Entry => two accounts
@@ -793,7 +794,7 @@ function parse_line(now,    current_field, i, j, x, number_accounts) {
   #   units < 0 => SELL cost element I
   #
   #  A blank or zero
-  #    units == 0 => Cost Base elelment II (the default)
+  #    units == 0 => Cost Base element II (the default)
   #
   #  A string  (roman numbers I to V are meaningful but could be anything without brackets)
   #    units == I   => Cost Base element I
@@ -887,7 +888,7 @@ function parse_line(now,    current_field, i, j, x, number_accounts) {
 
       # Treat as a comment
       if (x)
-        Comments = (("" == Comments)?(  x):( (("" ==  x)?( Comments):( (Comments ", "  x)))))
+        Comments = (("" == Comments)?(  x):( (("" ==  x)?( Comments):( (Comments  ", "  x)))))
     }
 
     # Increment i
@@ -896,13 +897,163 @@ function parse_line(now,    current_field, i, j, x, number_accounts) {
 
   # Comments should be signified with an octothorpe
   if (Comments !~ /^#/)
-    Comments = (("" == "# ")?(  Comments):( (("" ==  Comments)?( "# "):( ("# " ", "  Comments)))))
+    Comments = (("" == "# ")?(  Comments):( (("" ==  Comments)?( "# "):( ("# "  ", "  Comments)))))
 
-  # A document name is added as a final comment
-  Comments = (("" == Comments)?(  Documents):( (("" ==  Documents)?( Comments):( (Comments ", "  Documents)))))
+  # Documents can be added as comments
+  # Some special document names are supported
+  # So for example [<Buy>] expands to ABC Buy YYYY Mon
+  # and            [<Chess.x>] expands to ABC Chess YYYY Mon DD
+  for (x in Documents) {
+    delete Documents[x]
+
+    # Parse this document name
+    i = parse_document_name(x, now)
+
+    # Add the parsed name to the comments
+    Comments = (("" == Comments)?(  i):( (("" ==  i)?( Comments):( (Comments  ", "  i)))))
+  }
 
   # All done - return record type
   return number_accounts
+}
+
+
+# A document name may contain a filetype suffix
+function parse_document_name(name, now,    prefix, suffix, account_name, array, suffix_set) {
+
+  # Looks for special strings accompanied by a literal string
+  #
+  #   [B:literal] => Account Buy  (or Sell) YYYY Mon(literal)
+  #   [S:literal] => Account Sell (or Buy)
+  #   [H:literal] => Account Holding Statement
+  #   [I:literal]
+  #   [E:literal]
+  #   [:literal] => prepends the date
+  #   [literal:] => appends the date
+  #   [:]        => just the date
+  #   [literal]  => just the literal
+  #
+  #  If the colon is needed in a string literal a different Document_Shortcut code can be set in the Journal file
+  #
+  # <<, Document_Shortcut, =,>>
+  # 2008 Jun 30, INCOME.FOREIGN:FOR.PXUPA.ASX,          CASH,          0,      726.63, [PX:UPA Distribution=], # PX:UPA distribution
+  # <<, Document_Shortcut, :,>>
+
+    # Split the code name
+    # Use name component because we want the capture all the components apart from the first
+    if (split(name, array, Document_Shortcut) > 1) {
+      suffix = get_name_component(name, 2, -1, array)
+      suffix_set = (1)
+    } else
+      suffix_set = (0)
+
+    prefix = get_name_component(name, 1, 1, array)
+
+    #
+    switch (prefix) {
+      case "B" :
+      case "S":
+      case "H":
+
+        # Is this a buy, sell or holding statement?
+        if (units < 0 || "SELL" == Write_Units) {
+          prefix = (("H" == prefix)?( "Holding Statement"):( "Sell"))
+          account_name = get_name_component(Leaf[Account[1]], 1)
+        } else {
+          prefix = (("H" == prefix)?( "Holding Statement"):( "Buy"))
+          account_name = get_name_component(Leaf[Account[2]], 1)
+        }
+
+        # Add the date
+        prefix = prefix " " get_date(now, ("%Y %b")    )
+      break;;
+
+      case "I":
+      case "D": # Income
+        if (((Leaf[Account[1]]) ~ /^(DIV|DIST|FOR)\./))
+          account_name = get_name_component(Leaf[Account[1]], 2)
+        else
+          account_name = get_name_component(Leaf[Account[1]], 1)
+
+        # The second component of the account name (unless this is accrued income)
+        if (((Account[1]) ~ ("^" ( "ASSET.CURRENT.ACCRUED") "[.:]")))
+          prefix = "Distribution " get_date(now, ("%Y %b")    )
+        else
+          prefix = tolower(get_name_component(Account[1], 2)) " " get_date(now, ("%Y %b")    )
+        break;;
+
+      case "C":
+      case "E": # Expense or Cost
+        account_name = get_name_component(Leaf[Account[2]], 1)
+
+        # The second component of the account name is not used here...?
+        prefix = "Expense " get_date(now, ("%Y %b")    )
+        #prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, SHORT_FORMAT)
+        break;;
+
+      case "T": # Annual Tax Statement
+        account_name = get_name_component(Leaf[Account[2]], 1)
+        prefix = "Annual Tax Statement " (strftime("%Y", (now), UTC) + 0)
+        break;;
+
+      default: # no match - assume this is a literal string
+        # When a distinct suffix is present add the date
+        if (suffix_set)
+          prefix = (("" == prefix)?(  get_date(now, ("%Y %b")    )):( (("" ==  get_date(now, ("%Y %b")    ))?( prefix):( (prefix  " "  get_date(now, ("%Y %b")    ))))))
+
+        account_name = ""
+        break;;
+    } # End of switch
+
+    # We have at this point
+    #
+    #  prefix => Type of transaction, eg Buy, Dividend etc
+    #  account_name => BHP, AUS_BOND etc
+    #  suffix => Literal string
+    #
+    #  Or
+    #
+    #  prefix => ""
+    #  account_name => ""
+    #  suffix => Literal string
+    #
+
+    # Is there an account name?
+    if ("" != account_name)
+      prefix = account_name " " ((prefix)?( (toupper(substr(prefix, 1, 1)) substr(prefix, 2))):( (prefix)))
+
+    # Final parsed document name
+    prefix = (("" == prefix)?(  suffix):( (("" ==  suffix)?( prefix):( (prefix   suffix)))))
+
+    # Return either urlencoded version or the parsed name
+    # The parsed name indicates that the document is missing
+    return url_document_name(prefix)
+}
+
+# Get a version of a document name that can be used as a url
+function url_document_name(string,   filename, filetype, z, i, n) {
+
+  # How many dotted fields?
+  n = split(string, z, ".")
+
+  # If more than one last is treated as filetype
+  if (n > 1)
+    filetype = url_encode(z[n])
+  else # Default filetype
+    filetype = Document_Filetype
+
+  # Is this document missing?
+  if ((("file://" == Document_Protocol)?( stat(Document_Root string "." filetype, __MPX_ARRAY__)):( (0))))
+    # No such document - leave unconverted - this indicates that file is missing
+    return ("[[" string "]]")
+
+  # Process  the filename elements
+  filename = url_encode(z[1])
+  for (i = 2; i < n; i ++)
+    filename = filename "." url_encode(z[i])
+
+  # return result
+  return (Document_URI filename "." filetype)
 }
 
 # Parse optional value
@@ -987,40 +1138,19 @@ function parse_optional_string(field, save_document,    string, x) {
     return string
   }
 
-  # Only save the document name if non trivial and if requested
-  if ("" != string && "" != save_document) {
-    # Add any document names
-    if (!(string in Document_Name))
-      Document_Name[string] = parse_document_name(string)
-
-    # Add to Documents
-    Documents = (("" == Documents)?(  Document_Name[string]):( (("" ==  Document_Name[string])?( Documents):( (Documents ", "  Document_Name[string])))))
-  }
+  # A document name if we get here - save this
+  # An empty string means the input string is [] => use default string
+  # First version - replicate earlier behaviour
+  if ("" != string && "" != save_document)
+    # Can only have one example of each unique string...
+    if (!(string in Documents))
+      Documents[string] = string
 
   # All done
   return ""
 }
 
 
-# A document name may contain a filetype suffix
-function parse_document_name(string,    filename, filetype, z, i, n) {
-  # How many dotted fields?
-  n = split(string, z, ".")
-
-  # If more than one last is treated as filetype
-  if (n > 1)
-    filetype = url_encode(z[n])
-  else # Default filetype
-    filetype = Document_Filetype
-
-  # Process  the filename elements
-  filename = url_encode(z[1])
-  for (i = 2; i < n; i ++)
-    filename = filename "." url_encode(z[i])
-
-  # return result
-  return Document_Root filename "." filetype
-}
 
 # Is units a numerical value?
 function parse_units(u, units,      len) {
@@ -1233,7 +1363,7 @@ function held_to(ac, now,     p, latest_sale) {
 
   for (p = 0; p < Number_Parcels[ac]; p++)
     if ((Held_Until[(a)][( p)] <= ( now)))
-      latest_sale = (((latest_sale)>( Held_Until[ac][p]))?(latest_sale):( Held_Until[ac][p]))
+      latest_sale = (((latest_sale) - ( Held_Until[ac][p]) > 0)?(latest_sale):( Held_Until[ac][p]))
     else if (Held_Until[ac][p] < Future) {
       # If the asset still held now?
       latest_sale = now
@@ -1278,7 +1408,7 @@ function get_name_component(name, i, number_components, array,    name_length, s
   }
 
   # All done - add a line of code for debugging/trapping
-  assert("" != s, sprintf("Requested component <%d> couldn't be found in %s", i, name))
+  # assert("" != s, sprintf("Requested component <%d> couldn't be found in %s", i, name))
   return s
 }
 
@@ -1749,6 +1879,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     # At a parcel's sale they determine taxable
     # capital gains and losses
     # Stored (as sums) by parcel, cost element and time
+    # eg Accounting_Cost[account][parcel][element][time]
     Accounting_Cost[account_name][0][0][SUBSEP] = 0
     zero_costs(Accounting_Cost[account_name][0], SUBSEP)
     for (p in Accounting_Cost[account_name][0])
@@ -1759,6 +1890,18 @@ function initialize_account(account_name,     class_name, array, p, n,
     zero_costs(Tax_Adjustments[account_name][0], SUBSEP)
     for (p in Tax_Adjustments[account_name][0])
       delete Tax_Adjustments[account_name][0][p][SUBSEP]
+
+    # Store taxable capital losses too
+    if (((account_name) ~ /^ASSET\.CAPITAL[.:]/)) {
+      # No cost element or time term - Losses[account][parcel]
+      # Losses/Gains only ever occur when parcel is sold
+      # a parcel is only ever sold once
+      # Need to keep track of Long & Short losses & gains
+      Parcel_Long_Losses[account_name][SUBSEP]  ; delete Parcel_Long_Losses[account_name][SUBSEP]
+      Parcel_Short_Losses[account_name][SUBSEP] ; delete Parcel_Short_Losses[account_name][SUBSEP]
+      Parcel_Long_Gains[account_name][SUBSEP]  ; delete Parcel_Long_Gains[account_name][SUBSEP]
+      Parcel_Short_Gains[account_name][SUBSEP] ; delete Parcel_Short_Gains[account_name][SUBSEP]
+    }
 
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel
@@ -1778,7 +1921,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     #
     # (DIV|DIST|FOR).LEAF => LEAF
     #
-    if (((leaf_name) ~ /^(DIV|DIST|FOR)\./)) {
+    if (((Leaf[account_name]) ~ /^(DIV|DIST|FOR)\./)) {
       # Probably a better way to do this using a regex
       linked_name = get_name_component(leaf_name, 2, -1)
 
@@ -1787,7 +1930,6 @@ function initialize_account(account_name,     class_name, array, p, n,
 
 
     }
-
   }
 
   # Initialize account with common entries
@@ -1801,6 +1943,128 @@ function initialize_account(account_name,     class_name, array, p, n,
 function unlink_account(a) {
   if (a in Leaf)
     delete Leaf[a]
+}
+
+
+#
+# Filter Data
+#
+# Filter out irrelevant data - data that is out-of-range
+# can arise from importing records
+#
+function filter_data(now, variable_names, show_details,    array_names, name) {
+  # Which data arrays are to be filtered
+  if (!split(variable_names, array_names, ","))
+    return # Nothing to filter
+
+  # Should we log
+
+
+  # Filter the data arrays
+  for (name in array_names)
+    filter_array(now, SYMTAB[array_names[name]], array_names[name], show_details)
+}
+
+# Handle each array in turn
+function filter_array(now, data_array, name, show_blocks,
+                           a, p, start_block, end_block, block_id,
+                           stack, key, first_key,
+                           earliest_key, latest_key) {
+
+  # Record the earlist and latest keys found
+  if (show_blocks) {
+    # Report on data held
+    print Journal_Title > "/dev/stderr"
+    printf "%s Data Held Report for Period Ending %s\n\n", name, get_date(now)  > "/dev/stderr"
+
+    earliest_key = Future
+    latest_key   = Epoch
+  }
+
+  # list holding "blocks" - ie non-overlapping holding periods
+  # Each block is preceeded and/or followed by "gaps"
+  for (a in Leaf)
+    if ((a in data_array) && ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/))
+      if ((Held_From[(a)][0] > Epoch)) {
+        # Get each parcel in turn and list the contiguous blocks of time held
+        start_block = Held_From[a][0]
+        end_block = Held_Until[a][0]
+        block_id = 0
+        for (p = 1; p < Number_Parcels[a]; p ++) {
+          # This starts a new holding block if the purchase date is after the current end date
+          if (((Held_From[a][p] -  end_block) > 0)) {
+            # Check the data against each block
+            for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
+
+            # Remove originals of copies data to speed up processing of remaining entries
+            for (key in stack)
+              delete data_array[a][key]
+
+            # A new block
+            block_id ++
+            start_block = Held_From[a][p]
+            end_block = Held_Until[a][p]
+          } else if (((Held_Until[a][p] -  end_block) > 0)) # extend the old block
+            end_block = Held_Until[a][p]
+
+          # If this parcel is open we have completed all possible blocks
+          if ((Held_Until[(a)][( p)] > ( now)))
+            break
+        } # End of each parcel p
+
+        # Check the data against each block
+        for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
+        if (show_blocks)
+          # Get first key
+          for (first_key in stack) {
+            # Record latest key
+            latest_key = (((latest_key) - ( first_key) > 0)?(latest_key):( first_key))
+            break
+          }
+
+        # Some simple formatting
+        if (Show_Extra && show_blocks)
+          printf "\n" > "/dev/stderr"
+
+        # Copy the kept items back
+        for (key in stack) {
+          data_array[a][key] = stack[key]
+
+          # Show this data when detailed reporting is enabled
+          if (Show_Extra && show_blocks)
+            printf "%22s\t %s => %s\n", Leaf[a], get_date(key), format_value(stack[key]) > "/dev/stderr"
+        }
+
+        # get last key and show range of keys
+        if (show_blocks && (key in stack)) {
+          if (key != first_key)
+            # More than one key
+            printf "%22s\t[%s, %s]\n", Leaf[a], get_date(key), get_date(first_key) > "/dev/stderr"
+          else if (!Show_Extra)
+            # Only one key in this block - already recorded if Show_Extra set
+            printf "%22s\t[%s]\n", Leaf[a], get_date(first_key) > "/dev/stderr"
+
+          # Record earliest key
+          earliest_key = (((earliest_key) - ( key) < 0)?(earliest_key):( key))
+        }
+
+        # Clean up
+        delete stack
+
+      } else {
+        # Never held!
+        if (show_blocks)
+          printf "%22s\tNever Held!\n", Leaf[a] > "/dev/stderr"
+
+        unlink_account(a)
+      }
+    # End of each asset a
+
+    # Final Summary
+    if (show_blocks) {
+      underline(44, 6, "/dev/stderr")
+      printf "%22s\t[%s, %s]\n\n", name, get_date(earliest_key), get_date(latest_key) > "/dev/stderr"
+    }
 }
 
 ##
@@ -1941,13 +2205,15 @@ function get_tax(now, bands, total_income,
 function get_taxable_income(now, tax_left,
                                  total_income, band_width, band_tax,
                                  current_key, last_threshold, threshold) {
-  # Which band is the income in?
-  if ((((tax_left) <= Epsilon) && ((tax_left) >= -Epsilon)))
-    return 0 # Could be any amount less than the tax free threshold
-
   # Now get the tax due on the whole sum
   current_key = find_key(Tax_Bands, now)
   last_threshold = 0
+
+  # When the tax left is zero or negative it must be the first band
+  if (!((tax_left) >  Epsilon))
+    return tax_left / Tax_Bands[current_key][last_threshold]
+
+  # Now get the tax due on the whole sum
   total_income = 0
   for (threshold in Tax_Bands[current_key]) {
     # The last band's width
@@ -2002,7 +2268,7 @@ function url_encode(string,     c, chars, url, i) {
     c = chars[i]
 
     # Just prepend plain vanilla characters
-	  if (c ~ /[0-9A-Za-z]/)
+	  if (c ~ /[0-9A-Za-z/\.]/)
 	    url = c url
 	  else # Get the hex code
 	    url = "%" sprintf("%02X", ((c in URL_Lookup)?( URL_Lookup[c]):( (0)))) url
@@ -2357,14 +2623,14 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           if (!gains_event) {
             # Two types of header
             if (is_detailed)
-              printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
+              printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                       asset_width, "Asset", 10, "Parcel",
                       7, "Units", 14, "Cost",
                       11, "From", 12, to_label,
                       11, "Price", 16, proceeds_label,
                       13, "Reduced", 14, "Adjusted",
                       15, "Accounting", 9, "Type",
-                      18, "Taxable", 15, "Per Unit" > reports_stream
+                      18, "Taxable", 16, "Per Unit" > reports_stream
             else if (no_header_printed) {
               printf "%*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
                      asset_width, "Asset",
@@ -2454,7 +2720,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           # Print out the parcel information
           if (is_detailed) {
             # If printing out in detail
-            printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
+            printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                  asset_width + 1, label,
                  7, p,
                  11, units,
@@ -2468,7 +2734,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                  14, print_cash(- gains),
                  14, description,
                  14, print_cash(- parcel_gains),
-                 14, print_cash(- parcel_gains / units, 4) > reports_stream
+                 14, print_cash(parcel_cost / units, 4) > reports_stream
 
             # Clear label
             label = ""
@@ -2480,7 +2746,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       if (gains_event) {
         if (is_detailed)
           # Detailed format
-          underline(160 + asset_width, 6, reports_stream)
+          underline(175 + asset_width, 6, reports_stream)
 
         # The output starts here
         printf "%*s %*.3f %*s %*s   %*s %*s %*s %*s %*s ",
@@ -2558,7 +2824,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # First print the gains out in detail when required
     if ("/dev/null" != reports_stream) {
@@ -2744,7 +3010,6 @@ function get_carried_losses(past, limit,
   # This determines the carried losses
   set_cost(CARRIED_LOSSES, carried_losses, past)
   return carried_losses
-  #return get_cost(CARRIED_LOSSES, past)
 }
 
 # Compute the deferred gains
@@ -2754,7 +3019,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -2799,7 +3064,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -2939,7 +3204,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3074,7 +3339,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3147,7 +3412,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[fF]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3280,7 +3545,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -3340,7 +3605,7 @@ function print_dividend_qualification(now, past, is_detailed,
         # If not all units are qualified need to check the second half of the Qualification Window
         if (!(((total_units - qualified_units) <= Epsilon) && ((total_units - qualified_units) >= -Epsilon))) {
           q = maximum_entry(Qualified_Units[underlying_asset], qualifying_date, qualifying_date + 0.5 * Qualification_Window)
-          qualified_units = (((q)>( qualified_units))?(q):( qualified_units))
+          qualified_units = (((q) - ( qualified_units) > 0)?(q):( qualified_units))
           qualified_fraction = qualified_units / total_units
 
           # Should never be greater than unity
@@ -3357,7 +3622,7 @@ function print_dividend_qualification(now, past, is_detailed,
         qualified_payment += qualified_fraction * payment
 
         # Make the appropriate changes for the current tax jurisdiction
-        @Dividend_Qualification_Function(a, underlying_asset, key, 1.0 - qualified_fraction)
+        @Dividend_Qualification_Function(a, key, 1.0 - qualified_fraction)
 
         # Get the next key
         key = next_key
@@ -3652,13 +3917,13 @@ BEGIN {
   if ("" == Epoch)
     set_epoch()
 
-  # // Can set constants here
-  if (!Qualification_Window)
-    EOFY_Window = Qualification_Window = 0
-  else {
-    Qualification_Window = 91 * (86400) # seconds
-    EOFY_Window = 0.5 * (Qualification_Window - (86400))
-  }
+  # # // Can set constants here
+  # if (!Qualification_Window)
+  #   EOFY_Window = Qualification_Window = 0
+  # else {
+  #   Qualification_Window = 91 * ONE_DAY # seconds
+  #   EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
+  # }
 
   # Start of FY
   if ("" == FY_Date)
@@ -3694,9 +3959,6 @@ BEGIN {
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
   #
-  #
-  # # Franking deficit
-  # FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # For super funds the amount claimable is sometimes reduced to 75%
   Reduced_GST   = 0.75
@@ -3777,7 +4039,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -3830,7 +4092,8 @@ function income_tax_aud(now, past, benefits,
   #
   #
   # Australia ignores the distinction between long & short term losses
-  taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  #taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  taxable_gains = get_taxable_gains(now, get_carried_losses(past, (0)))
   if (((taxable_gains) < -Epsilon)) {
     # Gains are a negative number
     other_income -= taxable_gains
@@ -3846,7 +4109,7 @@ function income_tax_aud(now, past, benefits,
 
   # Losses might sometimes be written back against earlier gains
   # In practice this is always FALSE for Australia
-  if ((0) && !(((carried_losses) <= Epsilon) && ((carried_losses) >= -Epsilon))) {
+  if ((0) && (((carried_losses) > Epsilon) || ((carried_losses) < -Epsilon))) {
     # Try writing back losses
     printf "\n\t%27s => %14s\n", "Write Back Losses Available", print_cash(carried_losses) > write_stream
 
@@ -4156,7 +4419,11 @@ function income_tax_aud(now, past, benefits,
 
   } # End of if any attempt to apply non-refundable assets
 
-  # Now apply refundable offsets - but note if used these will not generate a tax loss
+  # What happens when the tax owed is negative??
+
+
+
+  # Now apply refundable offsets - but note these will not generate a tax loss - since they are refunded :)
   if (((refundable_offsets) >  Epsilon)) {
     tax_owed -= refundable_offsets
     printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > write_stream
@@ -4221,14 +4488,13 @@ function income_tax_aud(now, past, benefits,
 
   # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
   } else if (!((tax_owed + refundable_offsets) >  Epsilon)) { # Increase losses
-    # To be clear refundable offsets can generate a tax refund
-    # so tax_owed < 0 BUT this will be repaid so will not
-    # generate a tax loss
-    #
-    # On the other hand remaining franking offsets will generate tax loss
-    # Even when tax_owed == 0
-    # so do catch  the case of  tax_owed < Epsilon
-    tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
+    # This is a bit tricky
+    # (unused) franking offsets may still be present here
+    # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
+    # so adjust the tax losses accordingly
+    # -- so does this work for an individual or smsf?
+    tax_losses -= get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
+
 
   }
 
@@ -4441,8 +4707,10 @@ function get_taxable_gains(now, losses,
 #
 ## Dividend Qualification Function
 ##
-function dividend_qualification_aud(a, underlying_asset, now, unqualified,
+##function dividend_qualification_aud(a, underlying_asset, now, unqualified,
+function dividend_qualification_aud(a, now, unqualified,
 
+                                       underlying_asset,
                                        unqualified_account, imputation_credits) {
 
   # For Australia we need to adjust tax credits associated with an account
@@ -4452,9 +4720,11 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     return
 
   # Were there any tax credits anyway?
-  if (underlying_asset in Tax_Credits) {
+  if (a in Tax_Credits) {
+    underlying_asset = Underlying_Asset[a]
+
     # Get the Imputation credits associated with this transaction - and only this transaction
-    imputation_credits = (get_cost(Tax_Credits[underlying_asset],  now) - get_cost(Tax_Credits[underlying_asset], (( now) - 1)))
+    imputation_credits = (get_cost(Tax_Credits[a],  now) - get_cost(Tax_Credits[a], (( now) - 1)))
     if (!(((imputation_credits) <= Epsilon) && ((imputation_credits) >= -Epsilon))) {
       # Create an unqualified account
       unqualified_account = initialize_account("SPECIAL.FRANKING.OFFSET.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
@@ -4488,7 +4758,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -4831,6 +5101,16 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
 #
 # To Do =>
 #
+#   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
+#   Need to break down capital and carried losses by year
+#   Need INCOME.GAINS:LONG.LLC.ASX etc then this could be computed programmatically - i.e. gains distributed
+#        in a AMMA statement have taxable consequences which depend on whether any losses are available or not
+#        fixing this in general would make multiple currencies viable too
+#   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
+#   Consider breaking out income/expenses in  the same way as the tax return does?
+#   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
+#
+#
 #   Fix up wiki files
 #   More flexible ordering of optional fields?
 #   other tax_statement calculations (eg UK, US, NZ etc...)
@@ -4853,6 +5133,12 @@ BEGIN {
   # An array to hold real values
   ((SUBSEP in Real_Value)?((1)):((0)))
   ((SUBSEP in account_sum)?((1)):((0)))
+
+  # An array to hold document strings
+  ((SUBSEP in Documents)?((1)):((0)))
+
+  # A Document shortcut code
+  Document_Shortcut = ":"
 
   # And a gains stack
   ((SUBSEP in Gains_Stack)?((1)):((0)))
@@ -4944,7 +5230,8 @@ BEGIN {
   # Default Portfolio Name and document URI
   Journal_Title = "NEMO"
   Journal_Type = "IND"
-  Document_Root = "https:example.com/NEMO"
+  Document_Protocol = "https://"
+  Document_Root = "example.com/NEMO/"
 
   # Default currency
   Journal_Currency = "AUD"
@@ -5065,7 +5352,11 @@ BEGIN {
     # Currently importing Import_Array
     if (!index(Filter_Data, Import_Array_Name))
       # Make sure this array will be filtered
-      Filter_Data = Filter_Data " " Import_Array_Name
+      if ("" != Filter_Data)
+        Filter_Data = Filter_Data "," Import_Array_Name
+      else
+        Filter_Data = Import_Array_Name
+
 
 
 
@@ -5182,6 +5473,29 @@ function import_csv_data(array, symbol, name,
   Check_Balance_Function  = "check_balance"
   Update_Profits_Function = "update_profits"
   Update_Member_Function  = "update_member_liability"
+
+  # Dividend Qualification Window - is recorded
+  # with the help of the auxilliary variable
+  # which sets an EOFY_Window
+  if ("" == EOFY_Window) {
+    # Dividend Qualification Window is not yet set
+    if ("" == Qualification_Window)
+      Qualification_Window = (91) # Units in days
+
+    # Qualification_Window is set, but since EOFY_Window is unset the units are days
+    Qualification_Window *= (86400)
+
+    # Still need to set EOFY_Window
+    if (Qualification_Window > (86400))
+      EOFY_Window = 0.5 * (Qualification_Window - (86400))
+    else
+      EOFY_Window = 0
+  } else
+    # Qualification_Window must be set
+    assert("" != Qualification_Window, "Qualification Window is undefined even though EOFY_Window <" EOFY_Window "> is set")
+
+  # Set the URI document prefix
+  Document_URI = Document_Protocol url_encode(Document_Root)
 
   # Initialize local tax variables
   @Initialize_Tax_Function()
@@ -5329,6 +5643,7 @@ function set_special_accounts() {
 
   # Franking deficit offset
   # Other offsets stored in unique accounts with same branch name
+  #FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
   FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # Franking tax account - a creditor like account
@@ -5545,9 +5860,6 @@ function read_input_record(   t, n, a, threshold) {
       print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], units, amount)
   } else if (2 == n) {
     parse_transaction(t, Account[1], Account[2], units, amount)
-
-    # Were totals changed by this transaction?
-    #@Check_Balance_Function(t)
   } else # A zero entry line - a null transaction or a comment in the journal
     print_transaction(t, Comments)
 
@@ -5667,13 +5979,13 @@ function parse_transaction(now, a, b, units, amount,
     else
       underlying_asset = (0)
 
-    # Foreign or franking credits - could be made more general?
+    # Foreign or franking credits
     if (!(((tax_credits) <= Epsilon) && ((tax_credits) >= -Epsilon))) {
       # Keep an account of tax credits
       # We need the underlying asset to
       assert(underlying_asset, sprintf("Income account %s must have an underlying asset to receive tax credits", Leaf[a]))
-      if (underlying_asset in Tax_Credits)
-        credit_account = Tax_Credits[underlying_asset]
+      if (a in Tax_Credits)
+        credit_account = Tax_Credits[a]
       else {
         # Create tax credits account - just in time
         # Type of credits account depends on the underlying asset
@@ -5682,17 +5994,26 @@ function parse_transaction(now, a, b, units, amount,
         # INCOME.FOREIGN      => SPECIAL.FOREIGN.OFFSET
         #
         if (((a) ~ ("^" ( "INCOME.DIVIDEND") "[.:]")) || ((a) ~ ("^" ( "INCOME.DISTRIBUTION") "[.:]")))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
         else if (((a) ~ ("^" ( "INCOME.FOREIGN") "[.:]")))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FOREIGN.OFFSET:C_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.OFFSET.FOREIGN:C_TAX." Leaf[underlying_asset])
         else
           assert((0), sprintf("Can't link a tax credit account to income account %s", a))
       }
 
-      # Adjust franking account and credit account
-      adjust_cost(FRANKING, tax_credits, now)
+      # Adjust credit account
       adjust_cost(credit_account, - tax_credits, now)
-      print_transaction(now, ("# " Leaf[underlying_asset] " Tax Credits"), credit_account, FRANKING, 0, tax_credits)
+
+      # Adjust franking account when necessary
+      if (((a) ~ ("^" ( "INCOME.FOREIGN") "[.:]"))) {
+        # Foreign Credits
+        adjust_cost(NULL, tax_credits, now)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, 0, tax_credits)
+      } else {
+        # Frannking Credits
+        adjust_cost(FRANKING, tax_credits, now)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, 0, tax_credits)
+      }
     } else
       tax_credits = 0
 
@@ -6020,10 +6341,6 @@ function parse_transaction(now, a, b, units, amount,
     adjust_cost(a, -amount, now)
     adjust_cost(b,  amount, now)
 
-    # Catch manual depreciation
-    #if (is_fixed(a))
-    #  allocate_costs(a, now)
-
     # Record the transaction
     print_transaction(now, Comments, a, b, Write_Units, amount, fields, number_fields)
   }
@@ -6097,18 +6414,6 @@ function convert_term_account(a, now, maturity,       active_account, x, thresho
     (Threshold_Dates[threshold][( active_account)] = ( maturity))
 
   } else if (((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)) {
-    # Need to rename account
-    # TERM => CURRENT
-    #active_account = gensub(/(\.TERM)([.:])/, ".CURRENT\\2", 1, a)
-
-    # Create the new account is necessary
-    #active_account = initialize_account(active_account)
-
-    # Now create a synthetic transaction
-    # DATE, A, ACTIVE_ACCOUNT, 0, COST(A), # ....
-    #set_cost(active_account, get_cost(a, just_before(now)), now)
-    #set_cost(a, 0, now)
-
     # Need to identify this as a current account
     if (a in Maturity_Date)
       delete Maturity_Date[a]
@@ -6130,20 +6435,6 @@ function update_member_liability(now, delta_profits, a) {
   return
 }
 
-# A wrapper function updates allocated profits when required ()
-# function update_profits(now,     delta_profits) {
-#   # Compute the profits that need to be allocated to members
-#   # These are the profits accumulated since the last time they were distributed to members
-#   delta_profits = accumulated_profits(now) - get_cost(ALLOCATED, now)
-#   if (!near_zero(delta_profits)) {
-#     # Update the Allocated Profits
-#     adjust_cost(ALLOCATED, delta_profits, now, FALSE)
-#
-#     # Update the liabilities
-#     update_member_liability(now, delta_profits)
-#   }
-# }
-
 # checking and setting
 # Syntax
 # date, COST, ACCOUNT, ....
@@ -6158,7 +6449,7 @@ function checkset(now, a, account, units, amount, is_check,
     switch(action) {
       case "VALUE" :
         assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[(account)])))
-        quantity = get_value(account, now); break
+        quantity = ((((account) ~ /^ASSET\.CAPITAL[.:]/))?( ((__MPX_KEY__ = find_key(Price[account],   now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[account],    now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0))))):( get_cost(account,  now))); break
       case "PRICE" :
         assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[(account)])))
         quantity = ((__MPX_KEY__ = find_key(Price[account],  now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))); break
@@ -6208,169 +6499,6 @@ function checkset(now, a, account, units, amount, is_check,
 
 }
 
-# # Update a member liability
-# # This can be (i)   a contribution - specified member, taxable or tax-free
-# #          or (ii)  a benefit - specified member
-# #          or (iii) allocation amongst members - no specificiation
-# #          or (iv)  allocation to or from the reserve - no specification
-# # This function keeps the member liability up to date for a SMSF
-# #
-# function update_member_liability(now, amount, a,
-#                                       share, taxable_share,
-#                                       member_id, member_account,
-#                                       target_account,
-#                                       sum_total, x, sum_share) {
-#   # Update the member liabilities with their share of the income/expenses
-#   # The proportions only change when a contribution is received
-#   # or a benefit paid;
-#   # plus there is no legislation specifying the precise method of proportioning
-#   # but this seems reasonable
-#   #   Income / Expenses are made in proportion to net contributions made
-#   #   Contributions are assigned to the member
-#   #   Benefits are paid proportionate to  the member's balance - so security prices influence this
-#
-#   # In the various cases the following is passed in
-#   # Case (i)   :   account_name, now, amount
-#   # Case (ii)  :   account_name, now, amount
-#   # Case (iii) :   now, amount
-#   # Case (iv)  :   now, amount
-#
-#   # Note if a taxable share is driven negative the value should be transferred from the tax-free share
-#
-#   # Get the appropriate member account
-#   if ("" == a)
-#     member_id = ""
-#   else # This will be an account - but when not a CONTRIBUTION it will be a parent account
-#     member_id = get_member_name(a, now, amount)
-#
-# @ifeq LOG update_member_liability
-#   printf "Update Liabilities [%s]\n", get_date(now) > STDERR
-#   if (member_id)
-#     printf "\t%20s => %s\n", "Member id", member_id > STDERR
-#   printf "\tMember Shares\n" > STDERR
-# @endif # LOG
-#
-#   # Allocation to the liability accounts
-#   # Either no id is given - distribute amongst all accounts
-#   # Or a parent account - distribute amongst its offspring
-#   # Or a specific account - distribute solely to that account
-#   taxable_share = sum_total = sum_share = 0
-#
-#   # Normalize amounts
-#   if (member_id in Member_Liability) { # Exact match - a contribution
-#     # Adjust the liability
-#     adjust_cost(member_id, - amount, now)
-#     if (member_id ~ /TAXABLE/)
-#       taxable_share = 1.0
-#
-# @ifeq LOG update_member_liability
-#     sum_share = 1.0
-#     printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_id], sum_share, Leaf[member_id], print_cash(- amount) > STDERR
-# @endif # LOG
-#   } else { # Get totals
-#     # We still get the share from each account
-#     # Don't use the accumulated totals because (rarely) a negative account balance will break the proportioning
-#     # Also since  the order of transactions on a particular day is not defined use just_before() to compute proportions
-#     for (member_account in Member_Liability)
-#       if (!member_id || is_ancestor(member_id, member_account)) {
-#         share[member_account] = x = get_cost(member_account, just_before(now))
-#         sum_total += x
-#
-#         # Compute what fraction of the allocation was taxable
-#         if (member_account ~ /TAXABLE/)
-#           taxable_share += x
-#       }
-#
-#     # Normalize taxable share
-#     taxable_share /= sum_total
-#
-#     # There are two possibilities here -
-#     #   No member id => profit/loss everything goes to/from TAXABLE accounts
-#     #   A parent id  => proportioning rule applies
-#     # Update the liabilities - but only the target accounts
-#     for (member_account in share) {
-#       x = share[member_account] / sum_total
-#
-#       # Target account
-#       if (!member_id)
-#         target_account = Member_Liability[member_account]
-#       else
-#         target_account = member_account
-#
-#       # Adjust the liability
-#       adjust_cost(target_account, - x * amount, now)
-# @ifeq LOG update_member_liability
-#       sum_share += x
-#       printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_account], x, Leaf[target_account], print_cash(- x * amount) > STDERR
-#       if (get_cost(target_account, now) > 0)
-#         printf "\t\tNegative Balance in target account %16s => %14s\n", Leaf[target_account], print_cash(- get_cost(target_account, now)) > STDERR
-# @endif # LOG
-#     } # End of exact share
-#
-#     # Tidy up
-#     delete share
-#   } # End of allocation
-#
-# @ifeq LOG update_member_liability
-#   # Just debugging
-#   printf "\t%20s => %8.6f %16s => %14s\n", "Share", sum_share, "Total", print_cash(- amount) > STDERR
-# @endif # LOG
-#
-#   # return proportion that was taxable
-#   return taxable_share
-# }
-#
-# # Obtain the member account
-# function get_member_name(a, now, x,   member_name, member_account, target_account, subclass, contribution_tax) {
-#   # This obtains the liability account that needs to be modified
-#   # In more detail INCOME.CONTRIBUTION.SUBCLASS:NAME.SUFFIX => LIABILITY.MEMBER.NAME:NAME.SUBCLASS
-#   # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
-#   # In fact        X.Y:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
-#
-#   # Get the member name
-#   member_name = get_name_component(Leaf[a], 1) # first component
-#
-#   # A member liability account can only be created by a contribution
-#   if (is_class(a, "INCOME.CONTRIBUTION")) {
-#     # Identify the "subclass" - use Parent_Name because it is always available
-#     subclass = get_name_component(Parent_Name[a], 0) # last component
-#
-#     # If a link is made in a "MEMBER" array to each members liabilities
-#     # then there is no need to identify this as a member liability in the
-#     # account name
-#     member_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.%s", member_name, member_name, subclass))
-#
-#     # Ensure that this member is noted in the Member_Liability array
-#     if (!(member_account in Member_Liability)) {
-#       # Need to ensure that the target TAXABLE account is created
-#       # The target account can actually be the same as the member_account
-#       target_account = Member_Liability[member_account] = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.TAXABLE", member_name, member_name))
-#
-#       # Check the target account is included too
-#       if (!(target_account in Member_Liability))
-#         Member_Liability[target_account] = target_account
-#     } else # Get the target account so we check if contribution tax should be computed
-#       target_account = Member_Liability[member_account]
-#
-#     # This will change the LIABILITIES and EXPENSES equally
-#     if (target_account == member_account) {
-#       # This is a TAXABLE account
-#       contribution_tax = get_tax(now, Tax_Bands, x) # Always one band so ok to ignore other income
-#
-#       # Save the tax expenses and adjust the liability
-#       adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)
-#       adjust_cost(target_account,  contribution_tax, now)
-#     }
-#   } else {
-#     # Return the parent account
-#     member_account = "*LIABILITY.MEMBER." member_name
-#     assert(member_account in Parent_Name, "<" $0 "> Unknown account <" member_account ">")
-#   }
-#
-#   # Return the account
-#   return member_account
-# }
-
 # Final processing
 END {
   if (_assert_exit == 1)
@@ -6382,7 +6510,7 @@ END {
   # Delete empty accounts
   # Filter out data entries that were added by import CSV records
   # that do not overlap with the the holding period
-  filter_data(Last_Record)
+  filter_data(Last_Record, Filter_Data, (0))
 
   # Make sure any eofy transactions are recorded
   # This loop will happen at least once
@@ -6421,95 +6549,14 @@ END {
     if (!Write_Variables)
       printf "START_JOURNAL\n" > Write_State
   }
+
+  # Log data about selected variables
+  if (Write_Variables)
+    filter_data(Last_Record, Write_Variables, (1))
+
+  # Check
 } #// END
 #
-
-#
-# Filter Data
-#
-# Filter out irrelevant data - data that is out-of-range
-# can arise from importing records
-#
-function filter_data(now,      array_names, name) {
-  # Which data arrays are to be filtered
-  if (!split(Filter_Data, array_names, " "))
-    return # Nothing to filter
-
-  # Filter the data arrays
-  for (name in array_names)
-    filter_array(now, SYMTAB[array_names[name]], array_names[name])
-}
-
-# Handle each array in turn
-function filter_array(now, data_array, name,
-                           a, p, start_block, end_block, block_id,
-                           stack, key) {
-
-
-  # list holding "blocks" - ie non-overlapping holding periods
-  # Each block is preceeded and/or followed by "gaps"
-  for (a in Leaf)
-    if ((a in data_array) && ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/))
-      if ((Held_From[(a)][0] > Epoch)) {
-        # Get each parcel in turn and list the contiguous blocks of time held
-        start_block = Held_From[a][0]
-        end_block = Held_Until[a][0]
-        block_id = 0
-        for (p = 1; p < Number_Parcels[a]; p ++) {
-          # This starts a new holding block if the purchase date is after the current end date
-          if (((Held_From[a][p] -  end_block) > 0)) {
-            # Filter the old block
-
-
-            # # Check the data against each block
-            for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
-
-            # Remove anything kept to speed up processing
-            for (key in stack)
-              delete data_array[a][key]
-
-            # A new block
-            block_id ++
-            start_block = Held_From[a][p]
-            end_block = Held_Until[a][p]
-          } else if (((Held_Until[a][p] -  end_block) > 0)) # extend the old block
-            end_block = Held_Until[a][p]
-
-          # If this parcel is open we have completed all possible blocks
-          if ((Held_Until[(a)][( p)] > ( now)))
-            break
-        } # End of each parcel p
-
-        # The last holding block
-
-          # Check the data against each block
-          for (key in  data_array[a]) {  if (key -  end_block > 0)    continue;  if (key -  start_block >= 0)    stack[key] =  data_array[a][key];  else    break;}
-
-
-        # Copy the kept items back
-        for (key in stack)
-          data_array[a][key] = stack[key]
-        delete stack
-
-      } else {
-        # Never held!
-
-        unlink_account(a)
-      }
-
-
-    # End of each asset a
-}
-
-# The current value of an asset
-function get_value(a, now) {
-  # Depreciating assets are different
-  if (((a) ~ /^ASSET\.CAPITAL[.:]/))
-    return (((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))))
-
-  # Just the cost
-  return get_cost(a, now)
-}
 
 # Sell qualified units
 # This is trickier than ordinary units

@@ -38,6 +38,16 @@
 #
 # To Do =>
 #
+#   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
+#   Need to break down capital and carried losses by year
+#   Need INCOME.GAINS:LONG.LLC.ASX etc then this could be computed programmatically - i.e. gains distributed
+#        in a AMMA statement have taxable consequences which depend on whether any losses are available or not
+#        fixing this in general would make multiple currencies viable too
+#   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
+#   Consider breaking out income/expenses in  the same way as the tax return does?
+#   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
+#
+#
 #   Fix up wiki files
 #   More flexible ordering of optional fields?
 #   other tax_statement calculations (eg UK, US, NZ etc...)
@@ -60,6 +70,12 @@ BEGIN {
   # An array to hold real values
   make_array(Real_Value)
   make_array(account_sum)
+
+  # An array to hold document strings
+  make_array(Documents)
+
+  # A Document shortcut code
+  Document_Shortcut = ":"
 
   # And a gains stack
   make_array(Gains_Stack)
@@ -151,7 +167,8 @@ BEGIN {
   # Default Portfolio Name and document URI
   Journal_Title = "NEMO"
   Journal_Type = "IND"
-  Document_Root = "https:example.com/NEMO"
+  Document_Protocol = "https://"
+  Document_Root = "example.com/NEMO/"
 
   # Default currency
   Journal_Currency = JOURNAL_CURRENCY
@@ -274,7 +291,11 @@ BEGIN {
     # Currently importing Import_Array
     if (!index(Filter_Data, Import_Array_Name))
       # Make sure this array will be filtered
-      Filter_Data = Filter_Data " " Import_Array_Name
+      if ("" != Filter_Data)
+        Filter_Data = Filter_Data "," Import_Array_Name
+      else
+        Filter_Data = Import_Array_Name
+
 
 @ifeq LOG import_record
     printf "Import %s\n",  Import_Array_Name > STDERR
@@ -398,6 +419,29 @@ function import_csv_data(array, symbol, name,
   Check_Balance_Function  = "check_balance"
   Update_Profits_Function = "update_profits"
   Update_Member_Function  = "update_member_liability"
+
+  # Dividend Qualification Window - is recorded
+  # with the help of the auxilliary variable
+  # which sets an EOFY_Window
+  if ("" == EOFY_Window) {
+    # Dividend Qualification Window is not yet set
+    if ("" == Qualification_Window)
+      Qualification_Window = QUALIFICATION_WINDOW # Units in days
+
+    # Qualification_Window is set, but since EOFY_Window is unset the units are days
+    Qualification_Window *= ONE_DAY
+
+    # Still need to set EOFY_Window
+    if (Qualification_Window > ONE_DAY)
+      EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
+    else
+      EOFY_Window = 0
+  } else
+    # Qualification_Window must be set
+    assert("" != Qualification_Window, "Qualification Window is undefined even though EOFY_Window <" EOFY_Window "> is set")
+
+  # Set the URI document prefix
+  Document_URI = Document_Protocol url_encode(Document_Root)
 
   # Initialize local tax variables
   @Initialize_Tax_Function()
@@ -545,6 +589,7 @@ function set_special_accounts() {
 
   # Franking deficit offset
   # Other offsets stored in unique accounts with same branch name
+  #FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
   FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # Franking tax account - a creditor like account
@@ -769,9 +814,6 @@ function read_input_record(   t, n, a, threshold) {
       print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], units, amount)
   } else if (2 == n) {
     parse_transaction(t, Account[1], Account[2], units, amount)
-
-    # Were totals changed by this transaction?
-    #@Check_Balance_Function(t)
   } else # A zero entry line - a null transaction or a comment in the journal
     print_transaction(t, Comments)
 
@@ -891,13 +933,13 @@ function parse_transaction(now, a, b, units, amount,
     else
       underlying_asset = FALSE
 
-    # Foreign or franking credits - could be made more general?
+    # Foreign or franking credits
     if (!near_zero(tax_credits)) {
       # Keep an account of tax credits
       # We need the underlying asset to
       assert(underlying_asset, sprintf("Income account %s must have an underlying asset to receive tax credits", Leaf[a]))
-      if (underlying_asset in Tax_Credits)
-        credit_account = Tax_Credits[underlying_asset]
+      if (a in Tax_Credits)
+        credit_account = Tax_Credits[a]
       else {
         # Create tax credits account - just in time
         # Type of credits account depends on the underlying asset
@@ -906,17 +948,26 @@ function parse_transaction(now, a, b, units, amount,
         # INCOME.FOREIGN      => SPECIAL.FOREIGN.OFFSET
         #
         if (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION"))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
         else if (is_class(a, "INCOME.FOREIGN"))
-          credit_account = Tax_Credits[underlying_asset] = initialize_account("SPECIAL.FOREIGN.OFFSET:C_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.OFFSET.FOREIGN:C_TAX." Leaf[underlying_asset])
         else
           assert(FALSE, sprintf("Can't link a tax credit account to income account %s", a))
       }
 
-      # Adjust franking account and credit account
-      adjust_cost(FRANKING, tax_credits, now)
+      # Adjust credit account
       adjust_cost(credit_account, - tax_credits, now)
-      print_transaction(now, ("# " Leaf[underlying_asset] " Tax Credits"), credit_account, FRANKING, 0, tax_credits)
+
+      # Adjust franking account when necessary
+      if (is_class(a, "INCOME.FOREIGN")) {
+        # Foreign Credits
+        adjust_cost(NULL, tax_credits, now)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, 0, tax_credits)
+      } else {
+        # Frannking Credits
+        adjust_cost(FRANKING, tax_credits, now)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, 0, tax_credits)
+      }
     } else
       tax_credits = 0
 
@@ -1274,10 +1325,6 @@ function parse_transaction(now, a, b, units, amount,
     adjust_cost(a, -amount, now)
     adjust_cost(b,  amount, now)
 
-    # Catch manual depreciation
-    #if (is_fixed(a))
-    #  allocate_costs(a, now)
-
     # Record the transaction
     print_transaction(now, Comments, a, b, Write_Units, amount, fields, number_fields)
   }
@@ -1361,25 +1408,12 @@ function convert_term_account(a, now, maturity,       active_account, x, thresho
     printf "\n" > STDERR
 @endif
   } else if (is_term(a)) {
-    # Need to rename account
-    # TERM => CURRENT
-    #active_account = gensub(/(\.TERM)([.:])/, ".CURRENT\\2", 1, a)
-
-    # Create the new account is necessary
-    #active_account = initialize_account(active_account)
-
-    # Now create a synthetic transaction
-    # DATE, A, ACTIVE_ACCOUNT, 0, COST(A), # ....
-    #set_cost(active_account, get_cost(a, just_before(now)), now)
-    #set_cost(a, 0, now)
-
     # Need to identify this as a current account
     if (a in Maturity_Date)
       delete Maturity_Date[a]
 @ifeq LOG convert_term_account
     printf "\tRelabelled account => %s\n", a > STDERR
     printf "\tCurrent Account [%s] => %d\n", a, is_current(a) > STDERR
-    ##printf "\t\t Cost     => %s\n", print_cash(get_cost(active_account, now)) > STDERR
 @endif
   }
 
@@ -1397,20 +1431,6 @@ function update_member_liability(now, delta_profits, a) {
   # A no-op
   return
 }
-
-# A wrapper function updates allocated profits when required ()
-# function update_profits(now,     delta_profits) {
-#   # Compute the profits that need to be allocated to members
-#   # These are the profits accumulated since the last time they were distributed to members
-#   delta_profits = accumulated_profits(now) - get_cost(ALLOCATED, now)
-#   if (!near_zero(delta_profits)) {
-#     # Update the Allocated Profits
-#     adjust_cost(ALLOCATED, delta_profits, now, FALSE)
-#
-#     # Update the liabilities
-#     update_member_liability(now, delta_profits)
-#   }
-# }
 
 # checking and setting
 # Syntax
@@ -1479,169 +1499,6 @@ function checkset(now, a, account, units, amount, is_check,
 
 }
 
-# # Update a member liability
-# # This can be (i)   a contribution - specified member, taxable or tax-free
-# #          or (ii)  a benefit - specified member
-# #          or (iii) allocation amongst members - no specificiation
-# #          or (iv)  allocation to or from the reserve - no specification
-# # This function keeps the member liability up to date for a SMSF
-# #
-# function update_member_liability(now, amount, a,
-#                                       share, taxable_share,
-#                                       member_id, member_account,
-#                                       target_account,
-#                                       sum_total, x, sum_share) {
-#   # Update the member liabilities with their share of the income/expenses
-#   # The proportions only change when a contribution is received
-#   # or a benefit paid;
-#   # plus there is no legislation specifying the precise method of proportioning
-#   # but this seems reasonable
-#   #   Income / Expenses are made in proportion to net contributions made
-#   #   Contributions are assigned to the member
-#   #   Benefits are paid proportionate to  the member's balance - so security prices influence this
-#
-#   # In the various cases the following is passed in
-#   # Case (i)   :   account_name, now, amount
-#   # Case (ii)  :   account_name, now, amount
-#   # Case (iii) :   now, amount
-#   # Case (iv)  :   now, amount
-#
-#   # Note if a taxable share is driven negative the value should be transferred from the tax-free share
-#
-#   # Get the appropriate member account
-#   if ("" == a)
-#     member_id = ""
-#   else # This will be an account - but when not a CONTRIBUTION it will be a parent account
-#     member_id = get_member_name(a, now, amount)
-#
-# @ifeq LOG update_member_liability
-#   printf "Update Liabilities [%s]\n", get_date(now) > STDERR
-#   if (member_id)
-#     printf "\t%20s => %s\n", "Member id", member_id > STDERR
-#   printf "\tMember Shares\n" > STDERR
-# @endif # LOG
-#
-#   # Allocation to the liability accounts
-#   # Either no id is given - distribute amongst all accounts
-#   # Or a parent account - distribute amongst its offspring
-#   # Or a specific account - distribute solely to that account
-#   taxable_share = sum_total = sum_share = 0
-#
-#   # Normalize amounts
-#   if (member_id in Member_Liability) { # Exact match - a contribution
-#     # Adjust the liability
-#     adjust_cost(member_id, - amount, now)
-#     if (member_id ~ /TAXABLE/)
-#       taxable_share = 1.0
-#
-# @ifeq LOG update_member_liability
-#     sum_share = 1.0
-#     printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_id], sum_share, Leaf[member_id], print_cash(- amount) > STDERR
-# @endif # LOG
-#   } else { # Get totals
-#     # We still get the share from each account
-#     # Don't use the accumulated totals because (rarely) a negative account balance will break the proportioning
-#     # Also since  the order of transactions on a particular day is not defined use just_before() to compute proportions
-#     for (member_account in Member_Liability)
-#       if (!member_id || is_ancestor(member_id, member_account)) {
-#         share[member_account] = x = get_cost(member_account, just_before(now))
-#         sum_total += x
-#
-#         # Compute what fraction of the allocation was taxable
-#         if (member_account ~ /TAXABLE/)
-#           taxable_share += x
-#       }
-#
-#     # Normalize taxable share
-#     taxable_share /= sum_total
-#
-#     # There are two possibilities here -
-#     #   No member id => profit/loss everything goes to/from TAXABLE accounts
-#     #   A parent id  => proportioning rule applies
-#     # Update the liabilities - but only the target accounts
-#     for (member_account in share) {
-#       x = share[member_account] / sum_total
-#
-#       # Target account
-#       if (!member_id)
-#         target_account = Member_Liability[member_account]
-#       else
-#         target_account = member_account
-#
-#       # Adjust the liability
-#       adjust_cost(target_account, - x * amount, now)
-# @ifeq LOG update_member_liability
-#       sum_share += x
-#       printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_account], x, Leaf[target_account], print_cash(- x * amount) > STDERR
-#       if (get_cost(target_account, now) > 0)
-#         printf "\t\tNegative Balance in target account %16s => %14s\n", Leaf[target_account], print_cash(- get_cost(target_account, now)) > STDERR
-# @endif # LOG
-#     } # End of exact share
-#
-#     # Tidy up
-#     delete share
-#   } # End of allocation
-#
-# @ifeq LOG update_member_liability
-#   # Just debugging
-#   printf "\t%20s => %8.6f %16s => %14s\n", "Share", sum_share, "Total", print_cash(- amount) > STDERR
-# @endif # LOG
-#
-#   # return proportion that was taxable
-#   return taxable_share
-# }
-#
-# # Obtain the member account
-# function get_member_name(a, now, x,   member_name, member_account, target_account, subclass, contribution_tax) {
-#   # This obtains the liability account that needs to be modified
-#   # In more detail INCOME.CONTRIBUTION.SUBCLASS:NAME.SUFFIX => LIABILITY.MEMBER.NAME:NAME.SUBCLASS
-#   # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
-#   # In fact        X.Y:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
-#
-#   # Get the member name
-#   member_name = get_name_component(Leaf[a], 1) # first component
-#
-#   # A member liability account can only be created by a contribution
-#   if (is_class(a, "INCOME.CONTRIBUTION")) {
-#     # Identify the "subclass" - use Parent_Name because it is always available
-#     subclass = get_name_component(Parent_Name[a], 0) # last component
-#
-#     # If a link is made in a "MEMBER" array to each members liabilities
-#     # then there is no need to identify this as a member liability in the
-#     # account name
-#     member_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.%s", member_name, member_name, subclass))
-#
-#     # Ensure that this member is noted in the Member_Liability array
-#     if (!(member_account in Member_Liability)) {
-#       # Need to ensure that the target TAXABLE account is created
-#       # The target account can actually be the same as the member_account
-#       target_account = Member_Liability[member_account] = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.TAXABLE", member_name, member_name))
-#
-#       # Check the target account is included too
-#       if (!(target_account in Member_Liability))
-#         Member_Liability[target_account] = target_account
-#     } else # Get the target account so we check if contribution tax should be computed
-#       target_account = Member_Liability[member_account]
-#
-#     # This will change the LIABILITIES and EXPENSES equally
-#     if (target_account == member_account) {
-#       # This is a TAXABLE account
-#       contribution_tax = get_tax(now, Tax_Bands, x) # Always one band so ok to ignore other income
-#
-#       # Save the tax expenses and adjust the liability
-#       adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)
-#       adjust_cost(target_account,  contribution_tax, now)
-#     }
-#   } else {
-#     # Return the parent account
-#     member_account = "*LIABILITY.MEMBER." member_name
-#     assert(member_account in Parent_Name, "<" $0 "> Unknown account <" member_account ">")
-#   }
-#
-#   # Return the account
-#   return member_account
-# }
-
 # Final processing
 END {
   if (_assert_exit == 1)
@@ -1654,7 +1511,7 @@ END {
   # Delete empty accounts
   # Filter out data entries that were added by import CSV records
   # that do not overlap with the the holding period
-  filter_data(Last_Record)
+  filter_data(Last_Record, Filter_Data, FALSE)
 
   # Make sure any eofy transactions are recorded
   # This loop will happen at least once
@@ -1693,107 +1550,14 @@ END {
     if (!Write_Variables)
       printf "START_JOURNAL\n" > Write_State
   }
+
+  # Log data about selected variables
+  if (Write_Variables)
+    filter_data(Last_Record, Write_Variables, TRUE)
+
+  # Check
 } #// END
 #
-
-#
-# Filter Data
-#
-# Filter out irrelevant data - data that is out-of-range
-# can arise from importing records
-#
-function filter_data(now,      array_names, name) {
-  # Which data arrays are to be filtered
-  if (!split(Filter_Data, array_names, " "))
-    return # Nothing to filter
-
-  # Filter the data arrays
-  for (name in array_names)
-    filter_array(now, SYMTAB[array_names[name]], array_names[name])
-}
-
-# Handle each array in turn
-function filter_array(now, data_array, name,
-                           a, p, start_block, end_block, block_id,
-                           stack, key) {
-@ifeq LOG filter_data
- printf "Filter Data %s\n", name > STDERR
-@endif
-
-  # list holding "blocks" - ie non-overlapping holding periods
-  # Each block is preceeded and/or followed by "gaps"
-  for (a in Leaf)
-    if ((a in data_array) && is_unitized(a))
-      if (ever_held(a)) {
-        # Get each parcel in turn and list the contiguous blocks of time held
-        start_block = Held_From[a][0]
-        end_block = Held_Until[a][0]
-        block_id = 0
-        for (p = 1; p < Number_Parcels[a]; p ++) {
-          # This starts a new holding block if the purchase date is after the current end date
-          if (greater_than(Held_From[a][p], end_block)) {
-            # Filter the old block
-@ifeq LOG filter_data
-            # List this block
-            printf "%12s, %03d, %s, %s\n", Leaf[a], block_id, get_date(start_block), get_date(end_block) > STDERR
-@endif
-
-            # # Check the data against each block
-            filter_block(key, data_array[a], start_block, end_block)
-
-            # Remove anything kept to speed up processing
-            for (key in stack)
-              delete data_array[a][key]
-
-            # A new block
-            block_id ++
-            start_block = Held_From[a][p]
-            end_block = Held_Until[a][p]
-          } else if (greater_than(Held_Until[a][p], end_block)) # extend the old block
-            end_block = Held_Until[a][p]
-
-          # If this parcel is open we have completed all possible blocks
-          if (is_unsold(a, p, now))
-            break
-        } # End of each parcel p
-
-        # The last holding block
-@ifeq LOG filter_data
-          printf "%12s, %03d, %s, %s\n", Leaf[a], block_id, get_date(start_block), get_date(end_block) > STDERR
-@endif
-          # Check the data against each block
-          filter_block(key, data_array[a], start_block, end_block)
-
-@ifeq LOG filter_data
-        for (key in stack)
-          printf "\tKeep   => %s\n", get_date(key) > STDERR
-@endif
-        # Copy the kept items back
-        for (key in stack)
-          data_array[a][key] = stack[key]
-        delete stack
-
-      } else {
-        # Never held!
-@ifeq LOG filter_data
-        printf "%12s Never Held!\n", Leaf[a] > STDERR
-@endif
-        unlink_account(a)
-      }
-
-
-    # End of each asset a
-}
-
-# The current value of an asset
-function get_value(a, now) {
-  # Depreciating assets are different
-  if (is_capital(a))
-    return (find_entry(Price[a], now) * get_units(a, now))
-
-  # Just the cost
-  return get_cost(a, now)
-}
 
 # Sell qualified units
 # This is trickier than ordinary units

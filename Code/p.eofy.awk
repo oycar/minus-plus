@@ -173,14 +173,14 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           if (!gains_event) {
             # Two types of header
             if (is_detailed)
-              printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
+              printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                       asset_width, "Asset", 10, "Parcel",
                       7, "Units", 14, "Cost",
                       11, "From", 12, to_label,
                       11, "Price", 16, proceeds_label,
                       13, "Reduced", 14, "Adjusted",
                       15, "Accounting", 9, "Type",
-                      18, "Taxable", 15, "Per Unit" > reports_stream
+                      18, "Taxable", 16, "Per Unit" > reports_stream
             else if (no_header_printed) {
               printf "%*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
                      asset_width, "Asset",
@@ -270,7 +270,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           # Print out the parcel information
           if (is_detailed) {
             # If printing out in detail
-            printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
+            printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                  asset_width + 1, label,
                  7, p,
                  11, units,
@@ -284,7 +284,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                  14, print_cash(- gains),
                  14, description,
                  14, print_cash(- parcel_gains),
-                 14, print_cash(- parcel_gains / units, 4) > reports_stream
+                 14, print_cash(parcel_cost / units, 4) > reports_stream
 
             # Clear label
             label = ""
@@ -296,7 +296,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       if (gains_event) {
         if (is_detailed)
           # Detailed format
-          underline(160 + asset_width, 6, reports_stream)
+          underline(175 + asset_width, 6, reports_stream)
 
         # The output starts here
         printf "%*s %*.3f %*s %*s   %*s %*s %*s %*s %*s ",
@@ -568,7 +568,6 @@ function get_carried_losses(past, limit,
   # This determines the carried losses
   set_cost(CARRIED_LOSSES, carried_losses, past)
   return carried_losses
-  #return get_cost(CARRIED_LOSSES, past)
 }
 
 # Compute the deferred gains
@@ -1194,7 +1193,7 @@ function print_dividend_qualification(now, past, is_detailed,
         qualified_payment += qualified_fraction * payment
 
         # Make the appropriate changes for the current tax jurisdiction
-        @Dividend_Qualification_Function(a, underlying_asset, key, 1.0 - qualified_fraction)
+        @Dividend_Qualification_Function(a, key, 1.0 - qualified_fraction)
 
         # Get the next key
         key = next_key

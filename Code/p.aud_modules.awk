@@ -35,13 +35,13 @@ BEGIN {
   if ("" == Epoch)
     set_epoch()
 
-  # // Can set constants here
-  if (!Qualification_Window)
-    EOFY_Window = Qualification_Window = 0
-  else {
-    Qualification_Window = 91 * ONE_DAY # seconds
-    EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
-  }
+  # # // Can set constants here
+  # if (!Qualification_Window)
+  #   EOFY_Window = Qualification_Window = 0
+  # else {
+  #   Qualification_Window = 91 * ONE_DAY # seconds
+  #   EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
+  # }
 
   # Start of FY
   if ("" == FY_Date)
@@ -77,9 +77,6 @@ BEGIN {
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
   #
-  #
-  # # Franking deficit
-  # FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # For super funds the amount claimable is sometimes reduced to 75%
   Reduced_GST   = 0.75
@@ -213,7 +210,8 @@ function income_tax_aud(now, past, benefits,
   #
   #
   # Australia ignores the distinction between long & short term losses
-  taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  #taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
+  taxable_gains = get_taxable_gains(now, get_carried_losses(past, CARRY_FORWARD_LIMIT))
   if (below_zero(taxable_gains)) {
     # Gains are a negative number
     other_income -= taxable_gains
@@ -564,7 +562,11 @@ function income_tax_aud(now, past, benefits,
 @endif
   } # End of if any attempt to apply non-refundable assets
 
-  # Now apply refundable offsets - but note if used these will not generate a tax loss
+  # What happens when the tax owed is negative??
+
+
+
+  # Now apply refundable offsets - but note these will not generate a tax loss - since they are refunded :)
   if (above_zero(refundable_offsets)) {
     tax_owed -= refundable_offsets
     printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > write_stream
@@ -640,17 +642,16 @@ function income_tax_aud(now, past, benefits,
 
   # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
   } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
-    # To be clear refundable offsets can generate a tax refund
-    # so tax_owed < 0 BUT this will be repaid so will not
-    # generate a tax loss
-    #
-    # On the other hand remaining franking offsets will generate tax loss
-    # Even when tax_owed == 0
-    # so do catch  the case of  tax_owed < Epsilon
-    tax_losses = get_taxable_income(now, franking_offsets - refundable_offsets - tax_owed)
+    # This is a bit tricky
+    # (unused) franking offsets may still be present here
+    # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
+    # so adjust the tax losses accordingly
+    # -- so does this work for an individual or smsf?
+    tax_losses -= get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
 @ifeq LOG income_tax
     printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > write_stream
 @endif
+
   }
 
   # The carried tax losses
@@ -866,7 +867,7 @@ function get_taxable_gains(now, losses,
     # But not a long term loss
     losses = short_gains = 0
 @ifeq LOG get_gains
-    printf "\n\tOnly Long Gains\n" > reports_stream
+    printf "\n\tOnly Long Gains\n" > STDERR
     printf "\t%27s => %14s\n", "Long Gains", print_cash(- long_gains) > STDERR
 @endif
   } else {
@@ -893,8 +894,10 @@ function get_taxable_gains(now, losses,
 #
 ## Dividend Qualification Function
 ##
-function dividend_qualification_aud(a, underlying_asset, now, unqualified,
+##function dividend_qualification_aud(a, underlying_asset, now, unqualified,
+function dividend_qualification_aud(a, now, unqualified,
 
+                                       underlying_asset,
                                        unqualified_account, imputation_credits) {
 
   # For Australia we need to adjust tax credits associated with an account
@@ -904,9 +907,11 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
     return
 
   # Were there any tax credits anyway?
-  if (underlying_asset in Tax_Credits) {
+  if (a in Tax_Credits) {
+    underlying_asset = Underlying_Asset[a]
+
     # Get the Imputation credits associated with this transaction - and only this transaction
-    imputation_credits = get_delta_cost(Tax_Credits[underlying_asset], now)
+    imputation_credits = get_delta_cost(Tax_Credits[a], now)
     if (!near_zero(imputation_credits)) {
       # Create an unqualified account
       unqualified_account = initialize_account("SPECIAL.FRANKING.OFFSET.UNQUALIFIED:U_TAX." Leaf[underlying_asset])
@@ -915,9 +920,9 @@ function dividend_qualification_aud(a, underlying_asset, now, unqualified,
       unqualified *= imputation_credits
 @ifeq LOG dividend_qualification
       printf "Underlying Asset %s\n", Leaf[underlying_asset] > STDERR
-      printf "\tTax Credits %s[%s]      => %s\n", Leaf[Tax_Credits[underlying_asset]], get_date(now), print_cash(- imputation_credits) > STDERR
+      printf "\tTax Credits %s[%s]      => %s\n", Leaf[Tax_Credits[a]], get_date(now), print_cash(- imputation_credits) > STDERR
       printf "\tUnqualified Tax Credits => %s\n", print_cash(- unqualified) > STDERR
-      printf "\tTotal Tax Credits       => %s\n", print_cash(- get_cost(Tax_Credits[underlying_asset], now)) > STDERR
+      printf "\tTotal Tax Credits       => %s\n", print_cash(- get_cost(Tax_Credits[a], now)) > STDERR
       printf "\tFranking Balance        => %s\n", print_cash(get_cost(FRANKING, now)) > STDERR
       printf "\tTotal Unqualified       => %s\n", print_cash(- get_cost(unqualified_account, now)) > STDERR
 @endif
