@@ -1879,6 +1879,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     # At a parcel's sale they determine taxable
     # capital gains and losses
     # Stored (as sums) by parcel, cost element and time
+    # eg Accounting_Cost[account][parcel][element][time]
     Accounting_Cost[account_name][0][0][SUBSEP] = 0
     zero_costs(Accounting_Cost[account_name][0], SUBSEP)
     for (p in Accounting_Cost[account_name][0])
@@ -1889,6 +1890,18 @@ function initialize_account(account_name,     class_name, array, p, n,
     zero_costs(Tax_Adjustments[account_name][0], SUBSEP)
     for (p in Tax_Adjustments[account_name][0])
       delete Tax_Adjustments[account_name][0][p][SUBSEP]
+
+    # Store taxable capital losses too
+    if (((account_name) ~ /^ASSET\.CAPITAL[.:]/)) {
+      # No cost element or time term - Losses[account][parcel]
+      # Losses/Gains only ever occur when parcel is sold
+      # a parcel is only ever sold once
+      # Need to keep track of Long & Short losses & gains
+      Parcel_Long_Losses[account_name][SUBSEP]  ; delete Parcel_Long_Losses[account_name][SUBSEP]
+      Parcel_Short_Losses[account_name][SUBSEP] ; delete Parcel_Short_Losses[account_name][SUBSEP]
+      Parcel_Long_Gains[account_name][SUBSEP]  ; delete Parcel_Long_Gains[account_name][SUBSEP]
+      Parcel_Short_Gains[account_name][SUBSEP] ; delete Parcel_Short_Gains[account_name][SUBSEP]
+    }
 
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel
@@ -3609,7 +3622,6 @@ function print_dividend_qualification(now, past, is_detailed,
         qualified_payment += qualified_fraction * payment
 
         # Make the appropriate changes for the current tax jurisdiction
-##        @Dividend_Qualification_Function(a, underlying_asset, key, 1.0 - qualified_fraction)
         @Dividend_Qualification_Function(a, key, 1.0 - qualified_fraction)
 
         # Get the next key
@@ -5088,6 +5100,16 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
 #   2008 Apr 09, CASH, BHP.ASX, 200, 8382.00, # (in specie transfer in fact)
 #
 # To Do =>
+#
+#   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
+#   Need to break down capital and carried losses by year
+#   Need INCOME.GAINS:LONG.LLC.ASX etc then this could be computed programmatically - i.e. gains distributed
+#        in a AMMA statement have taxable consequences which depend on whether any losses are available or not
+#        fixing this in general would make multiple currencies viable too
+#   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
+#   Consider breaking out income/expenses in  the same way as the tax return does?
+#   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
+#
 #
 #   Fix up wiki files
 #   More flexible ordering of optional fields?

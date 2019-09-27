@@ -38,6 +38,16 @@
 #
 # To Do =>
 #
+#   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
+#   Need to break down capital and carried losses by year
+#   Need INCOME.GAINS:LONG.LLC.ASX etc then this could be computed programmatically - i.e. gains distributed
+#        in a AMMA statement have taxable consequences which depend on whether any losses are available or not
+#        fixing this in general would make multiple currencies viable too
+#   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
+#   Consider breaking out income/expenses in  the same way as the tax return does?
+#   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
+#
+#
 #   Fix up wiki files
 #   More flexible ordering of optional fields?
 #   other tax_statement calculations (eg UK, US, NZ etc...)

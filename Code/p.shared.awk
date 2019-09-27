@@ -1641,6 +1641,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     # At a parcel's sale they determine taxable
     # capital gains and losses
     # Stored (as sums) by parcel, cost element and time
+    # eg Accounting_Cost[account][parcel][element][time]
     Accounting_Cost[account_name][0][0][SUBSEP] = 0
     zero_costs(Accounting_Cost[account_name][0], SUBSEP)
     for (p in Accounting_Cost[account_name][0])
