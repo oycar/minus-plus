@@ -1321,6 +1321,8 @@ function set_cost(a, new_cost, now,     initial_cost) {
   adjust_cost(a, new_cost - initial_cost, now, FALSE)
 }
 
+
+
 # Unrealized or market gains
 function sum_market_gains(now,     sum, a) {
   sum = 0
@@ -1661,7 +1663,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     Total_Units[account_name][Epoch]     = 0
     Qualified_Units[account_name][SUBSEP]; delete Qualified_Units[account_name][SUBSEP]
 
-    # Each parcel also has a number of parcels
+    # Each account also has a number of parcels
     set_key(Number_Parcels, account_name, 0)
 
     # End of if ASSET
@@ -1669,7 +1671,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     # Set an Underlying_Asset if the leaf name
     # is of the appropriate format
     #
-    # (DIV|DIST|FOR).LEAF => LEAF
+    # (DIV|DIST|FOR|GAINS).LEAF => LEAF
     #
     if (is_linked(account_name)) {
       # Probably a better way to do this using a regex

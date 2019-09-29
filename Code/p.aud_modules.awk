@@ -210,8 +210,7 @@ function income_tax_aud(now, past, benefits,
   #
   #
   # Australia ignores the distinction between long & short term losses
-  #taxable_gains = get_taxable_gains(now, get_cost(CARRIED_LOSSES, past))
-  taxable_gains = get_taxable_gains(now, get_carried_losses(past, CARRY_FORWARD_LIMIT))
+  taxable_gains = @Get_Taxable_Gains_Function(now, get_carried_losses(past, CARRY_FORWARD_LIMIT))
   if (below_zero(taxable_gains)) {
     # Gains are a negative number
     other_income -= taxable_gains
@@ -807,7 +806,7 @@ function income_tax_aud(now, past, benefits,
 
 ## This should become jurisdiction specific
 ## There are complications with the discounting
-function get_taxable_gains(now, losses,
+function get_taxable_gains_aud(now, losses,
 
                            discount, long_gains, short_gains) {
   # There are two uses for this function
@@ -887,6 +886,61 @@ function get_taxable_gains(now, losses,
     return losses
   else # Taxable gains (may be zero)
     return short_gains + (1.0 - discount) * long_gains
+}
+
+# Balance the grossed up gains with underlying assets' cost bases
+function gross_up_gains_aud(stream, now, past, total_gains, net_gains,
+         a, underlying_asset,
+         extra_gains, extra_share, total_share,
+         gains_now, gains,
+         x, fraction) {
+
+  # Compute the difference between the grossed up and net income long gains
+  extra_gains = rational_value(CGT_Discount) * net_gains / (1.0 - rational_value(CGT_Discount))
+
+  # Track total share of extra gains remaining
+  total_share = 1
+  for (a in Leaf)
+    if (block_class(a, "INCOME.GAINS.LONG", "INCOME.GAINS.LONG.SUM")) {
+      # These are the income gains classes
+      # Each account needs the income gains increased in proportion to its share of the total gains
+      gains_now = get_cost(a, just_before(now))
+      gains     = gains_now - get_cost(a, past)
+
+      # Skip negligible gains
+      if (!below_zero(gains))
+        continue
+
+      # What share of the gains is this
+      fraction = gains / total_gains
+
+      # set new costs - don't use adjust because this is EOFY processing
+      extra_share = fraction * extra_gains
+
+      # Adjusting totals will allow swifter exit
+      total_share -= fraction
+
+      # Get underlying account
+      assert(a in Underlying_Asset, "No underlying asset account to balance extra capital gains <" a ">")
+      underlying_asset = Underlying_Asset[a]
+
+      # Get balance of underlying asset
+      x = get_cost(underlying_asset, just_before(now))
+      set_cost(a, gains_now + extra_share, now)
+      set_cost(underlying_asset, x - extra_share, now)
+      printf "\t\tCost Base Increase %27s => %s\n", Leaf[underlying_asset], print_cash(- extra_share) > stream
+
+      # Are we done?
+      if (!above_zero(total_share))
+        break
+    }
+
+  # Compute the difference between the grossed up and net income long gains
+  total_gains += extra_gains
+  printf "\t%27s => %14s\n", "Gross Long Income Gains", print_cash(- total_gains) > stream
+
+  # The grossed up value
+  return total_gains
 }
 
 

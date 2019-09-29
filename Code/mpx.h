@@ -130,9 +130,8 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define is_franking_deficit(a) ((a) ~ /^SPECIAL\.OFFSET\.FRANKING_DEFICIT[.:]/)
 
 # // Is a leaf name in a linked account format i.e. first component is
-# // (DIV|DIST|FOR).LEAF => LEAF
-@define is_linked(a) ((Leaf[a]) ~ /^(DIV|DIST|FOR)\./)
-
+# // (DIV|DIST|FOR|GAINS).LEAF => LEAF
+@define is_linked(a) ((Leaf[a]) ~ /^(DIV|DIST|FOR|GAINS)\./)
 
 # // The current value of an asset
 @define get_value(a, now) ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))

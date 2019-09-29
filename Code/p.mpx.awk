@@ -413,6 +413,8 @@ function import_csv_data(array, symbol, name,
   Initialize_Tax_Function = "initialize_tax_" tolower(Journal_Currency)
   Dividend_Qualification_Function = "dividend_qualification_" tolower(Journal_Currency)
   Imputation_Report_Function      = "imputation_report_" tolower(Journal_Currency)
+  Gross_Up_Gains_Function   = "gross_up_gains_" tolower(Journal_Currency)
+  Get_Taxable_Gains_Function   = "get_taxable_gains_" tolower(Journal_Currency)
 
   # These functions are not dependent on currency
   Balance_Profits_Function  = "balance_journal"
@@ -604,10 +606,10 @@ function set_special_accounts() {
   MARKET_CHANGES  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
 
   # Extra capital gains accounts which can be manipulated independently of asset revaluations
-  INCOME_LONG        = initialize_account("INCOME.GAINS:INCOME.LONG")
-  INCOME_SHORT       = initialize_account("INCOME.GAINS:INCOME.SHORT")
-  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES:EXPENSE.LONG")
-  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES:EXPENSE.SHORT")
+  INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")
+  INCOME_SHORT       = initialize_account("INCOME.GAINS.SHORT:INCOME.SHORT")
+  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES.LONG:EXPENSE.LONG")
+  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
 
   # Taxable capital gains are in special accounts
   # Tax Adjustments have potentially been applied to these quantities
