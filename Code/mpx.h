@@ -24,14 +24,15 @@
 @define DEVNULL "/dev/null"
 
 # //
-@define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf \
-Lifetime Long_Name Maturity_Date Method_Name Number_Parcels \
-Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands \
-Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held "
+@define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf\
+ Lifetime Long_Name Maturity_Date Method_Name Number_Parcels\
+ Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands\
+ Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held "
 
-@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length \
-FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED \
-Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
+@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root EOFY_Window FY_Day FY_Date FY_Length\
+ FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED\
+ Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function\
+ Income_Tax_Function Initialize_Tax_Function "
 
 # // Some constants
 @define DITTO ("^")

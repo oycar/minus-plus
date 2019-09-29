@@ -1216,6 +1216,10 @@ function update_cost(a, x, now,      p) {
 }
 
 function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,        cost_base) {
+  # Ignore negligible adjustments
+  if (near_zero(parcel_adjustment))
+    return
+
 @ifeq LOG adjust_cost
   printf "%s\n", a > STDERR
   printf "\tTimeStamp => %s\n", get_date(now) > STDERR
