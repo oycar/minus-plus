@@ -1322,28 +1322,33 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
 
   # Equities do not have tax adjustments and can indeed have a negative cost base
-  if (!is_equity(a)) {
-    # Now this is tricky -
-    #   The cost base can be negative
-    #   but not after the tax adjustment
-    # Also if this parcel was sold on the same day (so time==now)
-    # a term will be included in cash_out - so overrule that
-    cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) - get_cash_out(a, p, now)
-    if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) {
-      # Cannot create a negative cost base (for long)
-      # This will impact capital gains!
-      # Since a negative cost base cannot be deferred
-
-      # Save the parcel gain
-      save_parcel_gain(a, p, now)
-
-      # This parcel gain is not recorded...
-
-      # We are cashing the tax adjustments out so adjust both cost bases to zero
-      zero_costs(Accounting_Cost[a][p], now)
-      zero_costs(Tax_Adjustments[a][p], now)
-    }
-  }
+  # try doing nothing!
+  # but check instead in the EOFY processing....
+  # if (!is_equity(a)) {
+  #   # Now this is tricky -
+  #   #   The cost base can be negative
+  #   #   but not after the tax adjustment
+  #   # Also if this parcel was sold on the same day (so time==now)
+  #   # a term will be included in cash_out - so overrule that
+  #   cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) - get_cash_out(a, p, now)
+  #   if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) {
+  #     # Cannot create a negative cost base (for long)
+  #     # This will impact capital gains!
+  #     # Since a negative cost base cannot be deferred
+  #
+  #     # Save the parcel gain
+  #     save_parcel_gain(a, p, now)
+  #
+  #     # This parcel gain is not recorded...
+  #     # How to fix this....
+  #     # What if the parcel were split (unit -> 0:units) & the 0 parcel closed???
+  #
+  #
+  #     # We are cashing the tax adjustments out so adjust both cost bases to zero
+  #     zero_costs(Accounting_Cost[a][p], now)
+  #     zero_costs(Tax_Adjustments[a][p], now)
+  #   }
+  # }
 
   # Debugging
 @ifeq LOG adjust_cost

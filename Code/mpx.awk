@@ -1620,28 +1620,33 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
 
   # Equities do not have tax adjustments and can indeed have a negative cost base
-  if (!((a) ~ /^EQUITY[.:]/)) {
-    # Now this is tricky -
-    #   The cost base can be negative
-    #   but not after the tax adjustment
-    # Also if this parcel was sold on the same day (so time==now)
-    # a term will be included in cash_out - so overrule that
-    cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) - get_cash_out(a, p, now)
-    if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) {
-      # Cannot create a negative cost base (for long)
-      # This will impact capital gains!
-      # Since a negative cost base cannot be deferred
-
-      # Save the parcel gain
-      save_parcel_gain(a, p, now)
-
-      # This parcel gain is not recorded...
-
-      # We are cashing the tax adjustments out so adjust both cost bases to zero
-      zero_costs(Accounting_Cost[a][p], now)
-      zero_costs(Tax_Adjustments[a][p], now)
-    }
-  }
+  # try doing nothing!
+  # but check instead in the EOFY processing....
+  # if (!is_equity(a)) {
+  #   # Now this is tricky -
+  #   #   The cost base can be negative
+  #   #   but not after the tax adjustment
+  #   # Also if this parcel was sold on the same day (so time==now)
+  #   # a term will be included in cash_out - so overrule that
+  #   cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) - get_cash_out(a, p, now)
+  #   if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) {
+  #     # Cannot create a negative cost base (for long)
+  #     # This will impact capital gains!
+  #     # Since a negative cost base cannot be deferred
+  #
+  #     # Save the parcel gain
+  #     save_parcel_gain(a, p, now)
+  #
+  #     # This parcel gain is not recorded...
+  #     # How to fix this....
+  #     # What if the parcel were split (unit -> 0:units) & the 0 parcel closed???
+  #
+  #
+  #     # We are cashing the tax adjustments out so adjust both cost bases to zero
+  #     zero_costs(Accounting_Cost[a][p], now)
+  #     zero_costs(Tax_Adjustments[a][p], now)
+  #   }
+  # }
 
   # Debugging
 
@@ -3041,7 +3046,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3344,7 +3349,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -3387,7 +3392,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3527,7 +3532,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3660,7 +3665,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3733,7 +3738,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[fF]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[fF]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3866,7 +3871,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4360,7 +4365,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -5148,7 +5153,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[iI]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -7256,6 +7261,14 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
   # Update parent sums
   update_cost(ac, -x, now)
 }
+
+#
+# sell part or all a parcel at time now
+# account  a
+# parcel   p
+# sell     du units
+# proceeds amount_paid
+# time     now
 
 function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
   # The sale date

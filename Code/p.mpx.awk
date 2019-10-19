@@ -1965,6 +1965,14 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
   update_cost(ac, -x, now)
 }
 
+#
+# sell part or all a parcel at time now
+# account  a
+# parcel   p
+# sell     du units
+# proceeds amount_paid
+# time     now
+
 function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
   # The sale date
   Held_Until[a][p] = now
