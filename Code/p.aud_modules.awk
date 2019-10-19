@@ -210,7 +210,9 @@ function income_tax_aud(now, past, benefits,
   #
   #
   # Australia ignores the distinction between long & short term losses
-  taxable_gains = @Get_Taxable_Gains_Function(now, get_carried_losses(past, CARRY_FORWARD_LIMIT))
+  # The carried losses are based on the remaining losses; although
+  # the carry forward limit should be applied
+  taxable_gains = @Get_Taxable_Gains_Function(now, carry_losses(past)) # FIXME need carry forward limit
   if (below_zero(taxable_gains)) {
     # Gains are a negative number
     other_income -= taxable_gains
@@ -235,7 +237,7 @@ function income_tax_aud(now, past, benefits,
   }
 
   # Save the loss
-  set_cost(CARRIED_LOSSES, carried_losses, now)
+  #set_cost(CARRIED_LOSSES, carried_losses, now)
 
   # Imputation Tax Offsets
   #
@@ -724,7 +726,8 @@ function income_tax_aud(now, past, benefits,
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
-  capital_losses = get_cost(CARRIED_LOSSES, now)
+  #capital_losses = get_cost(CARRIED_LOSSES, now)
+  capital_losses = carry_losses(now)
   if (!near_zero(capital_losses))
     printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
@@ -832,9 +835,9 @@ function get_taxable_gains_aud(now, losses,
 @ifeq LOG get_gains
   printf "\nTaxable Gains Application of Combined Losses\n" > STDERR
   printf "\tDate        => %14s\n", get_date(now) > STDERR
-  printf "\tLong  Gains => %14s\n", print_cash(-long_gains)
-  printf "\tShort Gains => %14s\n", print_cash(-short_gains)
-  printf "\tLosses      => %14s\n", print_cash(losses)
+  printf "\tLong  Gains => %14s\n", print_cash(-long_gains) > STDERR
+  printf "\tShort Gains => %14s\n", print_cash(-short_gains) > STDERR
+  printf "\tLosses      => %14s\n", print_cash(losses) > STDERR
 
 @endif # LOG
   # Apply the losses - most favourable order is to apply them to other gains first
@@ -889,19 +892,30 @@ function get_taxable_gains_aud(now, losses,
 }
 
 # Balance the grossed up gains with underlying assets' cost bases
-function gross_up_gains_aud(stream, now, past, total_gains, net_gains,
+function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
          a, underlying_asset,
-         extra_gains, extra_share, total_share,
+         extra_share, total_share,
          gains_now, gains,
+         extra_gains,
          x, fraction) {
 
-  # Compute the difference between the grossed up and net income long gains
-  extra_gains = rational_value(CGT_Discount) * net_gains / (1.0 - rational_value(CGT_Discount))
+  # No short gains by default
+  short_gains = ternary(short_gains, short_gains, 0)
+
+  # Ensure there are gains
+  if (!below_zero(total_gains))
+    return 0
+
+  # Neglect the component due to short gains
+  fraction = long_gains / (long_gains + short_gains)
+
+  # Compute the difference between the grossed up and net income long gains - short gains are disregarded
+  extra_gains = rational_value(CGT_Discount) * fraction * total_gains / (1.0 - rational_value(CGT_Discount))
 
   # Track total share of extra gains remaining
   total_share = 1
   for (a in Leaf)
-    if (block_class(a, "INCOME.GAINS.LONG", "INCOME.GAINS.LONG.SUM")) {
+    if (select_class(a, "INCOME.GAINS.NET")) {
       # These are the income gains classes
       # Each account needs the income gains increased in proportion to its share of the total gains
       gains_now = get_cost(a, just_before(now))
@@ -912,7 +926,7 @@ function gross_up_gains_aud(stream, now, past, total_gains, net_gains,
         continue
 
       # What share of the gains is this
-      fraction = gains / total_gains
+      fraction = gains / long_gains
 
       # set new costs - don't use adjust because this is EOFY processing
       extra_share = fraction * extra_gains
@@ -928,7 +942,9 @@ function gross_up_gains_aud(stream, now, past, total_gains, net_gains,
       x = get_cost(underlying_asset, just_before(now))
       set_cost(a, gains_now + extra_share, now)
       set_cost(underlying_asset, x - extra_share, now)
-      printf "\t\tCost Base Increase %27s => %s\n", Leaf[underlying_asset], print_cash(- extra_share) > stream
+@ifeq LOG get_gains
+      printf "\t\tCost Base Increase %27s => %s\n", Leaf[underlying_asset], print_cash(- (gains + extra_share)) > STDERR
+@endif
 
       # Are we done?
       if (!above_zero(total_share))
@@ -936,11 +952,15 @@ function gross_up_gains_aud(stream, now, past, total_gains, net_gains,
     }
 
   # Compute the difference between the grossed up and net income long gains
-  total_gains += extra_gains
-  printf "\t%27s => %14s\n", "Gross Long Income Gains", print_cash(- total_gains) > stream
+  long_gains += extra_gains
 
-  # The grossed up value
-  return total_gains
+@ifeq LOG get_gains
+  printf "\t%27s => %14s\n", "Gross Short Income Gains", print_cash(- short_gains) > STDERR
+  printf "\t%27s => %14s\n", "Gross Long Income Gains",  print_cash(- long_gains) > STDERR
+@endif
+
+  # The grossed up long gains
+  return long_gains
 }
 
 

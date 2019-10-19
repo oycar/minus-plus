@@ -118,7 +118,6 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
     T) Show_Reports+="T";;  # Tax Statement
     Z) Show_Reports="Z";;   # Zero
 
-
     s) # stop time
       stop_time="${OPTARG}"
       echo "Stop Time => ${stop_time}";;

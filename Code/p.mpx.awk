@@ -40,9 +40,6 @@
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
 #   Need to break down capital and carried losses by year
-#   Need INCOME.GAINS:LONG.LLC.ASX etc then this could be computed programmatically - i.e. gains distributed
-#        in a AMMA statement have taxable consequences which depend on whether any losses are available or not
-#        fixing this in general would make multiple currencies viable too
 #   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
 #   Consider breaking out income/expenses in  the same way as the tax return does?
 #   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
@@ -75,7 +72,8 @@ BEGIN {
   make_array(Documents)
 
   # A Document shortcut code
-  Document_Shortcut = ":"
+  #Document_Shortcut = ":"
+  Document_Shortcut = "[:+]"
 
   # And a gains stack
   make_array(Gains_Stack)
@@ -158,6 +156,10 @@ BEGIN {
   make_array(Underlying_Asset)
   make_array(Units_Held)
 
+  # Provisional Carried Loss Arrays
+  make_array(Remaining_Losses)
+  Remaining_Losses[0][SUBSEP] = 0; delete Remaining_Losses[0][SUBSEP]
+
   # This is a CSV file
   read_csv_records()
 
@@ -190,6 +192,10 @@ BEGIN {
 
   # Set special accounts
   set_special_accounts()
+
+  # Default Taxable Capital Gains & Losses
+  #use_gains(LONG_GAINS, SHORT_GAINS)
+  #use_losses(LONG_LOSSES, SHORT_LOSSES)
 
   # Copyleft?
   if ("" != version) {
@@ -232,7 +238,7 @@ BEGIN {
   # The last recorded timestamp in a state file
   # is Last_State - also initialized to -1
   Last_State = - 1
-  FY_Time = -1
+  Last_FY = FY_Time = -1
   FY_Year = -1 # Not set yet
 } # End of BEGIN block
 
@@ -451,6 +457,7 @@ function import_csv_data(array, symbol, name,
   #
   # Initialize state file information
   initialize_state()
+  Last_FY = last_year(FY_Time)
 
   # All done
   next
@@ -466,6 +473,7 @@ function set_financial_year(now,   new_fy) {
   new_fy = read_date(FY_Year "-" FY_Date, 0)
   assert(new_fy > just_before(FY_Time), "Cannot regress financial year: Current FY => " get_date(FY_Time) " New FY => " get_date(new_fy))
   FY_Time = new_fy
+  Last_FY = last_year(FY_Time)
 
   # Get the day number for the FY_Date
   FY_Day = get_day_number(FY_Time)
@@ -618,10 +626,9 @@ function set_special_accounts() {
   SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
   SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
   WRITTEN_BACK   = initialize_account("SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK")
-  CARRIED_LOSSES = initialize_account("SPECIAL.CARRIED:CARRIED.LOSSES")
 
   # Taxable carried losses
-  TAX_LOSSES       = initialize_account("SPECIAL.CARRIED:TAX.LOSSES")
+  TAX_LOSSES       = initialize_account("SPECIAL.LOSSES:TAX.LOSSES")
 
   #
   # Deferred Gains & Losses too (all long...)
@@ -797,6 +804,7 @@ function read_input_record(   t, n, a, threshold) {
 
       # Update FY length
       FY_Length = get_year_length(FY_Year, FY_Day)
+      Last_FY = FY_Time
       FY_Time = next_year(FY_Time)
     }
   } else # Check for semi-monotonicity
@@ -1530,6 +1538,7 @@ END {
 
       # Update FY length
       FY_Length = get_year_length(FY_Year, FY_Day)
+      Last_FY = FY_Time
       FY_Time = next_year(FY_Time)
     } while (FY_Time + EOFY_Window < Last_Record)
 
@@ -1538,6 +1547,7 @@ END {
     FY_Length = get_year_length(FY_Year, FY_Day)
 
     FY_Time = last_year(FY_Time)
+    Last_FY = last_year(FY_Time)
   }
 
   # Write out code state - it sould be ok to do this after all processing now
@@ -2049,7 +2059,11 @@ function sell_fixed_parcel(a, p, now,     x) {
 }
 
 # Save a capital gain
-# The gain was made at time "now" on at asset purchased at "date_purchased"
+# The gain was made at time "now" on at asset purchased at Held_From[a][p]
+# Normally this saves taxable gains/losses in LONG_GAINS etc
+# Very occasionally uses the INCOME_LONG
+# So to avoid inefficiency uses a global name for these
+# accounts which can be flipped if necessary
 function save_parcel_gain(a, p, now,    x, held_time) {
   # Get the held time
   held_time = get_held_time(now, Held_From[a][p])

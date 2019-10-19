@@ -114,8 +114,10 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
                                                             units, units_sold,
                                                             cost, reduced_cost, adjusted_cost,
+                                                            sum_cost, sum_reduced, sum_adjusted,
                                                             parcel_cost, parcel_proceeds,
                                                             proceeds,
+                                                            sum_proceeds,
                                                             accounting_gains,
 
                                                             sum_long_gains, sum_long_losses,
@@ -144,6 +146,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   # Record accounting gains
   accounting_gains = 0
   sum_long_gains = sum_short_gains = sum_long_losses = sum_short_losses = 0 # Tax gains/losses summed here
+  sum_cost = sum_reduced = sum_proceeds = sum_adjusted = 0
 
   # formatting
   asset_width = 15
@@ -164,7 +167,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
       # Need to select parcels by sold date
       for (p = 0; p < Number_Parcels[a]; p++ ) {
-        if (Held_From[a][p] > now) # All further transactions occured after (now) - parcels are sorted in order bought
+        if (Held_From[a][p] > now) # All further transactions occurred after (now) - parcels are sorted in order bought
           break # All done
 
         # Check if sold in the (past, now) window (capital gains)
@@ -298,17 +301,17 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           # Detailed format
           underline(175 + asset_width, 6, reports_stream)
 
-        # The output starts here
-        printf "%*s %*.3f %*s %*s   %*s %*s %*s %*s %*s ",
-               asset_width + 1, label,
-               (11 + 8 * is_detailed), units_sold,
-               15, print_cash(cost),
-               7, get_date(Held_From[a][0]),
-               10, get_date(last_key),
-               12, print_cash(current_price),
-               14, print_cash(proceeds),
-               14, print_cash(reduced_cost),
-               14, print_cash(adjusted_cost) > reports_stream
+       # The output starts here
+       printf "%*s %*.3f %*s %*s   %*s %*s %*s %*s %*s ",
+              asset_width + 1, label,
+              (11 + 8 * is_detailed), units_sold,
+              15, print_cash(cost),
+              7, get_date(Held_From[a][0]),
+              10, get_date(last_key),
+              12, print_cash(current_price),
+              14, print_cash(proceeds),
+              14, print_cash(reduced_cost),
+              14, print_cash(adjusted_cost) > reports_stream
 
         # Stack the gains & losses
         if (not_zero(long_gains))
@@ -338,6 +341,12 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           delete Gains_Stack[key]
         }
 
+        # Grand totals
+        sum_cost     += cost
+        sum_proceeds += proceeds
+        sum_reduced  += reduced_cost
+        sum_adjusted += adjusted_cost
+
         printf "\n" > reports_stream
         if (is_detailed)
          printf "\n" > reports_stream
@@ -345,43 +354,167 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       } # End of gains event
     } # End of each asset
 
-  # Final line
-  if (!is_detailed)
-    underline(166, 6, reports_stream)
-  printf "\n" > reports_stream
+  # Final lines
+  underline(166 + is_detailed * (9 + asset_width), 6, reports_stream)
+  if (is_detailed)
+    underline(166 + is_detailed * (9 + asset_width), 6, reports_stream)
 
   # Stack the gains & losses
-  Gains_Stack[Long_Gains_Key]   = sum_long_gains
-  Gains_Stack[Long_Losses_Key]  = sum_long_losses
-  Gains_Stack[Short_Gains_Key]  = sum_short_gains
-  Gains_Stack[Short_Losses_Key] = sum_short_losses
+  if (not_zero(sum_long_gains))
+    Gains_Stack[Long_Gains_Key]   = sum_long_gains
+  if (not_zero(sum_long_losses))
+    Gains_Stack[Long_Losses_Key]  = sum_long_losses
+  if (not_zero(sum_short_gains))
+    Gains_Stack[Short_Gains_Key]  = sum_short_gains
+  if (not_zero(sum_short_losses))
+    Gains_Stack[Short_Losses_Key] = sum_short_losses
+
+  # Print out a summary
+  printf "%*s %*s %*s %*s %*s ",
+        asset_width + 1, "Totals",
+        (27 + 8 * is_detailed), print_cash(sum_cost),
+        53, print_cash(sum_proceeds),
+        14, print_cash(sum_reduced),
+        14, print_cash(sum_adjusted)  > reports_stream
+
+    # Common entries
+    for (key in Gains_Stack)
+      break
+    if (key) {
+      printf "%*s %*s %*s",
+        14, print_cash(sum_proceeds - sum_reduced),
+        14, key,
+        14, print_cash(- Gains_Stack[key]) > reports_stream
+      delete Gains_Stack[key]
+    } else
+      printf "%14s", print_cash(sum_proceeds - sum_reduced) > reports_stream
+
+    # Extra entries {
+    for (key in Gains_Stack) {
+      printf "\n%*s %14s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
+      delete Gains_Stack[key]
+    }
+  printf "\n" > reports_stream
 
   return accounting_gains
 } # End of print gains
 
+#
+# Report on income gains - distributed directly or indirectly from managed funds
+#
+function print_income_gains(now, past, is_detailed, reports_stream,
+                            a, gains, sum_gains,
+                            underlying_asset,
+                            no_header_printed,
+                            asset_width,
+                            class_list,
+                            sign, label) {
+
+  # A class list
+  class_list["INCOME.GAINS.NET"] = TRUE
+  class_list["INCOME.GAINS.LONG"] = TRUE
+  class_list["INCOME.GAINS.SHORT"] = TRUE
+  class_list["EXPENSE.LOSSES.LONG"] = TRUE
+  class_list["EXPENSE.LOSSES.SHORT"] = TRUE
+
+  # Are we printing out a detailed schedule?
+  is_detailed = ternary(is_detailed, is_detailed, FALSE)
+  asset_width = 15
+
+  # Report on income gains
+  # This should examine LONG & SHORT & LOSSES too
+  sum_gains = 0
+  no_header_printed = TRUE
+  for (a in Leaf)
+    for (c in class_list)
+      if (select_class(a, c)) {
+        # These are the income gains classes
+        # Each account needs the income gains increased in proportion to its share of the total gains
+        gains     = get_cost(a, now) - get_cost(a, past)
+
+        # Skip negligible gains
+        if (near_zero(gains))
+          continue
+
+        # Print a header when required
+        if (no_header_printed) {
+          # Print the gains report
+          printf "\n%s\n", Journal_Title > reports_stream
+          printf "Distributed Capital Gains Report for Period Ending %s\n\n", get_date(yesterday(now))  > reports_stream
+
+          # The header
+          if (is_detailed) {
+            printf "%*s %*s\n",
+                   asset_width, "Asset",
+                   14, "Distributed" > reports_stream
+            printf "%*s\n", 11 + asset_width, "Gains" > reports_stream
+            underline(9 + asset_width, 6, reports_stream)
+          } else {
+            printf "%*s\n",
+                 asset_width + 15, "Distributed" > reports_stream
+            printf "%*s\n", 11 + asset_width, "Gains" > reports_stream
+
+          }
+
+          # print Name
+          no_header_printed = FALSE
+        }
+
+        # Get underlying account
+        if (a in Underlying_Asset)
+          underlying_asset = Underlying_Asset[a]
+        else
+          underlying_asset = a
+
+        # Print out the detailed information
+        if (is_detailed) {
+          # If printing out in detail
+          printf "%*s %*s\n",
+               asset_width + 1, Leaf[underlying_asset],
+               11, print_cash(-gains) > reports_stream
+        }
+
+        # Sum the gains
+        sum_gains += gains
+      }
+
+  # The summary
+  if (!no_header_printed) {
+    if (is_detailed)
+      underline(9 + asset_width, 6, reports_stream)
+
+    printf "%*s %*s\n",
+       asset_width + 1, "Total",
+       11, print_cash(-sum_gains) > reports_stream
+   underline(9 + asset_width, 6, reports_stream)
+   printf "\n" > reports_stream
+  }
+
+  # Clean up
+  delete class_list
+
+  # All done
+  return
+}
 
 # Compute capital gains and losses
 function get_capital_gains(now, past, is_detailed,
 
                                 reports_stream,
                                 accounting_gains, accounting_losses,
-                                income_long_gains, income_short_gains,
+                                adjusted_gains,
+                                distributed_gains,
+                                income_long_gains, income_short_gains, income_net_gains,
                                 expense_long_losses, expense_short_losses,
-                                taxable_long_gains, taxable_short_gains,
-                                taxable_long_losses, taxable_short_losses,
+                                capital_long_gains, capital_short_gains,
+                                capital_long_losses, capital_short_losses,
+                                taxable_gains,
                                 carried_losses,
-                                net_short, net_long,
-                                available_losses) {
+                                losses, next_losses, key) {
 
 
     # The reports_stream is the pipe to write the schedule out to
     reports_stream = report_capital(EOFY)
-
-    # First print the gains out in detail when required
-    if (DEVNULL != reports_stream) {
-      print_gains(now, past, is_detailed, "Realized Gains", reports_stream)
-      delete Gains_Stack
-    }
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -405,14 +538,23 @@ function get_capital_gains(now, past, is_detailed,
     printf "\t%27s => %14s\n", "Accounting Capital Losses", print_cash(accounting_losses) > reports_stream
 
     # Now compute the total accounting gains
-    accounting_gains += accounting_losses
+    accounting_losses += accounting_gains
     underline(44, 8, reports_stream)
-    printf "\t%27s => %14s\n", "Net Accounting Gains", print_cash(- accounting_gains) > reports_stream
+    if (below_zero(accounting_losses))
+      printf "\t%27s => %14s\n", "Net Accounting Gains ", print_cash(- accounting_losses) > reports_stream
+    else if (above_zero(accounting_losses))
+      printf "\t%27s => %14s\n", "Net Accounting Losses", print_cash(accounting_losses) > reports_stream
+    else
+      printf "\t%27s\n", "Zero Accounting Gains" > reports_stream
+
+    # Carried losses from previous years (if any)
+    carried_losses = carry_losses(past)
 
     # The taxable long & short gains
     # If there are other income gains (eg from distributions etc)
     # then the taxable gains will need adjustment
-    income_long_gains  = get_cost("*INCOME.GAINS.LONG", just_before(now))  - get_cost("*INCOME.GAINS.LONG", past)
+    income_net_gains   = get_cost("*INCOME.GAINS.NET", now)  - get_cost("*INCOME.GAINS.NET", past)
+    income_long_gains  = get_cost("*INCOME.GAINS.LONG", now)  - get_cost("*INCOME.GAINS.LONG", past)
     income_short_gains = get_cost("*INCOME.GAINS.SHORT", now) - get_cost("*INCOME.GAINS.SHORT", past)
 
     # Simililarly for expenses
@@ -420,94 +562,163 @@ function get_capital_gains(now, past, is_detailed,
     expense_short_losses = get_cost("*EXPENSE.LOSSES.SHORT", now) - get_cost("*EXPENSE.LOSSES.SHORT", past)
 
     # The long gains and losses first
-    taxable_long_gains  = get_cost(LONG_GAINS, just_before(now)) - get_cost(LONG_GAINS, past)
-    taxable_long_losses = get_cost(LONG_LOSSES, just_before(now)) - get_cost(LONG_LOSSES, past)
+    capital_long_gains  = get_cost(LONG_GAINS, just_before(now)) - get_cost(LONG_GAINS, past)
+    capital_long_losses = get_cost(LONG_LOSSES, just_before(now)) - get_cost(LONG_LOSSES, past)
 
     # short gains & losses
-    taxable_short_gains   = get_cost(SHORT_GAINS, just_before(now)) - get_cost(SHORT_GAINS, past)
-    taxable_short_losses  = get_cost(SHORT_LOSSES, just_before(now)) - get_cost(SHORT_LOSSES, past)
+    capital_short_gains   = get_cost(SHORT_GAINS, just_before(now)) - get_cost(SHORT_GAINS, past)
+    capital_short_losses  = get_cost(SHORT_LOSSES, just_before(now)) - get_cost(SHORT_LOSSES, past)
 
-    # The taxable gains and losses
-    printf "\t%27s => %14s\n",   "Long Taxable Gains", print_cash(- taxable_long_gains) > reports_stream
-    printf "\t%27s => %14s\n\n", "Short Taxable Gains", print_cash(- taxable_short_gains) > reports_stream
+    # The adjusted gains and losses
+    printf "\n\tAdjusted Gains\n" > reports_stream
+    printf "\n\t%27s => %14s\n",  "Long Adjusted Gains", print_cash(- capital_long_gains) > reports_stream
+    printf "\t%27s => %14s\n\n", "Short Adjusted Gains", print_cash(- capital_short_gains) > reports_stream
 
-    ## If the taxable gains/losses are non zero at the EOFY  they must be carried losses
-    carried_losses = get_carried_losses(past, CARRY_FORWARD_LIMIT)
-    if (above_zero(carried_losses))
-      printf "\t%27s => %14s\n", "Carried Capital Losses", print_cash(carried_losses) > reports_stream
-    else {
-      assert(!below_zero(carried_losses), sprintf("Cannot carry taxable capital gains forward [%s] Gains => %14s", get_date(past), print_cash(- carried_losses)))
-      carried_losses = 0
-      printf "\t%27s\n", "No Carried Capital Losses" > reports_stream
+    # Finally the adjusted losses
+    # Which are the same as the accounting losses
+    printf "\t%27s => %14s\n", "Long Adjusted Losses", print_cash(capital_long_losses) > reports_stream
+    printf "\t%27s => %14s\n\n", "Short Adjusted Losses", print_cash(capital_short_losses) > reports_stream
+
+    # Report all distributed gains and losses
+    # Take care that the adjustments are not applied more than once
+    distributed_gains = FALSE
+    if (not_zero(expense_short_losses)) {
+      distributed_gains = TRUE
+      printf "\t%27s => %14s\n", "Short Expense Losses", print_cash(expense_short_losses) > reports_stream
+    }
+    if (not_zero(expense_long_losses)) {
+      distributed_gains = TRUE
+      printf "\t%27s => %14s\n", "Long Expense Losses", print_cash(expense_long_losses) > reports_stream
+    }
+    if (not_zero(income_short_gains)) {
+      distributed_gains = TRUE
+      # These should not occur for Australian returns
+      printf "\t%27s => %14s\n", "Short Income Gains", print_cash(- income_short_gains) > reports_stream
+    }
+    if (not_zero(income_long_gains)) {
+      distributed_gains = TRUE
+      printf "\t%27s => %14s\n", "Long Income Gains", print_cash(- income_long_gains) > reports_stream
+    }
+    if (not_zero(income_net_gains)) {
+      distributed_gains = TRUE
+      printf "\t%27s => %14s\n", "Long Income Net Gains", print_cash(- income_net_gains) > reports_stream
     }
 
-    # Finally the losses
-    printf "\t%27s => %14s\n", "Long Capital Losses", print_cash(taxable_long_losses) > reports_stream
-    printf "\t%27s => %14s\n\n", "Short Capital Losses", print_cash(taxable_short_losses) > reports_stream
-    underline(44, 8, reports_stream)
-    printf "\t%27s => %14s\n", "Total Capital Losses", print_cash(taxable_short_losses + taxable_long_losses + carried_losses) > reports_stream
+    # Need to handle distributed income & expenses in a jurisdiction agnostic way
+    if (distributed_gains) {
+      # Net up long gains and losses
+      income_long_gains += expense_long_losses
+
+      # Net up short gains and losses
+      income_short_gains += expense_short_losses
+
+      # Need the overall adjusted gains/losses (including available carried losses)
+      adjusted_gains = capital_long_gains  + capital_short_gains  +\
+                       capital_long_losses + capital_short_losses +\
+                       income_long_gains   + income_short_gains   +\
+                       income_net_gains    + carried_losses
+
+
+      # Compute extra taxable gains (if any)
+      # Need the less (in magnitude) of the overall adjusted gain or net gain
+      if (below_zero(adjusted_gains)) {
+        printf "\t%27s => %14s\n", "Available Gains", print_cash(- adjusted_gains) > reports_stream
+        # There are gains
+        if (less_than(adjusted_gains, income_net_gains))
+          # The gains are greater than the income net gains, so gross up the net gains
+          taxable_gains = @Gross_Up_Gains_Function(now, past, income_net_gains, income_net_gains)
+        else
+          # The gains are less than the income gains, so gross up the adjusted gains
+          taxable_gains = @Gross_Up_Gains_Function(now, past, adjusted_gains, income_net_gains)
+
+        # Assume grossed up taxable gains are treated as long gains
+        income_long_gains += taxable_gains
+      }
+
+      if (not_zero(taxable_gains))
+        printf "\t%27s => %14s\n", "Grossed Up Long Gains", print_cash(- income_long_gains) > reports_stream
+    }
 
     # Apply long & short losses separately
     # This is not strictly necessary in all cases but useful
     # Save net gains or losses
-    net_long = apply_losses(now, reports_stream, "Long",  taxable_long_gains,  taxable_long_losses,  LONG_GAINS,  LONG_LOSSES)
-    net_short = apply_losses(now, reports_stream, "Short", taxable_short_gains, taxable_short_losses, SHORT_GAINS, SHORT_LOSSES)
+    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  LONG_GAINS,  LONG_LOSSES)
+    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, SHORT_GAINS, SHORT_LOSSES)
 
-    # The next step is to apply any net capital gains paid out / net capital losses incurred
-    # The tax treatment of these can be jurisdiction dependent
-    # This code block will be the australian module
+    # Overall gains, losses and taxable gains
+    underline(44, 8, reports_stream)
+    if (below_zero(adjusted_gains))
+      printf "\t%27s => %14s\n", "Net Adjusted Gains ", print_cash(- adjusted_gains) > reports_stream
+    else if (above_zero(adjusted_gains))
+      printf "\t%27s => %14s\n", "Net Adjusted Losses", print_cash(adjusted_gains) > reports_stream
+    else
+      printf "\t%27s\n", "Zero Adjusted Gains" > reports_stream
+    if (above_zero(carried_losses)) {
+      printf "\t%27s => %14s\n", "Losses Brought Forward", print_cash(carried_losses) > reports_stream
 
-    # Are any losses available for offseting any distributed long gains?
-    # Are there currently any available capital losses?
-    available_losses = yield_positive(net_short + net_long + carried_losses + income_short_gains + expense_long_losses + expense_short_losses, 0)
-    if (above_zero(available_losses))
-      printf "\t%27s => %14s\n", "Available Capital Losses", print_cash(available_losses) > reports_stream
-
-    # Report all distributed gains and losses
-    # Take care that the adjustments are not applied more than once
-    if (not_zero(expense_short_losses))
-      printf "\t%27s => %14s\n", "Short Expense Losses", print_cash(expense_short_losses) > reports_stream
-    if (not_zero(expense_long_losses))
-      printf "\t%27s => %14s\n", "Long Expense Losses", print_cash(expense_long_losses) > reports_stream
-    if (not_zero(income_short_gains))
-      # These should not occur for Australian returns - but they will be treated as l
-      printf "\t%27s => %14s\n", "Short Income Gains", print_cash(- income_short_gains) > reports_stream
-    if (not_zero(income_long_gains)) {
-      printf "\t%27s => %14s\n", "Long Income Gains", print_cash(- income_long_gains) > reports_stream
-
-      # Any net long gains will be grossed up
-      if (below_zero(income_long_gains + available_losses))
-        # At this point the total taxable gains are correct but the extra gains applied here are
-        # not entered into the detailed accounts
-        # The extra gains should be applied pro-rata to each contributing account
-        income_long_gains = @Gross_Up_Gains_Function(reports_stream, now, past, income_long_gains, income_long_gains + available_losses)
+      accounting_gains = adjusted_gains + carried_losses
+      if (below_zero(accounting_gains))
+        printf "\t%27s => %14s\n", "Total Adjusted Gains ", print_cash(- accounting_gains) > reports_stream
+      else if (above_zero(accounting_gains))
+        printf "\t%27s => %14s\n", "Total Adjusted Losses", print_cash(accounting_gains) > reports_stream
+      else
+        printf "\t%27s\n", "Zero Adjusted Gains" > reports_stream
     }
 
-    # Are there any income gains / expense losses to apply?
-    if (below_zero(income_long_gains) || above_zero(expense_long_losses)) {
-      printf "\t%27s\n", "Apply Income Gains & Losses"  > reports_stream
-
-      # Apply the losses
-      net_long = apply_losses(now, reports_stream, "Long",  yield_negative(net_long, 0) + income_long_gains,  yield_positive(net_long, 0) + expense_long_losses,  LONG_GAINS,  LONG_LOSSES)
-    }
-
-    # Are there any short income gains / expense losses to apply?
-    if (below_zero(income_short_gains) || above_zero(expense_short_losses)) {
-      printf "\t%27s\n", "Apply Income Gains & Losses"  > reports_stream
-
-      # Apply the losses
-      net_short = apply_losses(now, reports_stream, "Short",  yield_negative(net_short, 0) + income_short_gains,  yield_positive(net_short, 0) + expense_short_losses,  SHORT_GAINS,  SHORT_LOSSES)
-    }
+    # Compute taxable gains
+    taxable_gains = @Get_Taxable_Gains_Function(now, carried_losses) # FIXME need carry forward limit
+    if (below_zero(taxable_gains))
+      printf "\t%27s => %14s\n",   "Taxable Gains",  print_cash(- taxable_gains) > reports_stream
 
     # All done
     underline(44, 8, reports_stream)
     print "\n" > reports_stream
+
+    # If the total capital losses are non zero at the EOFY they must be carried losses
+    carried_losses = get_carried_losses(now, adjusted_gains, CARRY_FORWARD_LIMIT)
+    if (above_zero(carried_losses))
+      printf "\t%27s => %14s\n", "Losses Carried Forward", print_cash(carried_losses) > reports_stream
+    else {
+      assert(near_zero(carried_losses), sprintf("Cannot carry taxable capital gains forward [%s] Gains => %14s", get_date(past), print_cash(- carried_losses, 6)))
+      carried_losses = 0
+    }
+
+    # Now the gains reports
+    if (DEVNULL != reports_stream) {
+      # Now the income gains report
+      print_income_gains(now, past, is_detailed, reports_stream)
+
+      # Report on Carried Losses
+      if (above_zero(carried_losses)) {
+        printf "Carried Losses Report\n" > reports_stream
+
+        printf "\t%14s  %14s\n", "Year", "Carried Losses"  > reports_stream
+        underline(44, 8, reports_stream)
+
+        next_losses = carried_losses
+        for (key in Remaining_Losses[now]) {
+          # The current losses
+          losses = next_losses
+
+          # The next losses
+          next_losses = find_entry(Remaining_Losses[now], just_before(key))
+          printf "\t%14s %14s\n", get_date(key, YEAR_FORMAT), print_cash(losses - next_losses)  > reports_stream
+        }
+        underline(44, 8, reports_stream)
+        printf "\t%14s %14s\n\n", "Total", print_cash(carried_losses) > reports_stream
+      }
+
+      # The Realized Gains
+      print_gains(now, past, is_detailed, "Realized Gains", reports_stream)
+      delete Gains_Stack
+    }
 }
 
 # Default gross up gains
-function gross_up_gains_def(stream, now, past, total_gains, net_gains) {
+function gross_up_gains_def(now, past, total_gains, long_gains, short_gains) {
   # Nothing to do by default
-  return total_gains
+  # Gains are alreay computed
+  return 0
 }
 
 # Shared code for applying losses to taxable gains
@@ -550,7 +761,7 @@ function apply_losses(now, reports_stream, label,
     printf "\t%27s => %14s\n", (label " Losses"), print_cash(get_cost(save_losses, now)) > reports_stream
   }
 
-  # Cannot have a net gain and a net loss so return which ever
+  # Cannot have a net gain and a net loss so return which
   if (near_zero(losses))
     # A (possibly zero) net gain
     return gains
@@ -560,63 +771,53 @@ function apply_losses(now, reports_stream, label,
 }
 
 # Get the carried losses - limit how many years a loss can be carried forward
-function get_carried_losses(past, limit,
-                            carried_losses, losses, y, limit_time) {
+function get_carried_losses(now, losses, limit,
+                            reports_stream,
+                            past,
+                            key) {
 
-  # When there is no limit simply return the losses
-  # carried forward from last year
-  if (!limit)
-    return get_cost(CARRIED_LOSSES, past)
+  # New Version
+  #
+  # Accounts
+  # Remaining_Losses[Now] => Total losses (and maybe gains) in year Now
+  # They have a non-standard double dependence on time
+  # There would be need to be one set per currency
+  past = find_key(Remaining_Losses, just_before(now))
 
-  # There is a limit - do not use any
-  # losses from more  than "limit" years ago -
-  # First note that this routine already starts one year back
-  if (limit > 1)
-    # When is that?
-    limit_time = past - one_year(past, 1 - limit)
-  else
-    limit_time = past
+  # If there are already earlier losses copy them
+  if (past in Remaining_Losses)
+    for (key in Remaining_Losses[past])
+      Remaining_Losses[now][key] = Remaining_Losses[past][key]
+
+  # If there are gains cancel the earliest losses
+  if (below_zero(losses)) {
+    # These are actually gains
+    # The oldest losses are cancelled first
+    # Remember gains are negative
+    # There may be no losses available
 @ifeq LOG get_gains
-  printf "get_carried_losses: %3d\n", limit > STDERR
-  printf "\tPast  => %14s\n", get_date(past) > STDERR
-  printf "\tLimit => %14s\n", get_date(limit_time) > STDERR
+    printf "\tDate => %s Net Gains  => %s\n", get_date(now), print_cash(-losses) > STDERR
 @endif
-
-  # No losses prior to the limit time are considered
-  # Lets start summing the losses
-  carried_losses = 0
-
-  # The first year considered
-  y = limit_time
-  do {
-    # Get the annualized combined losses & gains
-    losses = @Get_Taxable_Gains_Function(y)
-    carried_losses += losses
-
-    # Carried losses cannot be negative
-    carried_losses = yield_positive(carried_losses, 0)
-
+    if (now in Remaining_Losses)
+      remove_entries(Remaining_Losses[now], -losses)
+  } else if (above_zero(losses)) {
+    # OK no old losses will be extinguished
+    # A new loss is added
 @ifeq LOG get_gains
-  printf "\t\ty      => %14s\n", get_date(y) > STDERR
-  printf "\t\tLosses => %14s\n", print_cash(losses) > STDERR
-  printf "\t\tSummed => %14s\n", print_cash(carried_losses) > STDERR
+    printf "\tDate => %s Net Losses => %s\n", get_date(now), print_cash(losses) > STDERR
 @endif
-
-    # Next year
-    y += one_year(y, 1)
-  } while (y < past + ONE_WEEK)
-
-  # record if carried losses were extinguished
-  losses = get_cost(CARRIED_LOSSES, past)
-  if (not_zero(losses - carried_losses)) {
-    printf "\tPast  => %14s\n", get_date(past) > STDERR
-    printf "\tOld Carried Losses => %14s\n", losses > STDERR
-    printf "\tNew Carried Losses => %14s\n", carried_losses > STDERR
+    if (now in Remaining_Losses)
+      sum_entry(Remaining_Losses[now], losses, now)
+    else
+      Remaining_Losses[now][now] = losses
   }
+@ifeq LOG get_gains
+  else
+    printf "\tDate => %s Zero Losses\n", get_date(now)  > STDERR
+@endif
 
-  # This determines the carried losses
-  set_cost(CARRIED_LOSSES, carried_losses, past)
-  return carried_losses
+  # Return the value of the income long gains
+  return carry_losses(now)
 }
 
 # Compute the deferred gains
@@ -657,8 +858,6 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
   print "\n" > reports_stream
 
 } # End of deferred gains
-
-
 
 # Print out operating statement
 function print_operating_statement(now, past, is_detailed,     reports_stream,
@@ -846,8 +1045,6 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 
   # Now the non-current assets
   label = sprintf("Non Current Assets\n")
-  #label = print_account_class(reports_stream, label, "block_class", "ASSET", "ASSET.CURRENT", "get_cost", now, Epoch, past, Epoch, is_detailed)
-  #label = print_account_class(reports_stream, label, "not_current_class", "ASSET", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
   class_list["ASSET.TERM"] = TRUE
   class_list["ASSET.CURRENT"] = TRUE
   label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed)

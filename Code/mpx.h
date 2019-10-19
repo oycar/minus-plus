@@ -26,7 +26,7 @@
 # //
 @define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf\
  Lifetime Long_Name Maturity_Date Method_Name Number_Parcels\
- Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands\
+ Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Remaining_Losses Tax_Adjustments Tax_Bands\
  Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held "
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root EOFY_Window FY_Day FY_Date FY_Length\
@@ -101,6 +101,8 @@
 @define make_array(array)  ternary(SUBSEP in array,TRUE,FALSE)
 
 @define find_entry(array, now) ternary(__MPX_KEY__ = find_key(array, now), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
+@define first_entry(array) ternary(__MPX_KEY__ = first_key(array), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
+
 @define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
 #
@@ -212,6 +214,8 @@
 @define get_day_number(t)  (strftime("%j", (t), UTC) + 0)
 @define YYMMDD_date(x) (substr((x), 1, 2) "-" substr((x), 3, 2) "-" substr((x), 5, 2))
 
+@define show_date(t, format) ternary(format, (" " get_date(t, format)), "")
+
 # //
 # // The length of a year ending at time (y, d)
 @define get_year_length(y, d) (ternary((d) <= FEB29, leap_year((y) - 1), leap_year(y)) + 365)
@@ -241,7 +245,7 @@
 
 # // Include currency definitions
 @include "currency.h"
-
+@define carry_losses(t) ternary(t in Remaining_Losses, first_entry(Remaining_Losses[t]), 0)
 
 # // Capital Loss Window
 # // Unlimited goes all the way to the Epoch
@@ -258,6 +262,17 @@
   else\
     break;\
 }
+
+# // # // Which Gains to Use
+# // @define use_gains(l, s) if (TRUE) {\
+# //   Use_Long_Gains  = l;\
+# //   Use_Short_Gains = s\
+# // }
+# // # // Which Losses to Use
+# // @define use_losses(l, s) if (TRUE) {\
+# //   Use_Long_Losses  = l;\
+# //   Use_Short_Losses = s\
+# // }
 
 # // Print a block of n identical characters
 @define print_block(c, n, stream) if (TRUE) {while (n-- > 1) printf "%1s", c > stream; print c > stream}
