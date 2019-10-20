@@ -222,7 +222,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           proceeds       += parcel_proceeds
 
           # Total gains (accounting gains)
-          gains = sum_cost_elements(Accounting_Cost[a][p], now)
+          gains = sum_all_elements(Accounting_Cost[a][p], now) # All elements
           if (!is_realized_flag) # This is not sold yet
             gains -=  parcel_proceeds
 
@@ -254,7 +254,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
           # after application of tax adjustments
           # If there were losses then parcel_gains will be above zero
-          adjusted_gains = gains - sum_cost_elements(Tax_Adjustments[a][p], now)
+          adjusted_gains = gains - sum_all_elements(Tax_Adjustments[a][p], now) # Needs all elements
           if (below_zero(adjusted_gains)) {
             # Adjustments are negative and reduce taxable gains
             parcel_gains = adjusted_gains

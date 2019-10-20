@@ -1692,7 +1692,7 @@ function get_unrealized_gains(a, now,
       break # All done
     if (is_unsold(a, p, now)) # This is an unsold parcel at time (now)
       # If value > cash_in this is an unrealized gain
-      gains += sum_cost_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price
+      gains += sum_all_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price # Needs all elements
   }
 
 @ifeq LOG get_unrealized_gains
@@ -1751,7 +1751,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 
   # Buy u units for x
   u = Units_Held[a][last_parcel]
-  x = sum_cost_elements(Accounting_Cost[a][last_parcel], now) # This must be just the cash paid
+  x = find_entry(Accounting_Cost[a][last_parcel][I], now) # Element I is all important
 
   # Passive revaluation
   p = x / u
@@ -1771,7 +1771,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 }
 
 # Create or modify a parcel
-function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, i) {
+function new_parcel(ac, u, x, now, parcel_tag,        last_parcel) {
   # Purchases made at the same time can be averaged
   # So only increment the parcel counter if a new parcel name specified
   last_parcel = Number_Parcels[ac] - 1
@@ -1782,11 +1782,11 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, i) {
     # This adds a new parcel - always cost element I
     # We have to initialize  this parcels cost elements
     Accounting_Cost[ac][last_parcel][0][Epoch] = 0
-    zero_costs(Accounting_Cost[ac][last_parcel], Epoch)
+    zero_cost_elements(Accounting_Cost[ac][last_parcel], Epoch)
 
     # Ditto for tax adjustments
     Tax_Adjustments[ac][last_parcel][0][Epoch] = 0
-    zero_costs(Tax_Adjustments[ac][last_parcel], Epoch)
+    zero_cost_elements(Tax_Adjustments[ac][last_parcel], Epoch)
 
     # A new purchase is always cost element I
     Accounting_Cost[ac][last_parcel][I][now] = x
@@ -2042,7 +2042,7 @@ function sell_fixed_parcel(a, p, now,     x) {
   # so it will have accounting cost zero
 
   # Only need to save depreciation or appreciation
-  x = sum_cost_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset
+  x = sum_all_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset # Needs all elements
 
   # Set it to zero (use element 0)
   sum_entry(Accounting_Cost[a][p][0], -x, now)
@@ -2078,7 +2078,7 @@ function save_parcel_gain(a, p, now,    x, held_time) {
 
   # Accounting gains or Losses - based on reduced cost
   # Also taxable losses are based on the reduced cost...
-  x = sum_cost_elements(Accounting_Cost[a][p], now)
+  x = sum_all_elements(Accounting_Cost[a][p], now) # Needs all elements
   if (above_zero(x)) {
     adjust_cost(REALIZED_LOSSES, x, now)
 
@@ -2093,7 +2093,7 @@ function save_parcel_gain(a, p, now,    x, held_time) {
   # Taxable gains
   # after application of tax adjustments
   # This works if tax adjustments are negative
-  x -= sum_cost_elements(Tax_Adjustments[a][p], now)
+  x -= sum_all_elements(Tax_Adjustments[a][p], now) # Needs all elements
 
   # Taxable Gains are based on the adjusted cost
   if (below_zero(x)) {

@@ -1129,7 +1129,7 @@ function held_to(ac, now,     p, latest_sale) {
 }
 
 # Initialize cost element arrays
-function zero_costs(array, now,     e) {
+function zero_cost_elements(array, now,     e) {
   # Set all true cost elements to zero - ie elements I-V
   for (e in Elements)
     array[e][now] = 0
@@ -1322,33 +1322,31 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
 
   # Equities do not have tax adjustments and can indeed have a negative cost base
-  # try doing nothing!
+  # This is clearly wrong.... since this is acting on all elements not just the current one....
   # but check instead in the EOFY processing....
-  # if (!is_equity(a)) {
-  #   # Now this is tricky -
-  #   #   The cost base can be negative
-  #   #   but not after the tax adjustment
-  #   # Also if this parcel was sold on the same day (so time==now)
-  #   # a term will be included in cash_out - so overrule that
-  #   cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) - get_cash_out(a, p, now)
-  #   if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) {
-  #     # Cannot create a negative cost base (for long)
-  #     # This will impact capital gains!
-  #     # Since a negative cost base cannot be deferred
-  #
-  #     # Save the parcel gain
-  #     save_parcel_gain(a, p, now)
-  #
-  #     # This parcel gain is not recorded...
-  #     # How to fix this....
-  #     # What if the parcel were split (unit -> 0:units) & the 0 parcel closed???
-  #
-  #
-  #     # We are cashing the tax adjustments out so adjust both cost bases to zero
-  #     zero_costs(Accounting_Cost[a][p], now)
-  #     zero_costs(Tax_Adjustments[a][p], now)
-  #   }
-  # }
+  if (!is_equity(a)) {
+    # Now this is tricky -
+    #   The cost base can be negative
+    #   but not after the tax adjustment
+    # Also if this parcel was sold on the same day (so time==now)
+    # a term will be included in cash_out - so overrule that
+    cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
+    if (cost_base < sum_all_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
+      # Cannot create a negative cost base (for long)
+      # This will impact capital gains!
+      # Since a negative cost base cannot be deferred
+
+      # Save the parcel gain
+      save_parcel_gain(a, p, now)
+
+      # This parcel gain is not recorded...
+      # How to fix this....
+
+      # We are cashing the tax adjustments out so adjust both cost bases to zero
+      zero_cost_elements(Accounting_Cost[a][p], now)
+      zero_cost_elements(Tax_Adjustments[a][p], now)
+    }
+  }
 
   # Debugging
 @ifeq LOG adjust_cost
@@ -1358,6 +1356,9 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
+# Returns 0 for sold assets
+# What would happen if REALIZED were not populated and it returned the gains/losses for sold assets?
+# 
 function get_cost(a, now,     i, sum_cost) {
   # Adjustments for units bought
   if (is_unitized(a)) {
@@ -1368,7 +1369,7 @@ function get_cost(a, now,     i, sum_cost) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-        sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
+        sum_cost += sum_all_elements(Accounting_Cost[a][i], now) # Needs all elements
     }
     return sum_cost
   } else if (a in Cost_Basis) # Cash-like
@@ -1390,7 +1391,7 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-        sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
+        sum_adjustments += sum_all_elements(Tax_Adjustments[a][i], now) # Needs all elements
     }
   }
 
@@ -1420,14 +1421,26 @@ function sum_market_gains(now,     sum, a) {
   return sum
 }
 
-# Sum  the cost elements
+# Sum all the elements
+function sum_all_elements(array, now,     sum_elements, e) {
+@ifeq LOG DEBUG
+  assert(isarray(array), "<" $0 "> sum_all_elements:  needs an array")
+@endif
+
+  sum_elements = 0
+  for (e in array) # Include element [0]
+    sum_elements += find_entry(array[e], now)
+  return sum_elements
+}
+
+# Sum only the cost elements
 function sum_cost_elements(array, now,     sum_elements, e) {
 @ifeq LOG DEBUG
   assert(isarray(array), "<" $0 "> sum_cost_elements:  needs an array")
 @endif
 
   sum_elements = 0
-  for (e in array) # Should this include [0] or not?
+  for (e in Elements) # Exclude element [0]
     sum_elements += find_entry(array[e], now)
   return sum_elements
 }
@@ -1476,41 +1489,35 @@ function get_cash_in(a, i, now) {
 }
 
 # The cash paid out of the asset when sold
-function get_cash_out(a, i, now) {
+#function get_cash_out(a, i, now) {
   # We are only interested in the sale payment for this parcel - the zeroth element
-  if (is_sold(a, i, now))
+  # if (is_sold(a, i, now))
     # Each parcel can only be sold once - so if sold it is the first entry
-    return get_parcel_proceeds(a, i)
+    # return get_parcel_proceeds(a, i)
+#    return get_parcel_proceeds(a, i, now)
 
   # Not sold yet
-  return 0
-}
+  #return 0
+#}
 
 # The cost reductions
 function get_cost_modifications(a, p, now,  sum) {
   # This should exclude cash_in and cash_out
-  sum = sum_cost_elements(Accounting_Cost[a][p], now)
+  sum = sum_cost_elements(Accounting_Cost[a][p], now) # No I
 
   # Think about edge effects
-  return sum - get_cash_out(a, p, now) - get_cash_in(a, p, now)
+  return sum - get_cash_in(a, p, now)
 }
 
 # A shorthand - ignores final cost
 function get_parcel_cost(a, p, now, adjusted,    sum) {
-  # Adjusted or reduced cost?
   # Reduced cost by default
-  adjusted = ("" == adjusted) ? 0 : adjusted
+  sum = sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
+  if (adjusted)
+    sum -= sum_all_elements(Tax_Adjustments[a][p], now) ## Needs all elements
 
-  # Clunky
-  if (0 != adjusted)
-    # The adjusted parcel cost
-    adjusted = sum_cost_elements(Tax_Adjustments[a][p], now)
-
-  # This should exclude cash_in and cash_out
-  sum = sum_cost_elements(Accounting_Cost[a][p], now) - adjusted
-
-  # Remove the cash out component
-  return sum - get_cash_out(a, p, now)
+  # The parcel cost
+  return sum # - get_cash_out(a, p, now)
 }
 
 # Print out transactions
@@ -1728,15 +1735,11 @@ function initialize_account(account_name,     class_name, array, p, n,
     # Stored (as sums) by parcel, cost element and time
     # eg Accounting_Cost[account][parcel][element][time]
     Accounting_Cost[account_name][0][0][SUBSEP] = 0
-    zero_costs(Accounting_Cost[account_name][0], SUBSEP)
-    for (p in Accounting_Cost[account_name][0])
-      delete Accounting_Cost[account_name][0][p][SUBSEP]
+    delete Accounting_Cost[account_name][0][0][SUBSEP]
 
     # Ditto for tax adjustments
     Tax_Adjustments[account_name][0][0][SUBSEP] = 0
-    zero_costs(Tax_Adjustments[account_name][0], SUBSEP)
-    for (p in Tax_Adjustments[account_name][0])
-      delete Tax_Adjustments[account_name][0][p][SUBSEP]
+    delete Tax_Adjustments[account_name][0][0][SUBSEP]
 
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel

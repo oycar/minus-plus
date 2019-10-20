@@ -180,13 +180,15 @@
 
 @define is_closed(a, now) (!is_open((a), (now)))
 @define is_new(a) ("" == first_key(Cost_Basis[a]))
-@define ever_held(a) (Held_From[(a)][0] > Epoch)
-@define is_sold(a, p, now) (Held_Until[(a)][(p)] <= (now))
-@define is_unsold(a, p, now) (Held_Until[(a)][(p)] > (now))
-@define get_short_name(name) (Leaf[(name)])
+@define ever_held(a) (Held_From[a][0] > Epoch)
+@define is_sold(a, p, now) (Held_Until[a][p] <= (now))
+@define is_unsold(a, p, now) (Held_Until[a][p] > (now))
+@define get_short_name(name) (Leaf[name])
 @define get_reduced_cost(a, now) (get_cost(a, now))
 @define get_parcel_tax_adjustment(a, p, element, now) (find_entry(Tax_Adjustments[a][p][element], (now)))
-@define get_parcel_proceeds(a, p) (first_entry(Accounting_Cost[a][p][0]))
+# // @define get_parcel_proceeds(a, p) (first_entry(Accounting_Cost[a][p][0]))
+@define get_parcel_proceeds(a, p, t) (find_entry(Accounting_Cost[a][p][0], (t)))
+@define get_cash_out(a, p, t) @eval (get_parcel_proceeds(a, p, t))
 
 # // Get a single tranaction from the account
 @define get_delta_cost(a, now) (get_cost(a, now) - get_cost(a, just_before(now)))

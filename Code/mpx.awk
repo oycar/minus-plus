@@ -105,6 +105,8 @@ END {
 
 
 
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -215,6 +217,8 @@ END {
 
 
 
+
+# // @define get_parcel_proceeds(a, p) (first_entry(Accounting_Cost[a][p][0]))
 
 
 
@@ -1410,7 +1414,7 @@ function is_open(a, now,     p) {
   for (p = 0; p < Number_Parcels[a]; p ++) {
     if (Held_From[a][p] > now)
       break
-    if ((Held_Until[(a)][( p)] > ( now)))
+    if ((Held_Until[a][ p] > ( now)))
       return (1)
   }
   return (0)
@@ -1439,7 +1443,7 @@ function held_to(ac, now,     p, latest_sale) {
   latest_sale = Epoch
 
   for (p = 0; p < Number_Parcels[ac]; p++)
-    if ((Held_Until[(a)][( p)] <= ( now)))
+    if ((Held_Until[a][ p] <= ( now)))
       latest_sale = (((latest_sale) - ( Held_Until[ac][p]) > 0)?(latest_sale):( Held_Until[ac][p]))
     else if (Held_Until[ac][p] < Future) {
       # If the asset still held now?
@@ -1451,7 +1455,7 @@ function held_to(ac, now,     p, latest_sale) {
 }
 
 # Initialize cost element arrays
-function zero_costs(array, now,     e) {
+function zero_cost_elements(array, now,     e) {
   # Set all true cost elements to zero - ie elements I-V
   for (e in Elements)
     array[e][now] = 0
@@ -1551,7 +1555,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # Scan back down the parcels held and unsold at time now
     while (i -- > 0) {
-      if ((Held_Until[(a)][( i)] > ( now))) # This is an unsold parcel at time (now)
+      if ((Held_Until[a][ i] > ( now))) # This is an unsold parcel at time (now)
         # The parcel adjustment is proportional to the parcel size unless it is a depreciating asset
         if (flag)
           adjust_parcel_cost(a, i, now, get_parcel_cost(a, i, now) * adjustment, Cost_Element, tax_adjustment)
@@ -1622,31 +1626,31 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
   # Equities do not have tax adjustments and can indeed have a negative cost base
   # try doing nothing!
   # but check instead in the EOFY processing....
-  # if (!is_equity(a)) {
-  #   # Now this is tricky -
-  #   #   The cost base can be negative
-  #   #   but not after the tax adjustment
-  #   # Also if this parcel was sold on the same day (so time==now)
-  #   # a term will be included in cash_out - so overrule that
-  #   cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) - get_cash_out(a, p, now)
-  #   if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) {
-  #     # Cannot create a negative cost base (for long)
-  #     # This will impact capital gains!
-  #     # Since a negative cost base cannot be deferred
-  #
-  #     # Save the parcel gain
-  #     save_parcel_gain(a, p, now)
-  #
-  #     # This parcel gain is not recorded...
-  #     # How to fix this....
-  #     # What if the parcel were split (unit -> 0:units) & the 0 parcel closed???
-  #
-  #
-  #     # We are cashing the tax adjustments out so adjust both cost bases to zero
-  #     zero_costs(Accounting_Cost[a][p], now)
-  #     zero_costs(Tax_Adjustments[a][p], now)
-  #   }
-  # }
+  if (!((a) ~ /^EQUITY[.:]/)) {
+    # Now this is tricky -
+    #   The cost base can be negative
+    #   but not after the tax adjustment
+    # Also if this parcel was sold on the same day (so time==now)
+    # a term will be included in cash_out - so overrule that
+    cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # - get_cash_out(a, p, now) # No element 0
+    if (cost_base < sum_all_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
+      # Cannot create a negative cost base (for long)
+      # This will impact capital gains!
+      # Since a negative cost base cannot be deferred
+
+      # Save the parcel gain
+      save_parcel_gain(a, p, now)
+
+      # This parcel gain is not recorded...
+      # How to fix this....
+      # What if the parcel were split (unit -> 0:units) & the 0 parcel closed???
+
+
+      # We are cashing the tax adjustments out so adjust both cost bases to zero
+      zero_cost_elements(Accounting_Cost[a][p], now)
+      zero_cost_elements(Tax_Adjustments[a][p], now)
+    }
+  }
 
   # Debugging
 
@@ -1663,8 +1667,8 @@ function get_cost(a, now,     i, sum_cost) {
     for (i = 0; i < Number_Parcels[a]; i ++) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
-      if ((Held_Until[(a)][( i)] > ( now))) # This is an unsold parcel at time (now)
-        sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
+      if ((Held_Until[a][ i] > ( now))) # This is an unsold parcel at time (now)
+        sum_cost += sum_all_elements(Accounting_Cost[a][i], now) # Needs all elements
     }
     return sum_cost
   } else if (a in Cost_Basis) # Cash-like
@@ -1685,8 +1689,8 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
     for (i = 0; i < Number_Parcels[a]; i ++) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
-      if ((Held_Until[(a)][( i)] > ( now))) # This is an unsold parcel at time (now)
-        sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
+      if ((Held_Until[a][ i] > ( now))) # This is an unsold parcel at time (now)
+        sum_adjustments += sum_all_elements(Tax_Adjustments[a][i], now) # Needs all elements
     }
   }
 
@@ -1716,12 +1720,22 @@ function sum_market_gains(now,     sum, a) {
   return sum
 }
 
-# Sum  the cost elements
+# Sum all the elements
+function sum_all_elements(array, now,     sum_elements, e) {
+
+
+  sum_elements = 0
+  for (e in array) # Include element [0]
+    sum_elements += ((__MPX_KEY__ = find_key(array[e],  now))?( array[e][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( array[e][0]):( 0))))
+  return sum_elements
+}
+
+# Sum only the cost elements
 function sum_cost_elements(array, now,     sum_elements, e) {
 
 
   sum_elements = 0
-  for (e in array) # Should this include [0] or not?
+  for (e in Elements) # Exclude element [0]
     sum_elements += ((__MPX_KEY__ = find_key(array[e],  now))?( array[e][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( array[e][0]):( 0))))
   return sum_elements
 }
@@ -1736,7 +1750,7 @@ function get_cost_element(a, element, now,      i, sum_cost) {
     for (i = 0; i < Number_Parcels[a]; i ++) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
-      if ((Held_Until[(a)][( i)] > ( now))) # This is an unsold parcel at time (now)
+      if ((Held_Until[a][ i] > ( now))) # This is an unsold parcel at time (now)
         sum_cost += ((__MPX_KEY__ = find_key(Accounting_Cost[a][i][element],  now))?( Accounting_Cost[a][i][element][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][i][element][0]):( 0))))
     }
   }
@@ -1770,41 +1784,35 @@ function get_cash_in(a, i, now) {
 }
 
 # The cash paid out of the asset when sold
-function get_cash_out(a, i, now) {
+#function get_cash_out(a, i, now) {
   # We are only interested in the sale payment for this parcel - the zeroth element
-  if ((Held_Until[(a)][( i)] <= ( now)))
+  # if (is_sold(a, i, now))
     # Each parcel can only be sold once - so if sold it is the first entry
-    return (((__MPX_KEY__ = first_key(Accounting_Cost[a][ i][0]))?( Accounting_Cost[a][ i][0][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][ i][0][0]):( 0)))))
+    # return get_parcel_proceeds(a, i)
+#    return get_parcel_proceeds(a, i, now)
 
   # Not sold yet
-  return 0
-}
+  #return 0
+#}
 
 # The cost reductions
 function get_cost_modifications(a, p, now,  sum) {
   # This should exclude cash_in and cash_out
-  sum = sum_cost_elements(Accounting_Cost[a][p], now)
+  sum = sum_cost_elements(Accounting_Cost[a][p], now) # No I
 
   # Think about edge effects
-  return sum - get_cash_out(a, p, now) - get_cash_in(a, p, now)
+  return sum - get_cash_in(a, p, now)
 }
 
 # A shorthand - ignores final cost
 function get_parcel_cost(a, p, now, adjusted,    sum) {
-  # Adjusted or reduced cost?
   # Reduced cost by default
-  adjusted = ("" == adjusted) ? 0 : adjusted
+  sum = sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
+  if (adjusted)
+    sum -= sum_all_elements(Tax_Adjustments[a][p], now) ## Needs all elements
 
-  # Clunky
-  if (0 != adjusted)
-    # The adjusted parcel cost
-    adjusted = sum_cost_elements(Tax_Adjustments[a][p], now)
-
-  # This should exclude cash_in and cash_out
-  sum = sum_cost_elements(Accounting_Cost[a][p], now) - adjusted
-
-  # Remove the cash out component
-  return sum - get_cash_out(a, p, now)
+  # The parcel cost
+  return sum # - get_cash_out(a, p, now)
 }
 
 # Print out transactions
@@ -1973,15 +1981,11 @@ function initialize_account(account_name,     class_name, array, p, n,
     # Stored (as sums) by parcel, cost element and time
     # eg Accounting_Cost[account][parcel][element][time]
     Accounting_Cost[account_name][0][0][SUBSEP] = 0
-    zero_costs(Accounting_Cost[account_name][0], SUBSEP)
-    for (p in Accounting_Cost[account_name][0])
-      delete Accounting_Cost[account_name][0][p][SUBSEP]
+    delete Accounting_Cost[account_name][0][0][SUBSEP]
 
     # Ditto for tax adjustments
     Tax_Adjustments[account_name][0][0][SUBSEP] = 0
-    zero_costs(Tax_Adjustments[account_name][0], SUBSEP)
-    for (p in Tax_Adjustments[account_name][0])
-      delete Tax_Adjustments[account_name][0][p][SUBSEP]
+    delete Tax_Adjustments[account_name][0][0][SUBSEP]
 
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel
@@ -2065,7 +2069,7 @@ function filter_array(now, data_array, name, show_blocks,
   # Each block is preceeded and/or followed by "gaps"
   for (a in Leaf)
     if ((a in data_array) && ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/))
-      if ((Held_From[(a)][0] > Epoch)) {
+      if ((Held_From[a][0] > Epoch)) {
         # Get each parcel in turn and list the contiguous blocks of time held
         start_block = Held_From[a][0]
         end_block = Held_Until[a][0]
@@ -2088,7 +2092,7 @@ function filter_array(now, data_array, name, show_blocks,
             end_block = Held_Until[a][p]
 
           # If this parcel is open we have completed all possible blocks
-          if ((Held_Until[(a)][( p)] > ( now)))
+          if ((Held_Until[a][ p] > ( now)))
             break
         } # End of each parcel p
 
@@ -2158,7 +2162,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
                                       open_key, open_value,
                                       first_year_factor, factor) {
   # Depreciate from the most recent snapshot to now
-  assert(is_open(a, now), sprintf("depreciate_now: Can't depreciate closed asset %s", (Leaf[(a)])))
+  assert(is_open(a, now), sprintf("depreciate_now: Can't depreciate closed asset %s", (Leaf[a])))
 
   # Depreciating assets only use cost elements I or II
 
@@ -2184,7 +2188,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
     # Is this parcel purchased yet?
     if (Held_From[a][p] > now)
       break # All done
-    if ((Held_Until[(a)][( p)] > ( now))) {
+    if ((Held_Until[a][ p] > ( now))) {
       # First see if depreciation already was computed for time (now)
       if (now in Accounting_Cost[a][p][I]) {
         # Already depreciated
@@ -2194,7 +2198,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
 
       # Now we need the opening value for this parcel - always cost element I
       open_key = find_key(Accounting_Cost[a][p][I], ((now) - 1))
-      assert(open_key - Epoch >= 0, sprintf("%s: No earlier depreciation record than %s", (Leaf[(a)]), get_date(now)))
+      assert(open_key - Epoch >= 0, sprintf("%s: No earlier depreciation record than %s", (Leaf[a]), get_date(now)))
 
       # The opening value - cost element I
       open_value = get_parcel_element(a, p, I, open_key)
@@ -2704,7 +2708,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
         # Check if sold in the (past, now) window (capital gains)
         # or if it is unsold (deferred gains)
-        if (((Held_Until[(a)][( p)] <= ( now)) == is_realized_flag) && (Held_Until[(a)][( p)] > ( past))) {
+        if (((Held_Until[a][ p] <= ( now)) == is_realized_flag) && (Held_Until[a][ p] > ( past))) {
           if (!gains_event) {
             # Two types of header
             if (is_detailed)
@@ -2725,7 +2729,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             }
 
             # print Name
-            label = (Leaf[(a)])
+            label = (Leaf[a])
             gains_event = (1)
             no_header_printed = (0)
           }
@@ -2745,7 +2749,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           # cash in and out
           parcel_cost     =   get_cash_in(a, p, now)
           if (is_realized_flag) {
-            parcel_proceeds = - get_cash_out(a, p, now)
+            parcel_proceeds = - ((((__MPX_KEY__ = find_key(Accounting_Cost[a][  p][0],  (  now)))?( Accounting_Cost[a][  p][0][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][  p][0][0]):( 0))))))
             current_price = parcel_proceeds / units
           } else
             parcel_proceeds = current_price * Units_Held[a][p]
@@ -2754,7 +2758,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           proceeds       += parcel_proceeds
 
           # Total gains (accounting gains)
-          gains = sum_cost_elements(Accounting_Cost[a][p], now)
+          gains = sum_all_elements(Accounting_Cost[a][p], now) # All elements
           if (!is_realized_flag) # This is not sold yet
             gains -=  parcel_proceeds
 
@@ -2786,7 +2790,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
           # after application of tax adjustments
           # If there were losses then parcel_gains will be above zero
-          adjusted_gains = gains - sum_cost_elements(Tax_Adjustments[a][p], now)
+          adjusted_gains = gains - sum_all_elements(Tax_Adjustments[a][p], now) # Needs all elements
           if (((adjusted_gains) < -Epsilon)) {
             # Adjustments are negative and reduce taxable gains
             parcel_gains = adjusted_gains
@@ -3046,7 +3050,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3349,7 +3353,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -3392,7 +3396,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3532,7 +3536,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3665,7 +3669,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3712,7 +3716,7 @@ function allocate_second_element_costs(now,       a, p, second_element) {
         # Is this parcel purchased yet?
         if (Held_From[a][p] > now)
           break # All done
-        if ((Held_Until[(a)][( p)] > ( now))) {
+        if ((Held_Until[a][ p] > ( now))) {
           # Debugging
 
 
@@ -3738,7 +3742,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[fF]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3777,7 +3781,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
           open_key = past # This must be earlier than now for this asset to be open and considered
 
         # Is there is a problem if item is sold exactly at same time as depreciation occurs? (no if done carefully)
-        if ((Held_Until[(a)][( p)] <= ( now))) {
+        if ((Held_Until[a][ p] <= ( now))) {
           close_key = ((Held_Until[a][p]) - 1)
         } else
           close_key = ((now) - 1)
@@ -3821,7 +3825,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
         close_key = ((now) - 1)
 
       # Two types of footer
-      printf "%16s %11s ", (Leaf[(a)]), Depreciation_Method[Method_Name[a]] > reports_stream
+      printf "%16s %11s ", (Leaf[a]), Depreciation_Method[Method_Name[a]] > reports_stream
       if (is_detailed)
         printf "%8s", " " > reports_stream
 
@@ -3871,7 +3875,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4054,7 +4058,7 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
         }
 
         if (print_all > 1) {
-          printf "\t%24s %21s", (Leaf[(x)]), print_cash(account_income[now]) > stream
+          printf "\t%24s %21s", (Leaf[x]), print_cash(account_income[now]) > stream
           if (past)
             printf " %26s", print_cash(account_income[past]) > stream
           printf "\n"> stream
@@ -4365,7 +4369,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -5153,7 +5157,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6503,7 +6507,7 @@ function parse_transaction(now, a, b, units, amount,
         amount = - amount
       }
     }
-    assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, (Leaf[(a)]), (Leaf[(b)])))
+    assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, (Leaf[a]), (Leaf[b])))
 
     # Get the number of units to be sold in the special case of sell all
     if ("SELL" == Write_Units) {
@@ -6592,7 +6596,7 @@ function parse_transaction(now, a, b, units, amount,
         amount = - amount
       }
     }
-    assert(correct_order, sprintf("%s => can't buy asset %s\n", $0, (Leaf[(b)])))
+    assert(correct_order, sprintf("%s => can't buy asset %s\n", $0, (Leaf[b])))
 
     # Normally fields[1] is  the parcel name
     if ("" != Parcel_Name)
@@ -6606,7 +6610,7 @@ function parse_transaction(now, a, b, units, amount,
     if (((b) ~ /^ASSET\.FIXED[.:]/) && !(b in Method_Name)) {
       # This is  the asset Lifetime
       fields[++ number_fields] = Lifetime[b]  = Real_Value[1]; Real_Value[1] = 0
-      assert(!(((Lifetime[b]) <= Epsilon) && ((Lifetime[b]) >= -Epsilon)), sprintf("%s => Can't have a fixed asset %s with zero life", $0, (Leaf[(b)])))
+      assert(!(((Lifetime[b]) <= Epsilon) && ((Lifetime[b]) >= -Epsilon)), sprintf("%s => Can't have a fixed asset %s with zero life", $0, (Leaf[b])))
 
       # We need the method name
       # Currently a choice of POOL, DV, or PC
@@ -6701,7 +6705,7 @@ function parse_transaction(now, a, b, units, amount,
     if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
       assert(!((b) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/),
                sprintf("%s Both %s and %s cannot be unitized when parcel timestamp [%s] is set",
-               $0, (Leaf[(a)]), (Leaf[(b)]), get_date(Extra_Timestamp)))
+               $0, (Leaf[a]), (Leaf[b]), get_date(Extra_Timestamp)))
       adjust_cost(a, -amount, Extra_Timestamp)
       adjust_cost(b,  amount, now)
     } else if (((b) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
@@ -6720,7 +6724,7 @@ function parse_transaction(now, a, b, units, amount,
     } else
       assert((0),
              sprintf("<%s> Either %s or %s must be a capital asset or a term asset when timestamp [%s] is set",
-             $0, (Leaf[(a)]), (Leaf[(b)]), (Leaf[(b)]), get_date(Extra_Timestamp)))
+             $0, (Leaf[a]), (Leaf[b]), (Leaf[b]), get_date(Extra_Timestamp)))
 
      # Record the transaction
      print_transaction(now, Comments, a, b, Write_Units, amount, fields, number_fields)
@@ -6846,29 +6850,29 @@ function update_member_liability(now, delta_profits, a) {
 function checkset(now, a, account, units, amount, is_check,
                        action, quantity) {
   # Save short name for action
-  action = (Leaf[(a)])
+  action = (Leaf[a])
 
   # First lets check
   if (is_check) {
     # Check the action just after now
     switch(action) {
       case "VALUE" :
-        assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[(account)])))
+        assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[account])))
         quantity = ((((account) ~ /^ASSET\.CAPITAL[.:]/))?( ((__MPX_KEY__ = find_key(Price[account],   now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[account],    now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0))))):( get_cost(account,  now))); break
       case "PRICE" :
-        assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[(account)])))
+        assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[account])))
         quantity = ((__MPX_KEY__ = find_key(Price[account],  now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))); break
 
       case "COST" : quantity = get_cost(account, now); break
 
       case "UNITS" : quantity = ((__MPX_KEY__ = find_key(Total_Units[account],   now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0)))); break
       default : assert((0), sprintf("%s => I don't know how to check %s\n",
-                                      (Leaf[(account)]), action))
+                                      (Leaf[account]), action))
     }
 
     # Is this a checkpoint?
     assert((((amount - quantity) <= Epsilon) && ((amount - quantity) >= -Epsilon)), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
-                                                 (Leaf[(account)]), action, get_date(now, LONG_FORMAT), quantity, amount))
+                                                 (Leaf[account]), action, get_date(now, LONG_FORMAT), quantity, amount))
 
   } else {
     # is a setter
@@ -6895,7 +6899,7 @@ function checkset(now, a, account, units, amount, is_check,
       break
 
       default : assert((0), sprintf("SET: I don't know how to set <%s> for account %s\n",
-                                      action, (Leaf[(account)])))
+                                      action, (Leaf[account])))
     }
 
     # All Done
@@ -6989,7 +6993,7 @@ function sell_qualified_units(a, u, now, half_window,      du, dq, key, next_key
 
     # Assert all parcels must be positive
     assert(((dq) >  Epsilon), sprintf("Found a non-positive provisional parcel of units %s[%s] => %.3f",
-            (Leaf[(a)]), get_date(key), dq))
+            (Leaf[a]), get_date(key), dq))
 
     # Reduce this parcel first
     if (du < dq) {
@@ -7055,9 +7059,9 @@ function get_unrealized_gains(a, now,
   for (p = 0; p < Number_Parcels[a]; p++) {
     if (((Held_From[a][p] -  now) > 0)) # All further transactions occured after (now)
       break # All done
-    if ((Held_Until[(a)][( p)] > ( now))) # This is an unsold parcel at time (now)
+    if ((Held_Until[a][ p] > ( now))) # This is an unsold parcel at time (now)
       # If value > cash_in this is an unrealized gain
-      gains += sum_cost_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price
+      gains += sum_all_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price # Needs all elements
   }
 
 
@@ -7095,7 +7099,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 
   # Buy u units for x
   u = Units_Held[a][last_parcel]
-  x = sum_cost_elements(Accounting_Cost[a][last_parcel], now) # This must be just the cash paid
+  x = ((__MPX_KEY__ = find_key(Accounting_Cost[a][last_parcel][I],  now))?( Accounting_Cost[a][last_parcel][I][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][last_parcel][I][0]):( 0)))) # Element I is all important
 
   # Passive revaluation
   p = x / u
@@ -7109,7 +7113,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 }
 
 # Create or modify a parcel
-function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, i) {
+function new_parcel(ac, u, x, now, parcel_tag,        last_parcel) {
   # Purchases made at the same time can be averaged
   # So only increment the parcel counter if a new parcel name specified
   last_parcel = Number_Parcels[ac] - 1
@@ -7120,11 +7124,11 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, i) {
     # This adds a new parcel - always cost element I
     # We have to initialize  this parcels cost elements
     Accounting_Cost[ac][last_parcel][0][Epoch] = 0
-    zero_costs(Accounting_Cost[ac][last_parcel], Epoch)
+    zero_cost_elements(Accounting_Cost[ac][last_parcel], Epoch)
 
     # Ditto for tax adjustments
     Tax_Adjustments[ac][last_parcel][0][Epoch] = 0
-    zero_costs(Tax_Adjustments[ac][last_parcel], Epoch)
+    zero_cost_elements(Tax_Adjustments[ac][last_parcel], Epoch)
 
     # A new purchase is always cost element I
     Accounting_Cost[ac][last_parcel][I][now] = x
@@ -7216,7 +7220,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
   p = 0
   while (u > 0 && p < Number_Parcels[ac]) {
     # Skip sold parcels - including those sold today
-    if ((Held_Until[(ac)][( p)] <= ( now))) {
+    if ((Held_Until[ac][ p] <= ( now))) {
       p ++
       continue
     }
@@ -7256,7 +7260,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
 
 
   # Were all the requested units actually sold?
-  assert((((u) <= Epsilon) && ((u) >= -Epsilon)), sprintf("sell_units: Failed to sell the requested %d units of %s", u, (Leaf[(ac)])))
+  assert((((u) <= Epsilon) && ((u) >= -Epsilon)), sprintf("sell_units: Failed to sell the requested %d units of %s", u, (Leaf[ac])))
 
   # Update parent sums
   update_cost(ac, -x, now)
@@ -7327,7 +7331,7 @@ function sell_fixed_parcel(a, p, now,     x) {
   # so it will have accounting cost zero
 
   # Only need to save depreciation or appreciation
-  x = sum_cost_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset
+  x = sum_all_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset # Needs all elements
 
   # Set it to zero (use element 0)
   sum_entry(Accounting_Cost[a][p][0], -x, now)
@@ -7356,7 +7360,7 @@ function save_parcel_gain(a, p, now,    x, held_time) {
 
   # Accounting gains or Losses - based on reduced cost
   # Also taxable losses are based on the reduced cost...
-  x = sum_cost_elements(Accounting_Cost[a][p], now)
+  x = sum_all_elements(Accounting_Cost[a][p], now) # Needs all elements
   if (((x) >  Epsilon)) {
     adjust_cost(REALIZED_LOSSES, x, now)
 
@@ -7371,7 +7375,7 @@ function save_parcel_gain(a, p, now,    x, held_time) {
   # Taxable gains
   # after application of tax adjustments
   # This works if tax adjustments are negative
-  x -= sum_cost_elements(Tax_Adjustments[a][p], now)
+  x -= sum_all_elements(Tax_Adjustments[a][p], now) # Needs all elements
 
   # Taxable Gains are based on the adjusted cost
   if (((x) < -Epsilon)) {
