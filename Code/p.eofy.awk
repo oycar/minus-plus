@@ -48,7 +48,7 @@ function eofy_actions(now,      past, allocated_profits,
     allocated_profits = get_cost(ALLOCATED, just_before(now))
     set_cost(ALLOCATED, allocated_profits, now)
   }
-  set_cost(MARKET_CHANGES, sum_market_gains(just_before(now)), now)
+  set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", just_before(now)), now)
 
   # Do we need to check for dividend qualification
   if (Qualification_Window)

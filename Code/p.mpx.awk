@@ -882,7 +882,7 @@ function parse_transaction(now, a, b, units, amount,
     # But there is another complication - this needs to consider
     # unrealized gains too => so important assets are priced accurately
     #
-    set_cost(MARKET_CHANGES, sum_market_gains(just_before(now)), just_before(now))
+    set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", just_before(now)), just_before(now))
 
     # This will change proportions so update the profits first
     @Update_Profits_Function(now)
@@ -1665,45 +1665,6 @@ function get_held_time(now, from,     held_time) {
   if (CGT_PERIOD == held_time && CGT_PERIOD == one_year(now)) # A leap year
      held_time -= ONE_DAY # Fake the held time to get the correct tax treatment
   return held_time
-}
-
-# This is the hard way to do it
-# another way is return (Cost_Basis_change - market_value_change)
-# this way is being used ATM for consistency checking reasons
-# This is only used once in - in eofy statements
-function get_unrealized_gains(a, now,
-                              current_price, p, gains, x) {
-  if (is_closed(a, now))
-    return 0 # NO unrealized gains
-
-  # Sum the total value of the asset
-  gains = 0
-  current_price = find_entry(Price[a], now)
-
-@ifeq LOG get_unrealized_gains
-  printf "Get Unrealized Gains (%s)\n", get_short_name(a) > STDERR
-  printf "\tDate => %s\n",  get_date(now) > STDERR
-  printf "\tPrice => %s\n", print_cash(current_price) > STDERR
-  printf "\tAdjustments => %s\n", print_cash(gains) > STDERR
-@endif # LOG
-
-  # Unrealized gains held at time t are those in unsold parcels
-  for (p = 0; p < Number_Parcels[a]; p++) {
-    if (greater_than(Held_From[a][p], now)) # All further transactions occured after (now)
-      break # All done
-    if (is_unsold(a, p, now)) # This is an unsold parcel at time (now)
-      # If value > cash_in this is an unrealized gain
-      gains += sum_cost_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price
-  }
-
-@ifeq LOG get_unrealized_gains
-  printf "\tGains   => %s\n", print_cash(gains) > STDERR
-  printf "\tParcels => %03d\n", p > STDERR
-  printf "\tUnits   => %05d\n", get_units(a, now) > STDERR
-@endif # LOG
-
-  # The result
-  return gains
 }
 
 # Buy a parcel of u units at the cost of x

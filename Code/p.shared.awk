@@ -1407,18 +1407,55 @@ function set_cost(a, new_cost, now,     initial_cost) {
   adjust_cost(a, new_cost - initial_cost, now, FALSE)
 }
 
-# Unrealized or market gains
-function sum_market_gains(now,     sum, a) {
+# Get unrealized or realized gains
+function get_asset_gains(gains_function, now,   sum, a) {
   sum = 0
 
-  # Cash-like assets can be ignored
+  # Just sum the lower level function
   for (a in Leaf)
-    if (is_capital(a) && is_open(a, now))
-      # The asset must be active
-      sum += get_cost(a, now) - find_entry(Price[a], now) * get_units(a, now)
+    sum += @gains_function(a, now)
 
   # All done - negative values are gains
   return sum
+}
+
+# Get unrealized gains at the account level
+function get_unrealized_gains(a, now,
+                              gains) {
+
+  # The asset must be active
+  if (is_closed(a, now))
+    return 0 # No unrealized gains
+
+  if (is_capital(a))
+    gains = get_cost(a, now) - find_entry(Price[a], now) * get_units(a, now)
+  else
+    gains = 0
+
+  # The result
+  return gains
+}
+
+
+# Get realized gains at the parcel level
+function get_realized_gains(a, now,
+                              gains, i) {
+  # The asset must be active
+  if (is_open(a, now))
+    return 0 # No realized gains
+
+  # Must be a capital asset
+  if (is_capital(a)) {
+    for (i = 0; i < Number_Parcels[a]; i ++) {
+      if (Held_From[a][i] > now) # All further transactions occured after (now)
+        break # All done
+      if (is_sold(a, i, now)) # This is a sold parcel at time (now)
+        gains += find_entry(Accounting_Cost[a][i][0], now) + sum_cost_elements(Accounting_Cost[a][i], now) # All cost elements
+    }
+  } else
+    gains = 0
+
+  return gains
 }
 
 # Sum only the cost elements
@@ -1476,18 +1513,6 @@ function get_cash_in(a, i, now) {
   return 0
 }
 
-# The cash paid out of the asset when sold
-#function get_cash_out(a, i, now) {
-  # We are only interested in the sale payment for this parcel - the zeroth element
-  # if (is_sold(a, i, now))
-    # Each parcel can only be sold once - so if sold it is the first entry
-    # return get_parcel_proceeds(a, i)
-#    return get_parcel_proceeds(a, i, now)
-
-  # Not sold yet
-  #return 0
-#}
-
 # The cost reductions
 function get_cost_modifications(a, p, now,  sum) {
   # This should exclude cash_in and cash_out
@@ -1505,7 +1530,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
     sum -= sum_cost_elements(Tax_Adjustments[a][p], now) ## Needs all elements
 
   # The parcel cost
-  return sum # - get_cash_out(a, p, now)
+  return sum
 }
 
 # Print out transactions

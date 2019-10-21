@@ -1706,19 +1706,57 @@ function set_cost(a, new_cost, now,     initial_cost) {
   adjust_cost(a, new_cost - initial_cost, now, (0))
 }
 
-# Unrealized or market gains
-function sum_market_gains(now,     sum, a) {
+# Get unrealized or realized gains
+function get_asset_gains(gains_function, now,   sum, a) {
   sum = 0
 
-  # Cash-like assets can be ignored
+  # Just sum the lower level function
   for (a in Leaf)
-    if (((a) ~ /^ASSET\.CAPITAL[.:]/) && is_open(a, now))
-      # The asset must be active
-      sum += get_cost(a, now) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
+    sum += @gains_function(a, now)
 
   # All done - negative values are gains
   return sum
 }
+
+# Get unrealized gains at the account level
+function get_unrealized_gains(a, now,
+                              gains) {
+
+  # The asset must be active
+  if ((!is_open((a), ( now))))
+    return 0 # No unrealized gains
+
+  if (((a) ~ /^ASSET\.CAPITAL[.:]/))
+    gains = get_cost(a, now) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
+  else
+    gains = 0
+
+  # The result
+  return gains
+}
+
+
+# Get realized gains at the parcel level
+function get_realized_gains(a, now,
+                              gains, i) {
+  # The asset must be active
+  if (is_open(a, now))
+    return 0 # No realized gains
+
+  # Must be a capital asset
+  if (((a) ~ /^ASSET\.CAPITAL[.:]/)) {
+    for (i = 0; i < Number_Parcels[a]; i ++) {
+      if (Held_From[a][i] > now) # All further transactions occured after (now)
+        break # All done
+      if ((Held_Until[a][ i] <= ( now))) # This is a sold parcel at time (now)
+        gains += ((__MPX_KEY__ = find_key(Accounting_Cost[a][i][0],  now))?( Accounting_Cost[a][i][0][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][i][0][0]):( 0)))) + sum_cost_elements(Accounting_Cost[a][i], now) # All cost elements
+    }
+  } else
+    gains = 0
+
+  return gains
+}
+
 
 # Sum only the cost elements
 function sum_cost_elements(array, now,     sum_elements, e) {
@@ -2574,7 +2612,7 @@ function eofy_actions(now,      past, allocated_profits,
     allocated_profits = get_cost(ALLOCATED, ((now) - 1))
     set_cost(ALLOCATED, allocated_profits, now)
   }
-  set_cost(MARKET_CHANGES, sum_market_gains(((now) - 1)), now)
+  set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", ((now) - 1)), now)
 
   # Do we need to check for dividend qualification
   if (Qualification_Window)
@@ -6317,7 +6355,7 @@ function parse_transaction(now, a, b, units, amount,
     # But there is another complication - this needs to consider
     # unrealized gains too => so important assets are priced accurately
     #
-    set_cost(MARKET_CHANGES, sum_market_gains(((now) - 1)), ((now) - 1))
+    set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", ((now) - 1)), ((now) - 1))
 
     # This will change proportions so update the profits first
     @Update_Profits_Function(now)
@@ -7029,36 +7067,6 @@ function get_held_time(now, from,     held_time) {
   if (31622400 == held_time && 31622400 == one_year(now)) # A leap year
      held_time -= (86400) # Fake the held time to get the correct tax treatment
   return held_time
-}
-
-# This is the hard way to do it
-# another way is return (Cost_Basis_change - market_value_change)
-# this way is being used ATM for consistency checking reasons
-# This is only used once in - in eofy statements
-function get_unrealized_gains(a, now,
-                              current_price, p, gains, x) {
-  if ((!is_open((a), ( now))))
-    return 0 # NO unrealized gains
-
-  # Sum the total value of the asset
-  gains = 0
-  current_price = ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0))))
-
-
-
-  # Unrealized gains held at time t are those in unsold parcels
-  for (p = 0; p < Number_Parcels[a]; p++) {
-    if (((Held_From[a][p] -  now) > 0)) # All further transactions occured after (now)
-      break # All done
-    if ((Held_Until[a][ p] > ( now))) # This is an unsold parcel at time (now)
-      # If value > cash_in this is an unrealized gain
-      gains += sum_cost_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price
-  }
-
-
-
-  # The result
-  return gains
 }
 
 # Buy a parcel of u units at the cost of x
