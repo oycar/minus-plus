@@ -175,7 +175,6 @@ END {
 
 
 
-
 # //
 
 
@@ -495,7 +494,7 @@ function set_array(array, keys, first_key, last_key, value, flag) {
   # Set the array recursively
   if (first_key == last_key)
     # Set the value
-    (array[( keys[first_key])] = ( value))
+    (array[ keys[first_key]] = ( value))
   else {
     # Yikes
     # We need to ensure the subarray exists before calling set_array() otherwise
@@ -1454,12 +1453,12 @@ function held_to(ac, now,     p, latest_sale) {
   return latest_sale # returns the date the parcel was sold
 }
 
-# Initialize cost element arrays
-function zero_cost_elements(array, now,     e) {
-  # Set all true cost elements to zero - ie elements I-V
-  for (e in Elements)
-    array[e][now] = 0
-}
+# # Initialize cost element arrays
+# function set_array_entries(array, key,     e) {
+#   # Set all true cost elements to zero - ie elements I-V
+#   for (e in Elements)
+#     array[e][now] = 0
+# }
 
 # This splits up a branch name or a leaf name into dotted components
 function get_name_component(name, i, number_components, array,    name_length, s, dot) {
@@ -1623,32 +1622,32 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     # Update the accounting cost
     sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
 
-  # Equities do not have tax adjustments and can indeed have a negative cost base
-  # This is clearly wrong.... since this is acting on all elements not just the current one....
-  # but check instead in the EOFY processing....
-  if (!((a) ~ /^EQUITY[.:]/)) {
-    # Now this is tricky -
-    #   The cost base can be negative
-    #   but not after the tax adjustment
-    # Also if this parcel was sold on the same day (so time==now)
-    # a term will be included in cash_out - so overrule that
-    cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
-    if (cost_base < sum_all_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
-      # Cannot create a negative cost base (for long)
-      # This will impact capital gains!
-      # Since a negative cost base cannot be deferred
-
-      # Save the parcel gain
-      save_parcel_gain(a, p, now)
-
-      # This parcel gain is not recorded...
-      # How to fix this....
-
-      # We are cashing the tax adjustments out so adjust both cost bases to zero
-      zero_cost_elements(Accounting_Cost[a][p], now)
-      zero_cost_elements(Tax_Adjustments[a][p], now)
-    }
-  }
+  # # Equities do not have tax adjustments and can indeed have a negative cost base
+  # # This is clearly wrong.... since this is acting on all elements not just the current one....
+  # # but check instead in the EOFY processing....
+  # if (!is_equity(a)) {
+  #   # Now this is tricky -
+  #   #   The cost base can be negative
+  #   #   but not after the tax adjustment
+  #   # Also if this parcel was sold on the same day (so time==now)
+  #   # a term will be included in cash_out - so overrule that
+  #   cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
+  #   if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
+  #     # Cannot create a negative cost base (for long)
+  #     # This will impact capital gains!
+  #     # Since a negative cost base cannot be deferred
+  #
+  #     # Save the parcel gain
+  #     save_parcel_gain(a, p, now,  ....)
+  #
+  #     # This parcel gain is not recorded...
+  #     # How to fix this....
+  #
+  #     # We are cashing the tax adjustments out so adjust both cost bases to zero
+  #     zero_cost_elements(Accounting_Cost[a][p], now)
+  #     zero_cost_elements(Tax_Adjustments[a][p], now)
+  #   }
+  # }
 
   # Debugging
 
@@ -1658,7 +1657,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 # This is the same as the reduced cost
 # Returns 0 for sold assets
 # What would happen if REALIZED were not populated and it returned the gains/losses for sold assets?
-# 
+#
 function get_cost(a, now,     i, sum_cost) {
   # Adjustments for units bought
   if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
@@ -1669,7 +1668,7 @@ function get_cost(a, now,     i, sum_cost) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if ((Held_Until[a][ i] > ( now))) # This is an unsold parcel at time (now)
-        sum_cost += sum_all_elements(Accounting_Cost[a][i], now) # Needs all elements
+        sum_cost += sum_cost_elements(Accounting_Cost[a][i], now) # cost elements
     }
     return sum_cost
   } else if (a in Cost_Basis) # Cash-like
@@ -1691,7 +1690,7 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if ((Held_Until[a][ i] > ( now))) # This is an unsold parcel at time (now)
-        sum_adjustments += sum_all_elements(Tax_Adjustments[a][i], now) # Needs all elements
+        sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now) # Needs all elements
     }
   }
 
@@ -1719,16 +1718,6 @@ function sum_market_gains(now,     sum, a) {
 
   # All done - negative values are gains
   return sum
-}
-
-# Sum all the elements
-function sum_all_elements(array, now,     sum_elements, e) {
-
-
-  sum_elements = 0
-  for (e in array) # Include element [0]
-    sum_elements += ((__MPX_KEY__ = find_key(array[e],  now))?( array[e][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( array[e][0]):( 0))))
-  return sum_elements
 }
 
 # Sum only the cost elements
@@ -1810,7 +1799,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
   # Reduced cost by default
   sum = sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
   if (adjusted)
-    sum -= sum_all_elements(Tax_Adjustments[a][p], now) ## Needs all elements
+    sum -= sum_cost_elements(Tax_Adjustments[a][p], now) ## Needs all elements
 
   # The parcel cost
   return sum # - get_cash_out(a, p, now)
@@ -2759,7 +2748,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           proceeds       += parcel_proceeds
 
           # Total gains (accounting gains)
-          gains = sum_all_elements(Accounting_Cost[a][p], now) # All elements
+          gains = ((__MPX_KEY__ = find_key(Accounting_Cost[a][p][0],  now))?( Accounting_Cost[a][p][0][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][p][0][0]):( 0)))) + sum_cost_elements(Accounting_Cost[a][p], now) # All elements
           if (!is_realized_flag) # This is not sold yet
             gains -=  parcel_proceeds
 
@@ -2791,7 +2780,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
           # after application of tax adjustments
           # If there were losses then parcel_gains will be above zero
-          adjusted_gains = gains - sum_all_elements(Tax_Adjustments[a][p], now) # Needs all elements
+          adjusted_gains = gains - sum_cost_elements(Tax_Adjustments[a][p], now) # Needs all elements
           if (((adjusted_gains) < -Epsilon)) {
             # Adjustments are negative and reduce taxable gains
             parcel_gains = adjusted_gains
@@ -5848,7 +5837,7 @@ function import_csv_data(array, symbol, name,
 
 
   # Set the price
-  (array[a][( key)] = ( value))
+  (array[a][ key] = ( value))
 
   # Done
 }
@@ -6153,7 +6142,7 @@ function read_control_record(       now, i, x, p, is_check){
       assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
       p = strtonum($3)
 
-      (SYMTAB[i][( now)] = ( p))
+      (SYMTAB[i][ now] = ( p))
       break
 
     ## Several dates can be set
@@ -6446,7 +6435,7 @@ function parse_transaction(now, a, b, units, amount,
         # Save the ex-dividend date
         # But note that it must relate to an underlying asset
         #
-        (Payment_Date[underlying_asset][( Extra_Timestamp)] = ( now))
+        (Payment_Date[underlying_asset][ Extra_Timestamp] = ( now))
 
       } else if (Qualification_Window && (((a) ~ ("^" ( "INCOME.DIVIDEND") "[.:]")) || ((a) ~ ("^" ( "INCOME.DISTRIBUTION.CLOSE") "[.:]")))) {
         Extra_Timestamp = get_exdividend_date(underlying_asset, now)
@@ -6766,25 +6755,25 @@ function set_account_term(a, now) {
   # If the term is set make a note of it
   if (Real_Value[1] > 0)
    # It can change as long as it doesn't make a CURRENT asset non current
-   (Account_Term[a][( now)] = ( Real_Value[1]))
+   (Account_Term[a][ now] = ( Real_Value[1]))
 
   # At this stage term is assumed to be set in months
   if (Extra_Timestamp > now) { # Use the time stamp if it exists
-    (Maturity_Date[a][( now)] = ( Extra_Timestamp))
+    (Maturity_Date[a][ now] = ( Extra_Timestamp))
 
     # Don't use real value again
     Real_Value[1] = 0
   } else if (Real_Value[1] > 0) {
     # Need to set the first maturity date - real value is the same as account term
     Extra_Timestamp = add_months(now, Real_Value[1])
-    (Maturity_Date[a][( now)] = ( Extra_Timestamp))
+    (Maturity_Date[a][ now] = ( Extra_Timestamp))
 
     # Don't use real value again
     Real_Value[1] = 0
   } else if ((a in Maturity_Date) && now > ((__MPX_KEY__ = find_key(Maturity_Date[a],  ((now) - 1)))?( Maturity_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Maturity_Date[a][0]):( 0))))) {
     # Compute the maturity date
     Extra_Timestamp = add_months(now, ((__MPX_KEY__ = find_key(Account_Term[a],  now))?( Account_Term[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Account_Term[a][0]):( 0)))))
-    (Maturity_Date[a][( now)] = ( Extra_Timestamp))
+    (Maturity_Date[a][ now] = ( Extra_Timestamp))
   } else
     # No term was set
     return a
@@ -6821,7 +6810,7 @@ function convert_term_account(a, now, maturity,       active_account, x, thresho
     delete Threshold_Dates[threshold][SUBSEP]
 
     # The time "now" is recorded since  the entry can be modified later
-    (Threshold_Dates[threshold][( active_account)] = ( maturity))
+    (Threshold_Dates[threshold][ active_account] = ( maturity))
 
   } else if (((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)) {
     # Need to identify this as a current account
@@ -6890,7 +6879,7 @@ function checkset(now, a, account, units, amount, is_check,
       case "PRICE" :
         # This is a single unit
         # Set the price per unit
-        (Price[account][( now)] = ( amount))
+        (Price[account][ now] = ( amount))
       break
 
       case "COST" :
@@ -7045,6 +7034,7 @@ function get_held_time(now, from,     held_time) {
 # This is the hard way to do it
 # another way is return (Cost_Basis_change - market_value_change)
 # this way is being used ATM for consistency checking reasons
+# This is only used once in - in eofy statements
 function get_unrealized_gains(a, now,
                               current_price, p, gains, x) {
   if ((!is_open((a), ( now))))
@@ -7062,7 +7052,7 @@ function get_unrealized_gains(a, now,
       break # All done
     if ((Held_Until[a][ p] > ( now))) # This is an unsold parcel at time (now)
       # If value > cash_in this is an unrealized gain
-      gains += sum_all_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price # Needs all elements
+      gains += sum_cost_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price
   }
 
 
@@ -7107,14 +7097,14 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 
 
   # Set the new price
-  (Price[a][( now)] = ( p))
+  (Price[a][ now] = ( p))
 
   # Return the parcel id
   return last_parcel
 }
 
 # Create or modify a parcel
-function new_parcel(ac, u, x, now, parcel_tag,        last_parcel) {
+function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
   # Purchases made at the same time can be averaged
   # So only increment the parcel counter if a new parcel name specified
   last_parcel = Number_Parcels[ac] - 1
@@ -7125,11 +7115,13 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel) {
     # This adds a new parcel - always cost element I
     # We have to initialize  this parcels cost elements
     Accounting_Cost[ac][last_parcel][0][Epoch] = 0
-    zero_cost_elements(Accounting_Cost[ac][last_parcel], Epoch)
+    for (key in Elements)
+      Accounting_Cost[ac][last_parcel][key][Epoch] = 0
 
     # Ditto for tax adjustments
     Tax_Adjustments[ac][last_parcel][0][Epoch] = 0
-    zero_cost_elements(Tax_Adjustments[ac][last_parcel], Epoch)
+    for (key in Elements)
+      Tax_Adjustments[ac][last_parcel][key][Epoch] = 0
 
     # A new purchase is always cost element I
     Accounting_Cost[ac][last_parcel][I][now] = x
@@ -7213,7 +7205,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     new_price = x / u
 
     # Can set the price of a normal asset
-    (Price[ac][( now)] = ( new_price))
+    (Price[ac][ now] = ( new_price))
   }
 
   # Default assumption is first-in-first-out (FIFO)
@@ -7309,13 +7301,13 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
   # This is always recorded as cost_element 0 since it is not actually a true cost
   # This must be recorded as cash flowing out of the account
   # A parcel is only ever sold once so we can simply set the cost
-  (Accounting_Cost[a][p][0][( now)] = ( -amount_paid))
+  (Accounting_Cost[a][p][0][ now] = ( -amount_paid))
 
 
 
   # Save realized gains
   if (!((a) ~ /^ASSET\.FIXED[.:]/))
-    save_parcel_gain(a, p, now)
+    save_parcel_gain(a, p, now, - amount_paid)
   else
     sell_fixed_parcel(a, p, now)
 
@@ -7332,9 +7324,10 @@ function sell_fixed_parcel(a, p, now,     x) {
   # so it will have accounting cost zero
 
   # Only need to save depreciation or appreciation
-  x = sum_all_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset # Needs all elements
+  x = sum_cost_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset
 
   # Set it to zero (use element 0)
+  # In fact the cost of sold assets is 0 anyway
   sum_entry(Accounting_Cost[a][p][0], -x, now)
 
   # We need to adjust the asset sums by this too
@@ -7355,13 +7348,13 @@ function sell_fixed_parcel(a, p, now,     x) {
 # Very occasionally uses the INCOME_LONG
 # So to avoid inefficiency uses a global name for these
 # accounts which can be flipped if necessary
-function save_parcel_gain(a, p, now,    x, held_time) {
+function save_parcel_gain(a, p, now, x,       held_time) {
   # Get the held time
   held_time = get_held_time(now, Held_From[a][p])
 
   # Accounting gains or Losses - based on reduced cost
   # Also taxable losses are based on the reduced cost...
-  x = sum_all_elements(Accounting_Cost[a][p], now) # Needs all elements
+  x += sum_cost_elements(Accounting_Cost[a][p], now) # Needs all elements
   if (((x) >  Epsilon)) {
     adjust_cost(REALIZED_LOSSES, x, now)
 
@@ -7376,7 +7369,7 @@ function save_parcel_gain(a, p, now,    x, held_time) {
   # Taxable gains
   # after application of tax adjustments
   # This works if tax adjustments are negative
-  x -= sum_all_elements(Tax_Adjustments[a][p], now) # Needs all elements
+  x -= sum_cost_elements(Tax_Adjustments[a][p], now) # Needs all elements
 
   # Taxable Gains are based on the adjusted cost
   if (((x) < -Epsilon)) {

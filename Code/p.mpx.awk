@@ -1670,6 +1670,7 @@ function get_held_time(now, from,     held_time) {
 # This is the hard way to do it
 # another way is return (Cost_Basis_change - market_value_change)
 # this way is being used ATM for consistency checking reasons
+# This is only used once in - in eofy statements
 function get_unrealized_gains(a, now,
                               current_price, p, gains, x) {
   if (is_closed(a, now))
@@ -1692,7 +1693,7 @@ function get_unrealized_gains(a, now,
       break # All done
     if (is_unsold(a, p, now)) # This is an unsold parcel at time (now)
       # If value > cash_in this is an unrealized gain
-      gains += sum_all_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price # Needs all elements
+      gains += sum_cost_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price
   }
 
 @ifeq LOG get_unrealized_gains
@@ -2027,7 +2028,7 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
 
   # Save realized gains
   if (!is_fixed(a))
-    save_parcel_gain(a, p, now)
+    save_parcel_gain(a, p, now, - amount_paid)
   else
     sell_fixed_parcel(a, p, now)
 
@@ -2044,9 +2045,10 @@ function sell_fixed_parcel(a, p, now,     x) {
   # so it will have accounting cost zero
 
   # Only need to save depreciation or appreciation
-  x = sum_all_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset # Needs all elements
+  x = sum_cost_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset
 
   # Set it to zero (use element 0)
+  # In fact the cost of sold assets is 0 anyway
   sum_entry(Accounting_Cost[a][p][0], -x, now)
 
   # We need to adjust the asset sums by this too
@@ -2074,13 +2076,13 @@ function sell_fixed_parcel(a, p, now,     x) {
 # Very occasionally uses the INCOME_LONG
 # So to avoid inefficiency uses a global name for these
 # accounts which can be flipped if necessary
-function save_parcel_gain(a, p, now,    x, held_time) {
+function save_parcel_gain(a, p, now, x,       held_time) {
   # Get the held time
   held_time = get_held_time(now, Held_From[a][p])
 
   # Accounting gains or Losses - based on reduced cost
   # Also taxable losses are based on the reduced cost...
-  x = sum_all_elements(Accounting_Cost[a][p], now) # Needs all elements
+  x += sum_cost_elements(Accounting_Cost[a][p], now) # Needs all elements
   if (above_zero(x)) {
     adjust_cost(REALIZED_LOSSES, x, now)
 
@@ -2095,7 +2097,7 @@ function save_parcel_gain(a, p, now,    x, held_time) {
   # Taxable gains
   # after application of tax adjustments
   # This works if tax adjustments are negative
-  x -= sum_all_elements(Tax_Adjustments[a][p], now) # Needs all elements
+  x -= sum_cost_elements(Tax_Adjustments[a][p], now) # Needs all elements
 
   # Taxable Gains are based on the adjusted cost
   if (below_zero(x)) {

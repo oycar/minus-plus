@@ -1331,13 +1331,13 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
   #   # Also if this parcel was sold on the same day (so time==now)
   #   # a term will be included in cash_out - so overrule that
   #   cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
-  #   if (cost_base < sum_all_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
+  #   if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
   #     # Cannot create a negative cost base (for long)
   #     # This will impact capital gains!
   #     # Since a negative cost base cannot be deferred
   #
   #     # Save the parcel gain
-  #     save_parcel_gain(a, p, now)
+  #     save_parcel_gain(a, p, now,  ....)
   #
   #     # This parcel gain is not recorded...
   #     # How to fix this....
@@ -1369,7 +1369,7 @@ function get_cost(a, now,     i, sum_cost) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-        sum_cost += sum_all_elements(Accounting_Cost[a][i], now) # Needs all elements
+        sum_cost += sum_cost_elements(Accounting_Cost[a][i], now) # cost elements
     }
     return sum_cost
   } else if (a in Cost_Basis) # Cash-like
@@ -1391,7 +1391,7 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-        sum_adjustments += sum_all_elements(Tax_Adjustments[a][i], now) # Needs all elements
+        sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now) # Needs all elements
     }
   }
 
@@ -1419,18 +1419,6 @@ function sum_market_gains(now,     sum, a) {
 
   # All done - negative values are gains
   return sum
-}
-
-# Sum all the elements
-function sum_all_elements(array, now,     sum_elements, e) {
-@ifeq LOG DEBUG
-  assert(isarray(array), "<" $0 "> sum_all_elements:  needs an array")
-@endif
-
-  sum_elements = 0
-  for (e in array) # Include element [0]
-    sum_elements += find_entry(array[e], now)
-  return sum_elements
 }
 
 # Sum only the cost elements
@@ -1514,7 +1502,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
   # Reduced cost by default
   sum = sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
   if (adjusted)
-    sum -= sum_all_elements(Tax_Adjustments[a][p], now) ## Needs all elements
+    sum -= sum_cost_elements(Tax_Adjustments[a][p], now) ## Needs all elements
 
   # The parcel cost
   return sum # - get_cash_out(a, p, now)
