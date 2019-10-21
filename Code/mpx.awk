@@ -45,8 +45,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Control Export format
 
 
@@ -93,8 +91,6 @@ END {
 
 
 # // Default Reports
-
-
 
 
 
@@ -1524,6 +1520,13 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # What proportion of the sum is allocated to each unit at time now?
 
+    printf "%s\n", a > "/dev/stderr"
+    printf "\tTimeStamp => %s\n", get_date(now) > "/dev/stderr"
+    printf "\tInitial Units => %.3f\n", ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))) > "/dev/stderr"
+    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
+    printf "\tCost Base Adjustment => %s\n", print_cash(x) > "/dev/stderr"
+    printf "\tCost Element         => %s\n", Cost_Element > "/dev/stderr"
+
     # Either divide adjustment between all open parcels OR
     # concentrate with a parcel with the same timestamp
     for (i = 0; i < Number_Parcels[a]; i ++) {
@@ -1533,6 +1536,9 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
         # The adjustment is pooled explicitly with this parcel
         adjust_parcel_cost(a, i, now, x, Cost_Element, tax_adjustment)
 
+
+        # Debugging
+        printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
 
         # Also record the parents cost
         # If this is a tax adjustment then only negative costs are significant
@@ -1551,6 +1557,9 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # Debugging
 
+    printf "\tAverage Adjustment Per Unit  => %s\n",
+      print_cash(x / ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))))        > "/dev/stderr"
+
 
     # Scan back down the parcels held and unsold at time now
     while (i -- > 0) {
@@ -1563,6 +1572,8 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
     } # End of each parcel
 
     # Debugging
+
+    printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
 
 
     # Balance costs
@@ -1594,11 +1605,17 @@ function update_cost(a, x, now,      p) {
 
 function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
                             cost_base,
-                            held_time, x) {
+                            held_time) {
   # Ignore negligible adjustments
   if ((((parcel_adjustment) <= Epsilon) && ((parcel_adjustment) >= -Epsilon)))
     return
 
+
+  printf "%s\n", a > "/dev/stderr"
+  printf "\tTimeStamp => %s\n", get_date(now) > "/dev/stderr"
+  printf "\t\tParcel  => %05d", p  > "/dev/stderr"
+  printf " Opening Parcel Cost[%s]=> %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > "/dev/stderr"
+  printf "\t\t\t\tParcel Adjustment => %s\n", print_cash(parcel_adjustment) > "/dev/stderr"
 
 
   # save the cost adjustment/reduction related to this parcel
@@ -1622,34 +1639,54 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     # Update the accounting cost
     sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
 
-  # # Equities do not have tax adjustments and can indeed have a negative cost base
-  # # This is clearly wrong.... since this is acting on all elements not just the current one....
-  # # but check instead in the EOFY processing....
-  # if (!is_equity(a)) {
-  #   # Now this is tricky -
-  #   #   The cost base can be negative
-  #   #   but not after the tax adjustment
-  #   # Also if this parcel was sold on the same day (so time==now)
-  #   # a term will be included in cash_out - so overrule that
-  #   cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
-  #   if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
-  #     # Cannot create a negative cost base (for long)
-  #     # This will impact capital gains!
-  #     # Since a negative cost base cannot be deferred
-  #
-  #     # Save the parcel gain
-  #     save_parcel_gain(a, p, now,  ....)
-  #
-  #     # This parcel gain is not recorded...
-  #     # How to fix this....
-  #
-  #     # We are cashing the tax adjustments out so adjust both cost bases to zero
-  #     zero_cost_elements(Accounting_Cost[a][p], now)
-  #     zero_cost_elements(Tax_Adjustments[a][p], now)
-  #   }
-  # }
+  # Equities do not have tax adjustments and can indeed have a negative cost base
+  # This is clearly wrong.... since this is acting on all elements not just the current one....
+  # but check instead in the EOFY processing....
+  if (!((a) ~ /^EQUITY[.:]/)) {
+    #   Ensure that the cost base of any element is not negative
+    cost_base = ((__MPX_KEY__ = find_key(Accounting_Cost[a][p][element],  now))?( Accounting_Cost[a][p][element][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Accounting_Cost[a][p][element][0]):( 0))))
+    if (((cost_base) < -Epsilon)) {
+      # Save this quantity
+      #sum_entry(Accounting_Cost[a][p][0], cost_base, now)
+
+  printf "\t\t\t\tNegative Cost Base => %s\n", print_cash(cost_base) > "/dev/stderr"
+
+
+      # The reduced cost base is increased
+      parcel_adjustment = ((__MPX_KEY__ = find_key(Tax_Adjustments[a][p][element],  now))?( Tax_Adjustments[a][p][element][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Adjustments[a][p][element][0]):( 0))))
+
+      # Set cost to zero
+      (Accounting_Cost[a][p][element][ now] = ( 0))
+
+      # This will create a capital gain
+      adjust_cost(REALIZED_GAINS, cost_base, now)
+
+
+  printf "\t\t\t\tRealized Gains => %s\n",  print_cash(-cost_base) > "/dev/stderr"
+
+
+      # Adjust tax adjustment too
+      if (parcel_adjustment < cost_base)
+        sum_entry(Tax_Adjustments[a][p][element], cost_base, now)
+      else {
+       cost_base -= parcel_adjustment
+
+   printf "\t\t\t\tTaxable Gains => %s\n",  print_cash(-cost_base) > "/dev/stderr"
+
+       # Need to record taxable gains/losses too
+       held_time = get_held_time(now, Held_From[a][p])
+       if (held_time >= 31622400)
+         adjust_cost(LONG_GAINS, cost_base, now)
+       else
+         adjust_cost(SHORT_GAINS, cost_base, now)
+      }
+
+    }
+  }
 
   # Debugging
+
+  printf "\t\t\t\tReduced Parcel Cost[%s] => %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > "/dev/stderr"
 
 } # End of adjust_parcel_cost
 
@@ -1757,7 +1794,6 @@ function get_realized_gains(a, now,
   return gains
 }
 
-
 # Sum only the cost elements
 function sum_cost_elements(array, now,     sum_elements, e) {
 
@@ -1811,18 +1847,6 @@ function get_cash_in(a, i, now) {
   return 0
 }
 
-# The cash paid out of the asset when sold
-#function get_cash_out(a, i, now) {
-  # We are only interested in the sale payment for this parcel - the zeroth element
-  # if (is_sold(a, i, now))
-    # Each parcel can only be sold once - so if sold it is the first entry
-    # return get_parcel_proceeds(a, i)
-#    return get_parcel_proceeds(a, i, now)
-
-  # Not sold yet
-  #return 0
-#}
-
 # The cost reductions
 function get_cost_modifications(a, p, now,  sum) {
   # This should exclude cash_in and cash_out
@@ -1840,7 +1864,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
     sum -= sum_cost_elements(Tax_Adjustments[a][p], now) ## Needs all elements
 
   # The parcel cost
-  return sum # - get_cash_out(a, p, now)
+  return sum
 }
 
 # Print out transactions
@@ -3078,7 +3102,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3381,7 +3405,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -3424,7 +3448,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3564,7 +3588,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3697,7 +3721,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3770,7 +3794,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation, sum_adjusted) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[fF]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3903,7 +3927,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4397,7 +4421,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -5185,7 +5209,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[iI]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

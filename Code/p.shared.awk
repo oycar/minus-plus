@@ -1287,7 +1287,7 @@ function update_cost(a, x, now,      p) {
 
 function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
                             cost_base,
-                            held_time, x) {
+                            held_time) {
   # Ignore negligible adjustments
   if (near_zero(parcel_adjustment))
     return
@@ -1321,32 +1321,49 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     # Update the accounting cost
     sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
 
-  # # Equities do not have tax adjustments and can indeed have a negative cost base
-  # # This is clearly wrong.... since this is acting on all elements not just the current one....
-  # # but check instead in the EOFY processing....
-  # if (!is_equity(a)) {
-  #   # Now this is tricky -
-  #   #   The cost base can be negative
-  #   #   but not after the tax adjustment
-  #   # Also if this parcel was sold on the same day (so time==now)
-  #   # a term will be included in cash_out - so overrule that
-  #   cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
-  #   if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
-  #     # Cannot create a negative cost base (for long)
-  #     # This will impact capital gains!
-  #     # Since a negative cost base cannot be deferred
-  #
-  #     # Save the parcel gain
-  #     save_parcel_gain(a, p, now,  ....)
-  #
-  #     # This parcel gain is not recorded...
-  #     # How to fix this....
-  #
-  #     # We are cashing the tax adjustments out so adjust both cost bases to zero
-  #     zero_cost_elements(Accounting_Cost[a][p], now)
-  #     zero_cost_elements(Tax_Adjustments[a][p], now)
-  #   }
-  # }
+  # Equities do not have tax adjustments and can indeed have a negative cost base
+  # but check instead in the EOFY processing....
+  if (!is_equity(a)) {
+    #   Ensure that the cost base of any element is not negative
+    cost_base = find_entry(Accounting_Cost[a][p][element], now)
+    if (below_zero(cost_base)) {
+      # Save this quantity
+      #sum_entry(Accounting_Cost[a][p][0], cost_base, now)
+@ifeq LOG adjust_cost
+  printf "\t\t\t\tNegative Cost Base => %s\n", print_cash(cost_base) > STDERR
+@endif # LOG
+
+      # The reduced cost base is increased
+      parcel_adjustment = find_entry(Tax_Adjustments[a][p][element], now)
+
+      # Set cost to zero
+      set_entry(Accounting_Cost[a][p][element], 0, now)
+
+      # This will create a capital gain
+      adjust_cost(REALIZED_GAINS, cost_base, now)
+
+@ifeq LOG adjust_cost
+  printf "\t\t\t\tRealized Gains => %s\n",  print_cash(-cost_base) > STDERR
+@endif # LOG
+
+      # Adjust tax adjustment too
+      if (parcel_adjustment < cost_base)
+        sum_entry(Tax_Adjustments[a][p][element], cost_base, now)
+      else {
+       cost_base -= parcel_adjustment
+@ifeq LOG adjust_cost
+   printf "\t\t\t\tTaxable Gains => %s\n",  print_cash(-cost_base) > STDERR
+@endif # LOG
+       # Need to record taxable gains/losses too
+       held_time = get_held_time(now, Held_From[a][p])
+       if (held_time >= CGT_PERIOD)
+         adjust_cost(LONG_GAINS, cost_base, now)
+       else
+         adjust_cost(SHORT_GAINS, cost_base, now)
+      }
+
+    }
+  }
 
   # Debugging
 @ifeq LOG adjust_cost
