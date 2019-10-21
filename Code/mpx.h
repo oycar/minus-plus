@@ -143,7 +143,6 @@
 @define get_char(c) ternary(c in URL_Lookup, URL_Lookup[c], (0))
 
 
-
 # //
 @define is_star(a) ((a) ~ /^*/)
 @define is_individual (Journal_Type ~ /^IND$/)
@@ -151,7 +150,7 @@
 @define is_company (Journal_Type ~ /^(PTY|CORP|LTD)$/)
 @define is_trust (Journal_Type ~ /^TRUST$/)
 @define match_accounts(m,x,a,b) ternary(m=x,ternary(m=match_account(a, x), m, m=match_account(b, x)),m="")
-@define set_entry(array, x, now) (array[(now)] = (x))
+@define set_entry(array, x, t) (array[t] = (x))
 
 # // Rounding etc
 @define near_zero(x) (((x) <= Epsilon) && ((x) >= -Epsilon))

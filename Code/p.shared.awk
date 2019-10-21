@@ -1128,12 +1128,12 @@ function held_to(ac, now,     p, latest_sale) {
   return latest_sale # returns the date the parcel was sold
 }
 
-# Initialize cost element arrays
-function zero_cost_elements(array, now,     e) {
-  # Set all true cost elements to zero - ie elements I-V
-  for (e in Elements)
-    array[e][now] = 0
-}
+# # Initialize cost element arrays
+# function set_array_entries(array, key,     e) {
+#   # Set all true cost elements to zero - ie elements I-V
+#   for (e in Elements)
+#     array[e][now] = 0
+# }
 
 # This splits up a branch name or a leaf name into dotted components
 function get_name_component(name, i, number_components, array,    name_length, s, dot) {
@@ -1321,32 +1321,32 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     # Update the accounting cost
     sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
 
-  # Equities do not have tax adjustments and can indeed have a negative cost base
-  # This is clearly wrong.... since this is acting on all elements not just the current one....
-  # but check instead in the EOFY processing....
-  if (!is_equity(a)) {
-    # Now this is tricky -
-    #   The cost base can be negative
-    #   but not after the tax adjustment
-    # Also if this parcel was sold on the same day (so time==now)
-    # a term will be included in cash_out - so overrule that
-    cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
-    if (cost_base < sum_all_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
-      # Cannot create a negative cost base (for long)
-      # This will impact capital gains!
-      # Since a negative cost base cannot be deferred
-
-      # Save the parcel gain
-      save_parcel_gain(a, p, now)
-
-      # This parcel gain is not recorded...
-      # How to fix this....
-
-      # We are cashing the tax adjustments out so adjust both cost bases to zero
-      zero_cost_elements(Accounting_Cost[a][p], now)
-      zero_cost_elements(Tax_Adjustments[a][p], now)
-    }
-  }
+  # # Equities do not have tax adjustments and can indeed have a negative cost base
+  # # This is clearly wrong.... since this is acting on all elements not just the current one....
+  # # but check instead in the EOFY processing....
+  # if (!is_equity(a)) {
+  #   # Now this is tricky -
+  #   #   The cost base can be negative
+  #   #   but not after the tax adjustment
+  #   # Also if this parcel was sold on the same day (so time==now)
+  #   # a term will be included in cash_out - so overrule that
+  #   cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
+  #   if (cost_base < sum_all_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
+  #     # Cannot create a negative cost base (for long)
+  #     # This will impact capital gains!
+  #     # Since a negative cost base cannot be deferred
+  #
+  #     # Save the parcel gain
+  #     save_parcel_gain(a, p, now)
+  #
+  #     # This parcel gain is not recorded...
+  #     # How to fix this....
+  #
+  #     # We are cashing the tax adjustments out so adjust both cost bases to zero
+  #     zero_cost_elements(Accounting_Cost[a][p], now)
+  #     zero_cost_elements(Tax_Adjustments[a][p], now)
+  #   }
+  # }
 
   # Debugging
 @ifeq LOG adjust_cost
@@ -1358,7 +1358,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 # This is the same as the reduced cost
 # Returns 0 for sold assets
 # What would happen if REALIZED were not populated and it returned the gains/losses for sold assets?
-# 
+#
 function get_cost(a, now,     i, sum_cost) {
   # Adjustments for units bought
   if (is_unitized(a)) {

@@ -1771,7 +1771,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 }
 
 # Create or modify a parcel
-function new_parcel(ac, u, x, now, parcel_tag,        last_parcel) {
+function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
   # Purchases made at the same time can be averaged
   # So only increment the parcel counter if a new parcel name specified
   last_parcel = Number_Parcels[ac] - 1
@@ -1782,11 +1782,13 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel) {
     # This adds a new parcel - always cost element I
     # We have to initialize  this parcels cost elements
     Accounting_Cost[ac][last_parcel][0][Epoch] = 0
-    zero_cost_elements(Accounting_Cost[ac][last_parcel], Epoch)
+    for (key in Elements)
+      Accounting_Cost[ac][last_parcel][key][Epoch] = 0
 
     # Ditto for tax adjustments
     Tax_Adjustments[ac][last_parcel][0][Epoch] = 0
-    zero_cost_elements(Tax_Adjustments[ac][last_parcel], Epoch)
+    for (key in Elements)
+      Tax_Adjustments[ac][last_parcel][key][Epoch] = 0
 
     # A new purchase is always cost element I
     Accounting_Cost[ac][last_parcel][I][now] = x

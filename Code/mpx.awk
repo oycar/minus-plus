@@ -1624,7 +1624,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
 
   # Equities do not have tax adjustments and can indeed have a negative cost base
-  # try doing nothing!
+  # This is clearly wrong.... since this is acting on all elements not just the current one....
   # but check instead in the EOFY processing....
   if (!((a) ~ /^EQUITY[.:]/)) {
     # Now this is tricky -
@@ -1632,7 +1632,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     #   but not after the tax adjustment
     # Also if this parcel was sold on the same day (so time==now)
     # a term will be included in cash_out - so overrule that
-    cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # - get_cash_out(a, p, now) # No element 0
+    cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
     if (cost_base < sum_all_elements(Tax_Adjustments[a][p], now)) { # Needs all elements
       # Cannot create a negative cost base (for long)
       # This will impact capital gains!
@@ -1643,8 +1643,6 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 
       # This parcel gain is not recorded...
       # How to fix this....
-      # What if the parcel were split (unit -> 0:units) & the 0 parcel closed???
-
 
       # We are cashing the tax adjustments out so adjust both cost bases to zero
       zero_cost_elements(Accounting_Cost[a][p], now)
@@ -1658,6 +1656,9 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
+# Returns 0 for sold assets
+# What would happen if REALIZED were not populated and it returned the gains/losses for sold assets?
+# 
 function get_cost(a, now,     i, sum_cost) {
   # Adjustments for units bought
   if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
