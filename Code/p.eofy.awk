@@ -254,7 +254,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
           # after application of tax adjustments
           # If there were losses then parcel_gains will be above zero
-          adjusted_gains = gains - sum_cost_elements(Tax_Adjustments[a][p], now) # Needs all elements
+          adjusted_gains = gains - find_entry(Tax_Adjustments[a][p], now)
           if (below_zero(adjusted_gains)) {
             # Adjustments are negative and reduce taxable gains
             parcel_gains = adjusted_gains
@@ -1195,12 +1195,12 @@ function allocate_second_element_costs(now,       a, p, second_element) {
         if (is_unsold(a, p, now)) {
           # Debugging
 @ifeq LOG allocate_second_element_costs
-          printf "\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now)) > STDERR
-          printf "\tAdjusted Cost[%s] => %s\n", II, print_cash(get_parcel_element(a, p, II, now)) > STDERR
+          printf "\tAdjusted Cost[%s] => %s\n", I, print_cash(get_element_cost(a, p, I, now)) > STDERR
+          printf "\tAdjusted Cost[%s] => %s\n", II, print_cash(get_element_cost(a, p, II, now)) > STDERR
 @endif # LOG
 
           # Get the second element of the cost
-          second_element = get_parcel_element(a, p, II, now)
+          second_element = get_element_cost(a, p, II, now)
           if (!near_zero(second_element)) {
             # The Second Element Cost is applied to the First Element
             adjust_parcel_cost(a, p, now,   second_element,  I, FALSE)
@@ -1211,7 +1211,7 @@ function allocate_second_element_costs(now,       a, p, second_element) {
           printf "\t\tApply 2nd Element Cost => %s\n", second_element > STDERR
           printf "\t\tAfter Application\n" > STDERR
           printf "\t\tParcel            => %d\n", p > STDERR
-          printf "\t\tAdjusted Cost[%s] => %s\n", I, print_cash(get_parcel_element(a, p, I, now)) > STDERR
+          printf "\t\tElement Cost[%s]  => %s\n", I, print_cash(get_element_cost(a, p, I, now)) > STDERR
           printf "\t\tParcel Cost       => %11.2f\n", get_parcel_cost(a, p, now) > STDERR
 @endif # LOG
         } # End of if unsold parcel
@@ -1225,8 +1225,10 @@ function allocate_second_element_costs(now,       a, p, second_element) {
 
 
 # This function is is for slightly different times than the other EOFY actions
-function print_depreciating_holdings(now, past, is_detailed,      reports_stream, a, p, open_key, close_key, parcel_depreciation, account_depreciation, open_cost, total_depreciaiton, sum_open,
-                                                                  sale_depreciation, sale_appreciation, sum_adjusted) {
+function print_depreciating_holdings(now, past, is_detailed,      reports_stream, a, p, open_key, close_key, parcel_depreciation, account_depreciation,
+                                                                  open_cost, total_depreciaiton, sum_open,
+                                                                  second_element, sum_second_element,
+                                                                  sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
   reports_stream = report_fixed(EOFY)
@@ -1239,7 +1241,6 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
   # Print out the assets in alphabetical order
   for (a in Leaf)
     if (is_fixed(a) && (is_open(a, now) || is_open(a, past))) {
-
       if ("" == total_depreciation) {
         printf "\n" > reports_stream
         print Journal_Title > reports_stream
@@ -1258,7 +1259,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
       }
 
       # The opening value of an asset with multiple parcels cannot be tied to a single time
-      account_depreciation = sum_open = 0
+      account_depreciation = sum_open = sum_second_element = 0
 
       # Get each parcel
       for (p = 0; p < Number_Parcels[a]; p ++) {
@@ -1278,10 +1279,13 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
         sum_open += open_cost
 
         # Always get the parcel depreciation
-        parcel_depreciation = get_parcel_tax_adjustment(a, p, I, open_key) - get_parcel_tax_adjustment(a, p, I, close_key)
+        parcel_depreciation = find_entry(Tax_Adjustments[a][p], open_key) - find_entry(Tax_Adjustments[a][p], close_key)
 
         #  Just track the total depreciation
         account_depreciation   += parcel_depreciation
+
+        # Save second element cost
+        sum_second_element += (second_element = get_element_cost(a, p, II, just_before(close_key)))
 
         # Record detailed statement
         # Is this a named parcel?
@@ -1295,7 +1299,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
           printf " [%11s, %11s] %14s %14s %14s %14s %14s\n",
                     get_date(open_key), get_date(close_key), print_cash(open_cost),
                     print_cash(open_cost - parcel_depreciation),
-                    print_cash(get_parcel_element(a, p, II, just_before(close_key))),
+                    print_cash(second_element),
                     print_cash(get_parcel_cost(a, p, close_key)),
                     print_cash(parcel_depreciation) > reports_stream
         } # End of is_detailed
@@ -1320,7 +1324,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
       printf "[%11s, %11s] %14s %14s %14s %14s %14s\n",
         get_date(open_key), get_date(close_key), print_cash(sum_open),
         print_cash(sum_open - account_depreciation),
-        print_cash(get_cost_element(a, II, just_before(close_key))),
+        print_cash(sum_second_element),
         print_cash(get_cost(a, close_key)),
         print_cash(account_depreciation) > reports_stream
 

@@ -1713,7 +1713,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 
   # Buy u units for x
   u = Units_Held[a][last_parcel]
-  x = find_entry(Accounting_Cost[a][last_parcel][I], now) # Element I is all important
+  x = get_element_cost(a, last_parcel, I, now) # Element I is all important
 
   # Passive revaluation
   p = x / u
@@ -1747,10 +1747,8 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
     for (key in Elements)
       Accounting_Cost[ac][last_parcel][key][Epoch] = 0
 
-    # Ditto for tax adjustments
-    Tax_Adjustments[ac][last_parcel][0][Epoch] = 0
-    for (key in Elements)
-      Tax_Adjustments[ac][last_parcel][key][Epoch] = 0
+    # The tax adjustments
+    Tax_Adjustments[ac][last_parcel][Epoch] = 0
 
     # A new purchase is always cost element I
     Accounting_Cost[ac][last_parcel][I][now] = x
@@ -2058,7 +2056,7 @@ function save_parcel_gain(a, p, now, x,       held_time) {
   # Taxable gains
   # after application of tax adjustments
   # This works if tax adjustments are negative
-  x -= sum_cost_elements(Tax_Adjustments[a][p], now) # Needs all elements
+  x -= find_entry(Tax_Adjustments[a][p], now)
 
   # Taxable Gains are based on the adjusted cost
   if (below_zero(x)) {
@@ -2088,9 +2086,8 @@ function copy_parcel(ac, p, q,     e, key) {
   for (e in Accounting_Cost[ac][p])
     for (key in Accounting_Cost[ac][p][e])
         Accounting_Cost[ac][q][e][key] = Accounting_Cost[ac][p][e][key]
-  for (e in Tax_Adjustments[ac][p])
-    for (key in Tax_Adjustments[ac][p][e])
-      Tax_Adjustments[ac][q][e][key]  = Tax_Adjustments[ac][p][e][key]
+  for (key in Tax_Adjustments[ac][p])
+    Tax_Adjustments[ac][q][key]  = Tax_Adjustments[ac][p][key]
 }
 
 function split_parcel(ac, p, du,   fraction_kept, e, key) {
@@ -2118,16 +2115,15 @@ function split_parcel(ac, p, du,   fraction_kept, e, key) {
   for (e in Accounting_Cost[ac][p])
     for (key in Accounting_Cost[ac][p][e])
         Accounting_Cost[ac][p + 1][e][key] = fraction_kept * Accounting_Cost[ac][p][e][key]
-  for (e in Tax_Adjustments[ac][p])
-    for (key in Tax_Adjustments[ac][p][e])
-      Tax_Adjustments[ac][p + 1][e][key]  = fraction_kept * Tax_Adjustments[ac][p][e][key]
+  for (key in Tax_Adjustments[ac][p])
+      Tax_Adjustments[ac][p + 1][key]  = fraction_kept * Tax_Adjustments[ac][p][key]
 
+  # The balance
   for (e in Accounting_Cost[ac][p])
     for (key in Accounting_Cost[ac][p][e])
         Accounting_Cost[ac][p][e][key] -= Accounting_Cost[ac][p + 1][e][key]
-  for (e in Tax_Adjustments[ac][p])
-    for (key in Tax_Adjustments[ac][p][e])
-      Tax_Adjustments[ac][p][e][key]  -= Tax_Adjustments[ac][p + 1][e][key]
+  for (key in Tax_Adjustments[ac][p])
+    Tax_Adjustments[ac][p][key]  -= Tax_Adjustments[ac][p + 1][key]
 }
 
 # Find a parcel that can be sold

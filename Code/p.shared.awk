@@ -1286,7 +1286,7 @@ function update_cost(a, x, now,      p) {
 }
 
 function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
-                            cost_base,
+                            parcel_cost,
                             held_time) {
   # Ignore negligible adjustments
   if (near_zero(parcel_adjustment))
@@ -1295,9 +1295,12 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 @ifeq LOG adjust_cost
   printf "%s\n", a > STDERR
   printf "\tTimeStamp => %s\n", get_date(now) > STDERR
-  printf "\t\tParcel  => %05d", p  > STDERR
-  printf " Opening Parcel Cost[%s]=> %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > STDERR
-  printf "\t\t\t\tParcel Adjustment => %s\n", print_cash(parcel_adjustment) > STDERR
+  printf "\t\tParcel  => %05d\n", p  > STDERR
+  printf "\t\tParcel Cost         => %s\n", print_cash(get_parcel_cost(a, p, now))  > STDERR
+  printf "\t\tParcel Tax Adjusted => %s\n", print_cash(get_parcel_cost(a, p, now, TRUE))  > STDERR
+  printf "\t\tParcel Adjustment   => %s\n", print_cash(parcel_adjustment) > STDERR
+  printf "\t\tAdjust Tax          => %s\n", ternary(adjust_tax, "TRUE", "FALSE")
+  printf "\t\t\tOpening Element Cost[%s]=> %s\n", element, print_cash(get_element_cost(a, p, element, now)) > STDERR
 @endif # LOG
 
   # save the cost adjustment/reduction related to this parcel
@@ -1312,10 +1315,10 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     #   here the tax adjustment is still negative but the accounting adjustment is zero
     if (parcel_adjustment > 0)
       # A tax adjustment for an undeductible but legitimate expense
-      sum_entry(Tax_Adjustments[a][p][element], - parcel_adjustment, now)
+      sum_entry(Tax_Adjustments[a][p], - parcel_adjustment, now)
     else { # A tax adjustment for deferred tax or depreciation &c
       sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
-      sum_entry(Tax_Adjustments[a][p][element], parcel_adjustment, now)
+      sum_entry(Tax_Adjustments[a][p], parcel_adjustment, now)
     }
   } else
     # Update the accounting cost
@@ -1324,50 +1327,100 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
   # Equities do not have tax adjustments and can indeed have a negative cost base
   # but check instead in the EOFY processing....
   if (!is_equity(a)) {
-    #   Ensure that the cost base of any element is not negative
-    cost_base = find_entry(Accounting_Cost[a][p][element], now)
-    if (below_zero(cost_base)) {
-      # Save this quantity
-      #sum_entry(Accounting_Cost[a][p][0], cost_base, now)
+    #   Ensure that the parcel cost base is not negative
+    parcel_cost = get_parcel_cost(a, p, now)
+    if (below_zero(parcel_cost)) {
 @ifeq LOG adjust_cost
-  printf "\t\t\t\tNegative Cost Base => %s\n", print_cash(cost_base) > STDERR
+  printf "\t\t\tNegative Parcel Cost Base [%05d] => %s\n", p, print_cash(parcel_cost) > STDERR
 @endif # LOG
 
-      # The reduced cost base is increased
-      parcel_adjustment = find_entry(Tax_Adjustments[a][p][element], now)
+      # Get the tax adjustment - this will influence the taxable gains
+      parcel_adjustment = find_entry(Tax_Adjustments[a][p], now)
 
-      # Set cost to zero
-      set_entry(Accounting_Cost[a][p][element], 0, now)
+      # If the overall parcel cost is (P)
+      # and if the cost of this element is now (E)
+      # then the cost of the other elements is (P-E)
+      # so that an overall zero parcel cost is achieved if this element has cost (E-P)
+      sum_entry(Accounting_Cost[a][p][element], - parcel_cost, now)
 
       # This will create a capital gain
-      adjust_cost(REALIZED_GAINS, cost_base, now)
+      adjust_cost(REALIZED_GAINS, parcel_cost, now)
 
 @ifeq LOG adjust_cost
-  printf "\t\t\t\tRealized Gains => %s\n",  print_cash(-cost_base) > STDERR
+  printf "\t\t\tRealized Gains => %s\n",  print_cash(-parcel_cost) > STDERR
 @endif # LOG
 
       # Adjust tax adjustment too
-      if (parcel_adjustment < cost_base)
-        sum_entry(Tax_Adjustments[a][p][element], cost_base, now)
+      if (parcel_adjustment < parcel_cost)
+        sum_entry(Tax_Adjustments[a][p], parcel_cost, now)
       else {
-       cost_base -= parcel_adjustment
-@ifeq LOG adjust_cost
-   printf "\t\t\t\tTaxable Gains => %s\n",  print_cash(-cost_base) > STDERR
-@endif # LOG
-       # Need to record taxable gains/losses too
-       held_time = get_held_time(now, Held_From[a][p])
-       if (held_time >= CGT_PERIOD)
-         adjust_cost(LONG_GAINS, cost_base, now)
-       else
-         adjust_cost(SHORT_GAINS, cost_base, now)
-      }
+        parcel_cost -= parcel_adjustment
 
+        # This tax adjustment has been used
+        set_entry(Tax_Adjustments[a][p], 0, now)
+@ifeq LOG adjust_cost
+        printf "\t\t\tTaxable Gains => %s\n",  print_cash(-parcel_cost) > STDERR
+@endif # LOG
+        # Need to record taxable gains/losses too
+        held_time = get_held_time(now, Held_From[a][p])
+        if (held_time >= CGT_PERIOD)
+          adjust_cost(LONG_GAINS, parcel_cost, now)
+        else
+          adjust_cost(SHORT_GAINS, parcel_cost, now)
+      }
     }
+#
+#   # Equities do not have tax adjustments and can indeed have a negative cost base
+#   # but check instead in the EOFY processing....
+#   if (!is_equity(a)) {
+#     #   Ensure that the cost base of any element is not negative
+#     cost_base = find_entry(Accounting_Cost[a][p][element], now)
+#     if (below_zero(cost_base)) {
+#       # Save this quantity
+#       #sum_entry(Accounting_Cost[a][p][0], cost_base, now)
+# @ifeq LOG adjust_cost
+#   printf "\t\t\t\tNegative Cost Base => %s\n", print_cash(cost_base) > STDERR
+# @endif # LOG
+#
+#       # The reduced cost base is increased
+#       parcel_adjustment = find_entry(Tax_Adjustments[a][p], now)
+#
+#       # Set cost to zero
+#       set_entry(Accounting_Cost[a][p][element], 0, now)
+#
+#       # This will create a capital gain
+#       adjust_cost(REALIZED_GAINS, cost_base, now)
+#
+# @ifeq LOG adjust_cost
+#   printf "\t\t\t\tRealized Gains => %s\n",  print_cash(-cost_base) > STDERR
+# @endif # LOG
+#
+#       # Adjust tax adjustment too
+#       if (parcel_adjustment < cost_base)
+#         sum_entry(Tax_Adjustments[a][p], cost_base, now)
+#       else {
+#        cost_base -= parcel_adjustment
+# @ifeq LOG adjust_cost
+#    printf "\t\t\t\tTaxable Gains => %s\n",  print_cash(-cost_base) > STDERR
+# @endif # LOG
+#        # Need to record taxable gains/losses too
+#        held_time = get_held_time(now, Held_From[a][p])
+#        if (held_time >= CGT_PERIOD)
+#          adjust_cost(LONG_GAINS, cost_base, now)
+#        else
+#          adjust_cost(SHORT_GAINS, cost_base, now)
+#       }
+#
+#     }
   }
 
-  # Debugging
 @ifeq LOG adjust_cost
-  printf "\t\t\t\tReduced Parcel Cost[%s] => %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > STDERR
+  # Debugging
+  printf "\t\t\tClosing Element Cost[%s] => %s\n", element, print_cash(get_element_cost(a, p, element, now)) > STDERR
+  printf "\t\tClosing Parcel Cost => %s\n", print_cash(get_parcel_cost(a, p, now))  > STDERR
+  printf "\t\tClosing Tax Adjusted => %s\n", print_cash(get_parcel_cost(a, p, now, TRUE))  > STDERR
+  printf "\t\tTotal Realized Gains => %s\n", print_cash(get_delta_cost(REALIZED_GAINS, now))  > STDERR
+
 @endif # LOG
 } # End of adjust_parcel_cost
 
@@ -1408,7 +1461,7 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-        sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now) # Needs all elements
+        sum_adjustments += find_entry(Tax_Adjustments[a][i], now)
     }
   }
 
@@ -1487,44 +1540,14 @@ function sum_cost_elements(array, now,     sum_elements, e) {
   return sum_elements
 }
 
-# Get the specified cost element
-function get_cost_element(a, element, now,      i, sum_cost) {
-  # Initial cost
-  sum_cost = 0
-
-  # Only assets have cost elements - equity is just for simplicity
-  if (is_unitized(a)) {
-    for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
-        break # All done
-      if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-        sum_cost += find_entry(Accounting_Cost[a][i][element], now)
-    }
-  }
-
-  return sum_cost
-}
-
-# The parcel cost
-function get_parcel_element(a, p, element, now, adjusted) {
-  # Adjusted or reduced cost?
-  if (adjusted)
-    # The adjusted parcel cost
-    adjusted = get_parcel_tax_adjustment(a, p, element, now)
-  else
-    adjusted = 0
-
-  # This elements costs
-  return find_entry(Accounting_Cost[a][p][element], now) - adjusted
-}
-
 # The initial cost
 function get_cash_in(a, i, now) {
 
   # Is the account open?
   if (now >= Held_From[a][i])
     # Yes - always element I
-    return find_entry(Accounting_Cost[a][i][I], Held_From[a][i]) # The Held_From time ensures  that later element I costs do not impact the result
+    #return find_entry(Accounting_Cost[a][i][I], Held_From[a][i]) # The Held_From time ensures  that later element I costs do not impact the result
+    return get_element_cost(a, i, I, Held_From[a][i]) # The Held_From time ensures  that later element I costs do not impact the result
 
   # No - so no activity
   return 0
@@ -1544,7 +1567,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
   # Reduced cost by default
   sum = sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
   if (adjusted)
-    sum -= sum_cost_elements(Tax_Adjustments[a][p], now) ## Needs all elements
+    sum -= find_entry(Tax_Adjustments[a][p], now) ## Needs all elements
 
   # The parcel cost
   return sum
@@ -1768,8 +1791,8 @@ function initialize_account(account_name,     class_name, array, p, n,
     delete Accounting_Cost[account_name][0][0][SUBSEP]
 
     # Ditto for tax adjustments
-    Tax_Adjustments[account_name][0][0][SUBSEP] = 0
-    delete Tax_Adjustments[account_name][0][0][SUBSEP]
+    Tax_Adjustments[account_name][0][SUBSEP] = 0
+    delete Tax_Adjustments[account_name][0][SUBSEP]
 
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel
@@ -1996,7 +2019,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       assert(open_key - Epoch >= 0, sprintf("%s: No earlier depreciation record than %s", get_short_name(a), get_date(now)))
 
       # The opening value - cost element I
-      open_value = get_parcel_element(a, p, I, open_key)
+      open_value = Accounting_Cost[a][p][I][open_key]
 
 @ifeq LOG depreciate_now
       # Debugging
@@ -2009,7 +2032,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       # Refine factor at parcel level
       if (first_year_factor) {
         # First year sometimes has modified depreciation
-        if (near_zero(get_parcel_tax_adjustment(a, p, I, now)))
+        if (near_zero(find_entry(Tax_Adjustments[a][p], now)))
           delta = first_year_factor
         else
           delta = factor

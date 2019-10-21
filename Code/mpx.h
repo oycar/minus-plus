@@ -103,6 +103,9 @@
 @define find_entry(array, now) ternary(__MPX_KEY__ = find_key(array, now), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
 @define first_entry(array) ternary(__MPX_KEY__ = first_key(array), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
 
+# // This is not efficient
+@define delta_entry(array, now) (find_entry(array, now) - find_entry(array, just_before(now)))
+
 @define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
 #
@@ -184,7 +187,7 @@
 @define is_unsold(a, p, now) (Held_Until[a][p] > (now))
 @define get_short_name(name) (Leaf[name])
 @define get_reduced_cost(a, now) (get_cost(a, now))
-@define get_parcel_tax_adjustment(a, p, element, now) (find_entry(Tax_Adjustments[a][p][element], (now)))
+@define get_element_cost(a, p, e, now) (find_entry(Accounting_Cost[a][p][e], (now)))
 # // @define get_parcel_proceeds(a, p) (first_entry(Accounting_Cost[a][p][0]))
 @define get_parcel_proceeds(a, p, t) (find_entry(Accounting_Cost[a][p][0], (t)))
 @define get_cash_out(a, p, t) @eval (get_parcel_proceeds(a, p, t))
