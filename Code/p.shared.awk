@@ -1369,49 +1369,6 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
           adjust_cost(SHORT_GAINS, parcel_cost, now)
       }
     }
-#
-#   # Equities do not have tax adjustments and can indeed have a negative cost base
-#   # but check instead in the EOFY processing....
-#   if (!is_equity(a)) {
-#     #   Ensure that the cost base of any element is not negative
-#     cost_base = find_entry(Accounting_Cost[a][p][element], now)
-#     if (below_zero(cost_base)) {
-#       # Save this quantity
-#       #sum_entry(Accounting_Cost[a][p][0], cost_base, now)
-# @ifeq LOG adjust_cost
-#   printf "\t\t\t\tNegative Cost Base => %s\n", print_cash(cost_base) > STDERR
-# @endif # LOG
-#
-#       # The reduced cost base is increased
-#       parcel_adjustment = find_entry(Tax_Adjustments[a][p], now)
-#
-#       # Set cost to zero
-#       set_entry(Accounting_Cost[a][p][element], 0, now)
-#
-#       # This will create a capital gain
-#       adjust_cost(REALIZED_GAINS, cost_base, now)
-#
-# @ifeq LOG adjust_cost
-#   printf "\t\t\t\tRealized Gains => %s\n",  print_cash(-cost_base) > STDERR
-# @endif # LOG
-#
-#       # Adjust tax adjustment too
-#       if (parcel_adjustment < cost_base)
-#         sum_entry(Tax_Adjustments[a][p], cost_base, now)
-#       else {
-#        cost_base -= parcel_adjustment
-# @ifeq LOG adjust_cost
-#    printf "\t\t\t\tTaxable Gains => %s\n",  print_cash(-cost_base) > STDERR
-# @endif # LOG
-#        # Need to record taxable gains/losses too
-#        held_time = get_held_time(now, Held_From[a][p])
-#        if (held_time >= CGT_PERIOD)
-#          adjust_cost(LONG_GAINS, cost_base, now)
-#        else
-#          adjust_cost(SHORT_GAINS, cost_base, now)
-#       }
-#
-#     }
   }
 
 @ifeq LOG adjust_cost
@@ -1419,7 +1376,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
   printf "\t\t\tClosing Element Cost[%s] => %s\n", element, print_cash(get_element_cost(a, p, element, now)) > STDERR
   printf "\t\tClosing Parcel Cost => %s\n", print_cash(get_parcel_cost(a, p, now))  > STDERR
   printf "\t\tClosing Tax Adjusted => %s\n", print_cash(get_parcel_cost(a, p, now, TRUE))  > STDERR
-  printf "\t\tTotal Realized Gains => %s\n", print_cash(get_delta_cost(REALIZED_GAINS, now))  > STDERR
+  printf "\t\tTotal Realized Gains => %s\n", print_cash(- get_delta_cost(REALIZED_GAINS, now))  > STDERR
 
 @endif # LOG
 } # End of adjust_parcel_cost

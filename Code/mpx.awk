@@ -105,6 +105,8 @@ END {
 
 
 
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -1662,49 +1664,6 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
           adjust_cost(SHORT_GAINS, parcel_cost, now)
       }
     }
-#
-#   # Equities do not have tax adjustments and can indeed have a negative cost base
-#   # but check instead in the EOFY processing....
-#   if (!is_equity(a)) {
-#     #   Ensure that the cost base of any element is not negative
-#     cost_base = find_entry(Accounting_Cost[a][p][element], now)
-#     if (below_zero(cost_base)) {
-#       # Save this quantity
-#       #sum_entry(Accounting_Cost[a][p][0], cost_base, now)
-# @ifeq LOG adjust_cost
-#   printf "\t\t\t\tNegative Cost Base => %s\n", print_cash(cost_base) > STDERR
-# @endif # LOG
-#
-#       # The reduced cost base is increased
-#       parcel_adjustment = find_entry(Tax_Adjustments[a][p], now)
-#
-#       # Set cost to zero
-#       set_entry(Accounting_Cost[a][p][element], 0, now)
-#
-#       # This will create a capital gain
-#       adjust_cost(REALIZED_GAINS, cost_base, now)
-#
-# @ifeq LOG adjust_cost
-#   printf "\t\t\t\tRealized Gains => %s\n",  print_cash(-cost_base) > STDERR
-# @endif # LOG
-#
-#       # Adjust tax adjustment too
-#       if (parcel_adjustment < cost_base)
-#         sum_entry(Tax_Adjustments[a][p], cost_base, now)
-#       else {
-#        cost_base -= parcel_adjustment
-# @ifeq LOG adjust_cost
-#    printf "\t\t\t\tTaxable Gains => %s\n",  print_cash(-cost_base) > STDERR
-# @endif # LOG
-#        # Need to record taxable gains/losses too
-#        held_time = get_held_time(now, Held_From[a][p])
-#        if (held_time >= CGT_PERIOD)
-#          adjust_cost(LONG_GAINS, cost_base, now)
-#        else
-#          adjust_cost(SHORT_GAINS, cost_base, now)
-#       }
-#
-#     }
   }
 
 
@@ -3092,7 +3051,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("B" ~ /[cC]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3395,7 +3354,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("B" ~ /[dD]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -3438,7 +3397,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[oO]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3578,7 +3537,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[bB]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3711,7 +3670,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("B" ~ /[mM]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3786,7 +3745,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[fF]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3921,7 +3880,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("B" ~ /[qQ]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4415,7 +4374,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("B" ~ /[tT]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -5203,7 +5162,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[iI]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5547,7 +5506,8 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
 # To Do =>
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
-#   Need to break down capital and carried losses by year
+#   Need to break down carried tax losses by year
+#   Need to enforce CARRY_FORWARD_LIMIT or carried capital losses
 #   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
 #   Consider breaking out income/expenses in  the same way as the tax return does?
 #   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
@@ -5557,7 +5517,6 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
 #   More flexible ordering of optional fields?
 #   other tax_statement calculations (eg UK, US, NZ etc...)
 #
-#   Tax Adjustments / could be simplified?
 #   Allow non-rectangular arrays, i.e. only have [a][p][e] for active elements
 #   Allow other currencies or commodities (eg USD, AU, AG, etc)
 #   Read single entry transactions

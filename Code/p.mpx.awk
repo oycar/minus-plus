@@ -39,7 +39,8 @@
 # To Do =>
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
-#   Need to break down capital and carried losses by year
+#   Need to break down carried tax losses by year
+#   Need to enforce CARRY_FORWARD_LIMIT or carried capital losses
 #   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
 #   Consider breaking out income/expenses in  the same way as the tax return does?
 #   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
@@ -49,7 +50,6 @@
 #   More flexible ordering of optional fields?
 #   other tax_statement calculations (eg UK, US, NZ etc...)
 #
-#   Tax Adjustments / could be simplified?
 #   Allow non-rectangular arrays, i.e. only have [a][p][e] for active elements
 #   Allow other currencies or commodities (eg USD, AU, AG, etc)
 #   Read single entry transactions
