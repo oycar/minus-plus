@@ -824,9 +824,9 @@ function get_taxable_gains_aud(now, losses,
   # This function computes the taxable gains
   # It works for partioned long & short gains
   # And also for deferred gains when all such gains are long
-  losses     += get_cost(LONG_LOSSES, now) + get_cost(SHORT_LOSSES, now)
-  long_gains  = get_cost(LONG_GAINS, now)
-  short_gains = get_cost(SHORT_GAINS, now)
+  losses     += get_cost("*SPECIAL.TAXABLE.LOSSES.LONG", now) + get_cost("*SPECIAL.TAXABLE.LOSSES.SHORT", now)
+  long_gains  = get_cost("*SPECIAL.TAXABLE.GAINS.LONG", now)
+  short_gains = get_cost("*SPECIAL.TAXABLE.GAINS.SHORT", now)
 
   # Suppress negligible losses
   losses      = yield_positive(losses, 0)

@@ -72,7 +72,6 @@ BEGIN {
   make_array(Documents)
 
   # A Document shortcut code
-  #Document_Shortcut = ":"
   Document_Shortcut = "[:+]"
 
   # And a gains stack
@@ -192,10 +191,6 @@ BEGIN {
 
   # Set special accounts
   set_special_accounts()
-
-  # Default Taxable Capital Gains & Losses
-  #use_gains(LONG_GAINS, SHORT_GAINS)
-  #use_losses(LONG_LOSSES, SHORT_LOSSES)
 
   # Copyleft?
   if ("" != version) {
@@ -621,10 +616,10 @@ function set_special_accounts() {
 
   # Taxable capital gains are in special accounts
   # Tax Adjustments have potentially been applied to these quantities
-  LONG_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.LONG:LONG.GAINS")
-  LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG.LOSSES")
-  SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
-  SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
+  #LONG_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.LONG:LONG.GAINS")
+  #LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG.LOSSES")
+  #SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
+  #SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
   WRITTEN_BACK   = initialize_account("SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK")
 
   # Taxable carried losses
@@ -1982,7 +1977,7 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
     get_date(Held_From[a][p]), get_date(Held_Until[a][p]),
     print_cash(get_cost_modifications(a, p, now)),
     print_cash(get_parcel_cost(a, p, now)),
-    print_cash(get_cash_out(a, p, now)) > STDERR
+    print_cash(get_parcel_proceeds(a, p, now)) > STDERR
 @endif # LOG
 
   # Save realized gains
@@ -2047,9 +2042,9 @@ function save_parcel_gain(a, p, now, x,       held_time) {
 
     # Taxable losses are based on the reduced cost
     if (held_time >= CGT_PERIOD)
-      adjust_cost(LONG_LOSSES, x, now)
+      adjust_cost(Long_Losses[a], x, now)
     else
-      adjust_cost(SHORT_LOSSES, x, now)
+      adjust_cost(Short_Losses[a], x, now)
   } else if (below_zero(x))
     adjust_cost(REALIZED_GAINS, x, now)
 
@@ -2062,9 +2057,9 @@ function save_parcel_gain(a, p, now, x,       held_time) {
   if (below_zero(x)) {
     # Taxable losses are based on the reduced cost
     if (held_time >= CGT_PERIOD)
-      adjust_cost(LONG_GAINS, x, now)
+      adjust_cost(Long_Gains[a], x, now)
     else
-      adjust_cost(SHORT_GAINS, x, now)
+      adjust_cost(Short_Gains[a], x, now)
   }
 }
 

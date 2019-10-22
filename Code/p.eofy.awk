@@ -152,207 +152,225 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   asset_width = 15
 
   # For each asset sold in the current period
-  for (a in Leaf)
-    if (is_capital(a) && (is_realized_flag || is_open(a, now))) {
-      gains_event = FALSE
-      proceeds = cost = reduced_cost = adjusted_cost = 0 # Total cost summed here
-      long_gains = short_gains = long_losses = short_losses = 0
-      units_sold = 0
+  for (a in Leaf) {
+    if (is_capital(a)) {
+      # The other way to do it
+      long_gains   = get_cost(Long_Gains[a], now)   - get_cost(Long_Gains[a], past)
+      long_losses  = get_cost(Long_Losses[a], now)  - get_cost(Long_Losses[a], past)
+      short_gains  = get_cost(Short_Gains[a], now)  - get_cost(Short_Gains[a], past)
+      short_losses = get_cost(Short_Losses[a], now) - get_cost(Short_Losses[a], past)
 
-      # The price
-      if (!is_realized_flag) {
-        current_price = find_entry(Price[a], now)
-        last_key = found_key
+      # If any of these are non-zero there was a gains event 
+
+
+      if (is_realized_flag || is_open(a, now)) {
+        gains_event = FALSE
+        proceeds = cost = reduced_cost = adjusted_cost = 0 # Total cost summed here
+        long_gains = short_gains = long_losses = short_losses = 0
+        units_sold = 0
+
+        # The price
+        if (!is_realized_flag) {
+          current_price = find_entry(Price[a], now)
+          last_key = found_key
+        }
+
+        # Need to select parcels by sold date
+        for (p = 0; p < Number_Parcels[a]; p++ ) {
+          if (Held_From[a][p] > now) # All further transactions occurred after (now) - parcels are sorted in order bought
+            break # All done
+
+          # Check if sold in the (past, now) window (capital gains)
+          # or if it is unsold (deferred gains)
+          if ((is_sold(a, p, now) == is_realized_flag) && is_unsold(a, p, past)) {
+            if (!gains_event) {
+              # Two types of header
+              if (is_detailed)
+                printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
+                        asset_width, "Asset", 10, "Parcel",
+                        7, "Units", 14, "Cost",
+                        11, "From", 12, to_label,
+                        11, "Price", 16, proceeds_label,
+                        13, "Reduced", 14, "Adjusted",
+                        15, "Accounting", 9, "Type",
+                        18, "Taxable", 16, "Per Unit" > reports_stream
+              else if (no_header_printed) {
+                printf "%*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
+                       asset_width, "Asset",
+                       10, "Units", 14, "Cost", 11, "From", 12, to_label, 11, "Price", 16, proceeds_label,
+                       13, "Reduced", 14, "Adjusted", 15, "Accounting", 9, "Type", 18, "Taxable" > reports_stream
+                underline(151 + asset_width, 6, reports_stream)
+              }
+
+              # print Name
+              label = get_short_name(a)
+              gains_event = TRUE
+              no_header_printed = FALSE
+            }
+
+            # Keep track
+            units = Units_Held[a][p]
+            units_sold += units
+            if (is_realized_flag) {
+              held_time = get_held_time(Held_Until[a][p], Held_From[a][p])
+              last_key = Held_Until[a][p]
+            } else
+              held_time = get_held_time(sold_time, Held_From[a][p])
+
+            reduced_cost  += get_parcel_cost(a, p, now)
+            adjusted_cost += get_parcel_cost(a, p, now, TRUE)
+
+            # cash in and out
+            parcel_cost     =   get_cash_in(a, p, now)
+            if (is_realized_flag) {
+              parcel_proceeds = - get_parcel_proceeds(a, p, now)
+              current_price = parcel_proceeds / units
+            } else
+              parcel_proceeds = current_price * Units_Held[a][p]
+
+            cost           += parcel_cost
+            proceeds       += parcel_proceeds
+
+            # Total gains (accounting gains)
+            gains = find_entry(Accounting_Cost[a][p][0], now) + sum_cost_elements(Accounting_Cost[a][p], now) # All elements
+            if (!is_realized_flag) # This is not sold yet
+              gains -=  parcel_proceeds
+
+            # Keep track of accounting gains
+            accounting_gains += gains
+
+            # We want taxable gains
+            # Gains are relative to adjusted cost
+            # Losses are relative to reduced cost (so equal accounting losses)
+            if (above_zero(gains)) {
+              # These are losses
+              parcel_gains = gains
+              if (held_time >= CGT_PERIOD) {
+                description = "Long Losses "
+                long_losses += gains
+                sum_long_losses += gains
+              } else {
+                description = "Short Losses"
+                short_losses += gains
+                sum_short_losses += gains
+              }
+            } else {
+              # Assume zero losses or gains
+              parcel_gains = 0
+
+              # Taxable gains
+              description = "Zero Gains  "
+            }
+
+            # after application of tax adjustments
+            # If there were losses then parcel_gains will be above zero
+            adjusted_gains = gains - find_entry(Tax_Adjustments[a][p], now)
+            if (below_zero(adjusted_gains)) {
+              # Adjustments are negative and reduce taxable gains
+              parcel_gains = adjusted_gains
+              if (held_time >= CGT_PERIOD) {
+                description = "Long Gains  "
+                long_gains += parcel_gains
+                sum_long_gains += parcel_gains
+
+              } else {
+                description = "Short Gains "
+                short_gains += parcel_gains
+                sum_short_gains += parcel_gains
+              }
+            }
+
+            # Print out the parcel information
+            if (is_detailed) {
+              # If printing out in detail
+              printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
+                   asset_width + 1, label,
+                   7, p,
+                   11, units,
+                   15, print_cash(parcel_cost),
+                   11, get_date(Held_From[a][p]),
+                   10, get_date(last_key),
+                   12, print_cash(current_price),
+                   14, print_cash(parcel_proceeds),
+                   14, print_cash(get_parcel_cost(a, p, now)),
+                   14, print_cash(get_parcel_cost(a, p, now, TRUE)),
+                   14, print_cash(- gains),
+                   14, description,
+                   14, print_cash(- parcel_gains),
+                   14, print_cash(parcel_cost / units, 4) > reports_stream
+
+              # Clear label
+              label = ""
+            }
+          }
+        } # End of each parcel p
+
+        # Show any gains event
+        if (gains_event) {
+          # # The other way to do it
+          # long_gains   = get_cost(Long_Gains[a], now)   - get_cost(Long_Gains[a], past)
+          # long_losses  = get_cost(Long_Losses[a], now)  - get_cost(Long_Losses[a], past)
+          # short_gains  = get_cost(Short_Gains[a], now)  - get_cost(Short_Gains[a], past)
+          # short_losses = get_cost(Short_Losses[a], now) - get_cost(Short_Losses[a], past)
+
+          if (is_detailed)
+            # Detailed format
+            underline(175 + asset_width, 6, reports_stream)
+
+         # This is account level information
+         printf "%*s %*.3f %*s %*s   %*s %*s %*s %*s %*s ",
+                asset_width + 1, label,
+                (11 + 8 * is_detailed), units_sold,
+                15, print_cash(cost),
+                7, get_date(Held_From[a][0]),
+                10, get_date(last_key),
+                12, print_cash(current_price),
+                14, print_cash(proceeds),
+                14, print_cash(reduced_cost),
+                14, print_cash(adjusted_cost) > reports_stream
+
+          # Stack the gains & losses
+          if (not_zero(long_gains))
+            Gains_Stack[Long_Gains_Key]   = long_gains
+          if (not_zero(long_losses))
+            Gains_Stack[Long_Losses_Key]  = long_losses
+          if (not_zero(short_gains))
+            Gains_Stack[Short_Gains_Key]  = short_gains
+          if (not_zero(short_losses))
+            Gains_Stack[Short_Losses_Key] = short_losses
+
+          # Common entries
+          for (key in Gains_Stack)
+            break
+          if (key) {
+            printf "%*s %*s %*s",
+              14, print_cash(proceeds - reduced_cost),
+              14, key,
+              14, print_cash(- Gains_Stack[key]) > reports_stream
+            delete Gains_Stack[key]
+          } else
+            printf "%14s", print_cash(proceeds - reduced_cost) > reports_stream
+
+          # Extra entries {
+          for (key in Gains_Stack) {
+            printf "\n%*s %14s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
+            delete Gains_Stack[key]
+          }
+
+          # Grand totals
+          sum_cost     += cost
+          sum_proceeds += proceeds
+          sum_reduced  += reduced_cost
+          sum_adjusted += adjusted_cost
+
+          printf "\n" > reports_stream
+          if (is_detailed)
+           printf "\n" > reports_stream
+
+        } # End of gains event
       }
-
-      # Need to select parcels by sold date
-      for (p = 0; p < Number_Parcels[a]; p++ ) {
-        if (Held_From[a][p] > now) # All further transactions occurred after (now) - parcels are sorted in order bought
-          break # All done
-
-        # Check if sold in the (past, now) window (capital gains)
-        # or if it is unsold (deferred gains)
-        if ((is_sold(a, p, now) == is_realized_flag) && is_unsold(a, p, past)) {
-          if (!gains_event) {
-            # Two types of header
-            if (is_detailed)
-              printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
-                      asset_width, "Asset", 10, "Parcel",
-                      7, "Units", 14, "Cost",
-                      11, "From", 12, to_label,
-                      11, "Price", 16, proceeds_label,
-                      13, "Reduced", 14, "Adjusted",
-                      15, "Accounting", 9, "Type",
-                      18, "Taxable", 16, "Per Unit" > reports_stream
-            else if (no_header_printed) {
-              printf "%*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s\n",
-                     asset_width, "Asset",
-                     10, "Units", 14, "Cost", 11, "From", 12, to_label, 11, "Price", 16, proceeds_label,
-                     13, "Reduced", 14, "Adjusted", 15, "Accounting", 9, "Type", 18, "Taxable" > reports_stream
-              underline(151 + asset_width, 6, reports_stream)
-            }
-
-            # print Name
-            label = get_short_name(a)
-            gains_event = TRUE
-            no_header_printed = FALSE
-          }
-
-          # Keep track
-          units = Units_Held[a][p]
-          units_sold += units
-          if (is_realized_flag) {
-            held_time = get_held_time(Held_Until[a][p], Held_From[a][p])
-            last_key = Held_Until[a][p]
-          } else
-            held_time = get_held_time(sold_time, Held_From[a][p])
-
-          reduced_cost  += get_parcel_cost(a, p, now)
-          adjusted_cost += get_parcel_cost(a, p, now, TRUE)
-
-          # cash in and out
-          parcel_cost     =   get_cash_in(a, p, now)
-          if (is_realized_flag) {
-            parcel_proceeds = - get_cash_out(a, p, now)
-            current_price = parcel_proceeds / units
-          } else
-            parcel_proceeds = current_price * Units_Held[a][p]
-
-          cost           += parcel_cost
-          proceeds       += parcel_proceeds
-
-          # Total gains (accounting gains)
-          gains = find_entry(Accounting_Cost[a][p][0], now) + sum_cost_elements(Accounting_Cost[a][p], now) # All elements
-          if (!is_realized_flag) # This is not sold yet
-            gains -=  parcel_proceeds
-
-          # Keep track of accounting gains
-          accounting_gains += gains
-
-          # We want taxable gains
-          # Gains are relative to adjusted cost
-          # Losses are relative to reduced cost (so equal accounting losses)
-          if (above_zero(gains)) {
-            # These are losses
-            parcel_gains = gains
-            if (held_time >= CGT_PERIOD) {
-              description = "Long Losses "
-              long_losses += gains
-              sum_long_losses += gains
-            } else {
-              description = "Short Losses"
-              short_losses += gains
-              sum_short_losses += gains
-            }
-          } else {
-            # Assume zero losses or gains
-            parcel_gains = 0
-
-            # Taxable gains
-            description = "Zero Gains  "
-          }
-
-          # after application of tax adjustments
-          # If there were losses then parcel_gains will be above zero
-          adjusted_gains = gains - find_entry(Tax_Adjustments[a][p], now)
-          if (below_zero(adjusted_gains)) {
-            # Adjustments are negative and reduce taxable gains
-            parcel_gains = adjusted_gains
-            if (held_time >= CGT_PERIOD) {
-              description = "Long Gains  "
-              long_gains += parcel_gains
-              sum_long_gains += parcel_gains
-
-            } else {
-              description = "Short Gains "
-              short_gains += parcel_gains
-              sum_short_gains += parcel_gains
-            }
-          }
-
-          # Print out the parcel information
-          if (is_detailed) {
-            # If printing out in detail
-            printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
-                 asset_width + 1, label,
-                 7, p,
-                 11, units,
-                 15, print_cash(parcel_cost),
-                 11, get_date(Held_From[a][p]),
-                 10, get_date(last_key),
-                 12, print_cash(current_price),
-                 14, print_cash(parcel_proceeds),
-                 14, print_cash(get_parcel_cost(a, p, now)),
-                 14, print_cash(get_parcel_cost(a, p, now, TRUE)),
-                 14, print_cash(- gains),
-                 14, description,
-                 14, print_cash(- parcel_gains),
-                 14, print_cash(parcel_cost / units, 4) > reports_stream
-
-            # Clear label
-            label = ""
-          }
-        }
-      } # End of each parcel p
-
-      # Show any gains event
-      if (gains_event) {
-        if (is_detailed)
-          # Detailed format
-          underline(175 + asset_width, 6, reports_stream)
-
-       # The output starts here
-       printf "%*s %*.3f %*s %*s   %*s %*s %*s %*s %*s ",
-              asset_width + 1, label,
-              (11 + 8 * is_detailed), units_sold,
-              15, print_cash(cost),
-              7, get_date(Held_From[a][0]),
-              10, get_date(last_key),
-              12, print_cash(current_price),
-              14, print_cash(proceeds),
-              14, print_cash(reduced_cost),
-              14, print_cash(adjusted_cost) > reports_stream
-
-        # Stack the gains & losses
-        if (not_zero(long_gains))
-          Gains_Stack[Long_Gains_Key]   = long_gains
-        if (not_zero(long_losses))
-          Gains_Stack[Long_Losses_Key]  = long_losses
-        if (not_zero(short_gains))
-          Gains_Stack[Short_Gains_Key]  = short_gains
-        if (not_zero(short_losses))
-          Gains_Stack[Short_Losses_Key] = short_losses
-
-        # Common entries
-        for (key in Gains_Stack)
-          break
-        if (key) {
-          printf "%*s %*s %*s",
-            14, print_cash(proceeds - reduced_cost),
-            14, key,
-            14, print_cash(- Gains_Stack[key]) > reports_stream
-          delete Gains_Stack[key]
-        } else
-          printf "%14s", print_cash(proceeds - reduced_cost) > reports_stream
-
-        # Extra entries {
-        for (key in Gains_Stack) {
-          printf "\n%*s %14s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
-          delete Gains_Stack[key]
-        }
-
-        # Grand totals
-        sum_cost     += cost
-        sum_proceeds += proceeds
-        sum_reduced  += reduced_cost
-        sum_adjusted += adjusted_cost
-
-        printf "\n" > reports_stream
-        if (is_detailed)
-         printf "\n" > reports_stream
-
-      } # End of gains event
-    } # End of each asset
+    } # End of if is capital
+  } # End of each asset
 
   # Final lines
   underline(166 + is_detailed * (9 + asset_width), 6, reports_stream)
@@ -395,6 +413,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       delete Gains_Stack[key]
     }
   printf "\n" > reports_stream
+
+  # Try
 
   return accounting_gains
 } # End of print gains
@@ -562,12 +582,12 @@ function get_capital_gains(now, past, is_detailed,
     expense_short_losses = get_cost("*EXPENSE.LOSSES.SHORT", now) - get_cost("*EXPENSE.LOSSES.SHORT", past)
 
     # The long gains and losses first
-    capital_long_gains  = get_cost(LONG_GAINS, just_before(now)) - get_cost(LONG_GAINS, past)
-    capital_long_losses = get_cost(LONG_LOSSES, just_before(now)) - get_cost(LONG_LOSSES, past)
+    capital_long_gains  = get_cost("*SPECIAL.TAXABLE.GAINS.LONG", just_before(now)) - get_cost("*SPECIAL.TAXABLE.GAINS.LONG", past)
+    capital_long_losses = get_cost("*SPECIAL.TAXABLE.LOSSES.LONG", just_before(now)) - get_cost("*SPECIAL.TAXABLE.LOSSES.LONG", past)
 
     # short gains & losses
-    capital_short_gains   = get_cost(SHORT_GAINS, just_before(now)) - get_cost(SHORT_GAINS, past)
-    capital_short_losses  = get_cost(SHORT_LOSSES, just_before(now)) - get_cost(SHORT_LOSSES, past)
+    capital_short_gains   = get_cost("*SPECIAL.TAXABLE.GAINS.SHORT", just_before(now)) - get_cost("*SPECIAL.TAXABLE.GAINS.SHORT", past)
+    capital_short_losses  = get_cost("*SPECIAL.TAXABLE.LOSSES.SHORT", just_before(now)) - get_cost("*SPECIAL.TAXABLE.LOSSES.SHORT", past)
 
     # The adjusted gains and losses
     printf "\n\tAdjusted Gains\n" > reports_stream
@@ -642,8 +662,9 @@ function get_capital_gains(now, past, is_detailed,
     # Apply long & short losses separately
     # This is not strictly necessary in all cases but useful
     # Save net gains or losses
-    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  LONG_GAINS,  LONG_LOSSES)
-    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, SHORT_GAINS, SHORT_LOSSES)
+    # What happens when you manipulate a parent account?
+    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  "*SPECIAL.TAXABLE.GAINS.LONG",  "*SPECIAL.TAXABLE.LOSSES.LONG")
+    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, "*SPECIAL.TAXABLE.GAINS.SHORT", "*SPECIAL.TAXABLE.LOSSES.SHORT")
 
     # Overall gains, losses and taxable gains
     underline(44, 8, reports_stream)

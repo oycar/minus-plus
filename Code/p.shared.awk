@@ -1364,9 +1364,9 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
         # Need to record taxable gains/losses too
         held_time = get_held_time(now, Held_From[a][p])
         if (held_time >= CGT_PERIOD)
-          adjust_cost(LONG_GAINS, parcel_cost, now)
+          adjust_cost(Long_Gains[a], parcel_cost, now)
         else
-          adjust_cost(SHORT_GAINS, parcel_cost, now)
+          adjust_cost(Short_Gains[a], parcel_cost, now)
       }
     }
   }
@@ -1744,12 +1744,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     # capital gains and losses
     # Stored (as sums) by parcel, cost element and time
     # eg Accounting_Cost[account][parcel][element][time]
-    Accounting_Cost[account_name][0][0][SUBSEP] = 0
-    delete Accounting_Cost[account_name][0][0][SUBSEP]
 
-    # Ditto for tax adjustments
-    Tax_Adjustments[account_name][0][SUBSEP] = 0
-    delete Tax_Adjustments[account_name][0][SUBSEP]
 
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel
@@ -1761,6 +1756,14 @@ function initialize_account(account_name,     class_name, array, p, n,
 
     # Each account also has a number of parcels
     set_key(Number_Parcels, account_name, 0)
+
+    # Capital assets have linked capital gains accounts
+    if (is_capital(account_name)) {
+      Long_Losses[account_name] = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG." (leaf_name))
+      Short_Losses[account_name] = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT." (leaf_name))
+      Long_Gains[account_name] = initialize_account("SPECIAL.TAXABLE.GAINS.LONG:LONG." (leaf_name))
+      Short_Gains[account_name] = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT." (leaf_name))
+    }
 
     # End of if ASSET
   } else if (is_class(account_name, "INCOME")) {

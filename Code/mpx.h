@@ -104,7 +104,7 @@
 @define first_entry(array) ternary(__MPX_KEY__ = first_key(array), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
 
 # // This is not efficient
-@define delta_entry(array, now) (find_entry(array, now) - find_entry(array, just_before(now)))
+@define get_delta(array, t) (find_entry(array, t) - find_entry(array, just_before(t)))
 
 @define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
@@ -144,7 +144,6 @@
 
 # // char code lookup
 @define get_char(c) ternary(c in URL_Lookup, URL_Lookup[c], (0))
-
 
 # //
 @define is_star(a) ((a) ~ /^*/)
@@ -188,11 +187,9 @@
 @define get_short_name(name) (Leaf[name])
 @define get_reduced_cost(a, now) (get_cost(a, now))
 @define get_element_cost(a, p, e, now) (find_entry(Accounting_Cost[a][p][e], (now)))
-# // @define get_parcel_proceeds(a, p) (first_entry(Accounting_Cost[a][p][0]))
 @define get_parcel_proceeds(a, p, t) (find_entry(Accounting_Cost[a][p][0], (t)))
-@define get_cash_out(a, p, t) @eval (get_parcel_proceeds(a, p, t))
 
-# // Get a single tranaction from the account
+# // Get a single transaction from the account
 @define get_delta_cost(a, now) (get_cost(a, now) - get_cost(a, just_before(now)))
 @define get_latest_transaction(a, now) (find_key(Cost_Basis[a], now))
 @define get_previous_transaction(a, now) (find_key(Cost_Basis[a], just_before(now)))
