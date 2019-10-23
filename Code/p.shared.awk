@@ -1477,7 +1477,7 @@ function get_realized_gains(a, now,
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_sold(a, i, now)) # This is a sold parcel at time (now)
-        gains += find_entry(Accounting_Cost[a][i][0], now) + sum_cost_elements(Accounting_Cost[a][i], now) # All cost elements
+        gains += get_parcel_proceeds(a, i) + sum_cost_elements(Accounting_Cost[a][i], now) # All cost elements
     }
   } else
     gains = 0
@@ -1492,7 +1492,7 @@ function sum_cost_elements(array, now,     sum_elements, e) {
 @endif
 
   sum_elements = 0
-  for (e in Elements) # Exclude element [0]
+  for (e in array) # Exclude element [0]
     sum_elements += find_entry(array[e], now)
   return sum_elements
 }
@@ -1503,7 +1503,6 @@ function get_cash_in(a, i, now) {
   # Is the account open?
   if (now >= Held_From[a][i])
     # Yes - always element I
-    #return find_entry(Accounting_Cost[a][i][I], Held_From[a][i]) # The Held_From time ensures  that later element I costs do not impact the result
     return get_element_cost(a, i, I, Held_From[a][i]) # The Held_From time ensures  that later element I costs do not impact the result
 
   # No - so no activity
@@ -1759,10 +1758,10 @@ function initialize_account(account_name,     class_name, array, p, n,
 
     # Capital assets have linked capital gains accounts
     if (is_capital(account_name)) {
-      Long_Losses[account_name] = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG." (leaf_name))
-      Short_Losses[account_name] = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT." (leaf_name))
-      Long_Gains[account_name] = initialize_account("SPECIAL.TAXABLE.GAINS.LONG:LONG." (leaf_name))
-      Short_Gains[account_name] = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT." (leaf_name))
+      Long_Losses[account_name] = initialize_account(LONG_LOSSES ":LONG." (leaf_name))
+      Short_Losses[account_name] = initialize_account(SHORT_LOSSES ":SHORT" (leaf_name))
+      Long_Gains[account_name] = initialize_account(LONG_GAINS ":LONG." (leaf_name))
+      Short_Gains[account_name] = initialize_account(SHORT_GAINS ":SHORT." (leaf_name))
     }
 
     # End of if ASSET

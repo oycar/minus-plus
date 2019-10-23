@@ -24,14 +24,17 @@
 @define DEVNULL "/dev/null"
 
 # //
-@define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf\
- Lifetime Long_Name Maturity_Date Method_Name Number_Parcels\
- Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Remaining_Losses Tax_Adjustments Tax_Bands\
- Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held "
+@define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit\
+ Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date\
+ Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units\
+ Remaining_Losses Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits\
+ Threshold_Dates Total_Units Underlying_Asset Units_Held "
 
-@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root EOFY_Window FY_Day FY_Date FY_Length\
- FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED\
- Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function\
+@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
+ Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency\
+ Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED\
+ Dividend_Qualification_Function Get_Taxable_Gains_Function\
+ Gross_Up_Gains_Function Imputation_Report_Function\
  Income_Tax_Function Initialize_Tax_Function "
 
 # // Some constants
@@ -65,6 +68,7 @@
 @define   SHOW_REPORTS "bcot"
 @endif # // SHOW_REPORTS
 
+@define ternary(a, b, c) ((a)?(b):(c))
 @define report_balance(s)    ternary(SHOW_REPORTS ~ /[bB]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
 @define report_capital(s)    ternary(SHOW_REPORTS ~ /[cC]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
 @define report_deferred(s)   ternary(SHOW_REPORTS ~ /[dD]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
@@ -78,6 +82,16 @@
 # // Default Asset Prefix for Price Lists
 @define ASSET_PREFIX ("ASSET.CAPITAL.SHARES")
 @define ASSET_SUFFIX ("ASX")
+
+# // Start Defining Special Account Names
+@define TAXABLE_GAINS ("SPECIAL.TAXABLE")
+@define LONG_GAINS    ("SPECIAL.TAXABLE.GAINS.LONG")
+@define LONG_LOSSES   ("SPECIAL.TAXABLE.LOSSES.LONG")
+@define SHORT_GAINS   ("SPECIAL.TAXABLE.GAINS.SHORT")
+@define SHORT_LOSSES  ("SPECIAL.TAXABLE.LOSSES.SHORT")
+@define star(s)       ternary(is_star(s), (s), ("*" (s)))
+@define is_star(a)    ((a) ~ /^\*/)
+
 
 # // The Epoch and minimum time difference
 @define EPOCH_START        (2000)
@@ -97,7 +111,6 @@
 @define RESERVED_CLASSES  /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL/
 
 # // Useful inline functions - this may be overdoing it
-@define ternary(a, b, c) ((a)?(b):(c))
 @define make_array(array)  ternary(SUBSEP in array,TRUE,FALSE)
 
 @define find_entry(array, now) ternary(__MPX_KEY__ = find_key(array, now), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
@@ -146,7 +159,6 @@
 @define get_char(c) ternary(c in URL_Lookup, URL_Lookup[c], (0))
 
 # //
-@define is_star(a) ((a) ~ /^*/)
 @define is_individual (Journal_Type ~ /^IND$/)
 @define is_smsf (Journal_Type ~ /^SMSF$/)
 @define is_company (Journal_Type ~ /^(PTY|CORP|LTD)$/)
@@ -187,7 +199,9 @@
 @define get_short_name(name) (Leaf[name])
 @define get_reduced_cost(a, now) (get_cost(a, now))
 @define get_element_cost(a, p, e, now) (find_entry(Accounting_Cost[a][p][e], (now)))
-@define get_parcel_proceeds(a, p, t) (find_entry(Accounting_Cost[a][p][0], (t)))
+@define get_parcel_proceeds(a, p) (Parcel_Proceeds[a][p])
+@define set_parcel_proceeds(a, p, x) (Parcel_Proceeds[a][p] = (x))
+
 
 # // Get a single transaction from the account
 @define get_delta_cost(a, now) (get_cost(a, now) - get_cost(a, just_before(now)))
@@ -263,17 +277,6 @@
   else\
     break;\
 }
-
-# // # // Which Gains to Use
-# // @define use_gains(l, s) if (TRUE) {\
-# //   Use_Long_Gains  = l;\
-# //   Use_Short_Gains = s\
-# // }
-# // # // Which Losses to Use
-# // @define use_losses(l, s) if (TRUE) {\
-# //   Use_Long_Losses  = l;\
-# //   Use_Short_Losses = s\
-# // }
 
 # // Print a block of n identical characters
 @define print_block(c, n, stream) if (TRUE) {while (n-- > 1) printf "%1s", c > stream; print c > stream}

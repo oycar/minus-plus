@@ -130,30 +130,35 @@ BEGIN {
   url_init()
 
   # Initialize arrays
-  make_array(Account_Term)
-  make_array(Accounting_Cost)
-  make_array(Cost_Basis)
-  make_array(Foreign_Offset_Limit)
-  make_array(Held_From)
-  make_array(Held_Until)
-  make_array(Leaf)
-  make_array(Lifetime)
-  make_array(Long_Name)
-  make_array(Maturity_Date)
-  make_array(Method_Name)
-  make_array(Number_Parcels)
-  make_array(Parcel_Tag)
-  make_array(Parent_Name)
-  make_array(Price)
-  make_array(Payment_Date)
-  make_array(Qualified_Units)
-  make_array(Tax_Adjustments)
-  make_array(Tax_Bands)
-  make_array(Tax_Credits)
-  make_array(Threshold_Dates)
-  make_array(Total_Units)
-  make_array(Underlying_Asset)
-  make_array(Units_Held)
+  # make_array(Account_Term)
+  # make_array(Accounting_Cost)
+  # make_array(Cost_Basis)
+  # make_array(Foreign_Offset_Limit)
+  # make_array(Held_From)
+  # make_array(Held_Until)
+  # make_array(Leaf)
+  # make_array(Lifetime)
+  # make_array(Long_Gains)
+  # make_array(Long_Losses)
+  # make_array(Long_Name)
+  # make_array(Maturity_Date)
+  # make_array(Method_Name)
+  # make_array(Number_Parcels)
+  # make_array(Parcel_Proceeds)
+  # make_array(Parcel_Tag)
+  # make_array(Parent_Name)
+  # make_array(Price)
+  # make_array(Payment_Date)
+  # make_array(Qualified_Units)
+  # make_array(Short_Gains)
+  # make_array(Short_Losses)
+  # make_array(Tax_Adjustments)
+  # make_array(Tax_Bands)
+  # make_array(Tax_Credits)
+  # make_array(Threshold_Dates)
+  # make_array(Total_Units)
+  # make_array(Underlying_Asset)
+  # make_array(Units_Held)
 
   # Provisional Carried Loss Arrays
   make_array(Remaining_Losses)
@@ -616,10 +621,6 @@ function set_special_accounts() {
 
   # Taxable capital gains are in special accounts
   # Tax Adjustments have potentially been applied to these quantities
-  #LONG_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.LONG:LONG.GAINS")
-  #LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG.LOSSES")
-  #SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
-  #SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
   WRITTEN_BACK   = initialize_account("SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK")
 
   # Taxable carried losses
@@ -1738,7 +1739,7 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
 
     # This adds a new parcel - always cost element I
     # We have to initialize  this parcels cost elements
-    Accounting_Cost[ac][last_parcel][0][Epoch] = 0
+    Parcel_Proceeds[ac][last_parcel] = 0
     for (key in Elements)
       Accounting_Cost[ac][last_parcel][key][Epoch] = 0
 
@@ -1969,7 +1970,7 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
   # This is always recorded as cost_element 0 since it is not actually a true cost
   # This must be recorded as cash flowing out of the account
   # A parcel is only ever sold once so we can simply set the cost
-  set_entry(Accounting_Cost[a][p][0], -amount_paid, now)
+  set_parcel_proceeds(a, p, -amount_paid)
 
 @ifeq LOG sell_units
   printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n",
@@ -1977,7 +1978,7 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
     get_date(Held_From[a][p]), get_date(Held_Until[a][p]),
     print_cash(get_cost_modifications(a, p, now)),
     print_cash(get_parcel_cost(a, p, now)),
-    print_cash(get_parcel_proceeds(a, p, now)) > STDERR
+    print_cash(get_parcel_proceeds(a, p)) > STDERR
 @endif # LOG
 
   # Save realized gains
@@ -2003,7 +2004,7 @@ function sell_fixed_parcel(a, p, now,     x) {
 
   # Set it to zero (use element 0)
   # In fact the cost of sold assets is 0 anyway
-  sum_entry(Accounting_Cost[a][p][0], -x, now)
+  set_parcel_proceeds(a, p, -x)
 
   # We need to adjust the asset sums by this too
   update_cost(a, -x, now)
@@ -2073,6 +2074,7 @@ function copy_parcel(ac, p, q,     e, key) {
   Units_Held[ac][q]  = Units_Held[ac][p]
   Held_From[ac][q] = Held_From[ac][p]
   Held_Until[ac][q] = Held_Until[ac][p]
+  Parcel_Proceeds[ac][q] = Parcel_Proceeds[ac][p]
 
   # Copy all entries
   # Note keys will not match so need to delete old entries from parcel q
@@ -2099,6 +2101,9 @@ function split_parcel(ac, p, du,   fraction_kept, e, key) {
   # The date
   Held_From[ac][p + 1]  = Held_From[ac][p]
   Held_Until[ac][p + 1] = Future
+
+  # Parcel Proceeds
+  Parcel_Proceeds[ac][p + 1] = 0
 
   # The New Adjustments
   # Need to delete old arrays because
