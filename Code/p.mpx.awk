@@ -129,7 +129,7 @@ BEGIN {
   # url encoding lookup table
   url_init()
 
-  # Initialize arrays
+  # # Initialize arrays
   # make_array(Account_Term)
   # make_array(Accounting_Cost)
   # make_array(Cost_Basis)
@@ -161,7 +161,7 @@ BEGIN {
   # make_array(Units_Held)
 
   # Provisional Carried Loss Arrays
-  make_array(Remaining_Losses)
+  #make_array(Remaining_Losses)
   Remaining_Losses[0][SUBSEP] = 0; delete Remaining_Losses[0][SUBSEP]
 
   # This is a CSV file
@@ -620,8 +620,12 @@ function set_special_accounts() {
   EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
 
   # Taxable capital gains are in special accounts
-  # Tax Adjustments have potentially been applied to these quantities
-  WRITTEN_BACK   = initialize_account("SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK")
+  # Make sure the parent accounts exist
+  initialize_account(LONG_GAINS  ":LONG.GAINS")
+  initialize_account(LONG_LOSSES ":LONG.LOSSES")
+  initialize_account(SHORT_GAINS ":SHORT.GAINS")
+  WRITTEN_BACK   =   initialize_account(SHORT_LOSSES ":SHORT.LOSSES")
+
 
   # Taxable carried losses
   TAX_LOSSES       = initialize_account("SPECIAL.LOSSES:TAX.LOSSES")
@@ -2042,11 +2046,16 @@ function save_parcel_gain(a, p, now, x,       held_time) {
     adjust_cost(REALIZED_LOSSES, x, now)
 
     # Taxable losses are based on the reduced cost
-    if (held_time >= CGT_PERIOD)
+    if (held_time >= CGT_PERIOD) {
+      if (!(a in Long_Losses))
+        Long_Losses[a] = initialize_account(LONG_LOSSES ":LL." Leaf[a])
       adjust_cost(Long_Losses[a], x, now)
-    else
+    } else {
+      if (!(a in Short_Losses))
+        Short_Losses[a] = initialize_account(SHORT_LOSSES ":SL." Leaf[a])
       adjust_cost(Short_Losses[a], x, now)
-  } else if (below_zero(x))
+    }
+  } else if (below_zero(x))s
     adjust_cost(REALIZED_GAINS, x, now)
 
   # Taxable gains
@@ -2057,10 +2066,15 @@ function save_parcel_gain(a, p, now, x,       held_time) {
   # Taxable Gains are based on the adjusted cost
   if (below_zero(x)) {
     # Taxable losses are based on the reduced cost
-    if (held_time >= CGT_PERIOD)
+    if (held_time >= CGT_PERIOD) {
+      if (!(a in Long_Gains))
+        Long_Gains[a] = initialize_account(LONG_GAINS ":LG." Leaf[a])
       adjust_cost(Long_Gains[a], x, now)
-    else
+    } else {
+      if (!(a in Short_Gains))
+        Short_Gains[a] = initialize_account(SHORT_GAINS ":SG." Leaf[a])
       adjust_cost(Short_Gains[a], x, now)
+    }
   }
 }
 

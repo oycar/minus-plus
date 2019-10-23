@@ -158,10 +158,25 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       if (is_realized_flag) {
         # If any of these are non-zero there was a gains event
         # These just apply for the whole account - not parcels
-        long_gains   = get_cost(Long_Gains[a], now)   - get_cost(Long_Gains[a], past)
-        long_losses  = get_cost(Long_Losses[a], now)  - get_cost(Long_Losses[a], past)
-        short_gains  = get_cost(Short_Gains[a], now)  - get_cost(Short_Gains[a], past)
-        short_losses = get_cost(Short_Losses[a], now) - get_cost(Short_Losses[a], past)
+        if (a in Long_Gains)
+          long_gains   = get_cost(Long_Gains[a], now)   - get_cost(Long_Gains[a], past)
+        else
+          long_gains = 0
+
+        if (a in Long_Losses)
+          long_losses  = get_cost(Long_Losses[a], now)  - get_cost(Long_Losses[a], past)
+        else
+          long_losses = 0
+
+        if (a in Short_Gains)
+          short_gains  = get_cost(Short_Gains[a], now)  - get_cost(Short_Gains[a], past)
+        else
+          short_gains = 0
+
+        if (a in Short_Losses)
+          short_losses = get_cost(Short_Losses[a], now) - get_cost(Short_Losses[a], past)
+        else
+          short_losses = 0
         key     = FALSE
       } else {
         long_gains = short_gains = long_losses = short_losses = 0

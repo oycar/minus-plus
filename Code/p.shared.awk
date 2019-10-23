@@ -1363,10 +1363,15 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 @endif # LOG
         # Need to record taxable gains/losses too
         held_time = get_held_time(now, Held_From[a][p])
-        if (held_time >= CGT_PERIOD)
+        if (held_time >= CGT_PERIOD) {
+          if (!(a in Long_Gains))
+            Long_Gains[a] = initialize_account(LONG_GAINS ":LG." Leaf[a])
           adjust_cost(Long_Gains[a], parcel_cost, now)
-        else
+        } else {
+          if (!(a in Short_Gains))
+            Short_Gains[a] = initialize_account(SHORT_GAINS ":SG." Leaf[a])
           adjust_cost(Short_Gains[a], parcel_cost, now)
+        }
       }
     }
   }
@@ -1755,14 +1760,6 @@ function initialize_account(account_name,     class_name, array, p, n,
 
     # Each account also has a number of parcels
     set_key(Number_Parcels, account_name, 0)
-
-    # Capital assets have linked capital gains accounts
-    if (is_capital(account_name)) {
-      Long_Losses[account_name] = initialize_account(LONG_LOSSES ":LONG." (leaf_name))
-      Short_Losses[account_name] = initialize_account(SHORT_LOSSES ":SHORT" (leaf_name))
-      Long_Gains[account_name] = initialize_account(LONG_GAINS ":LONG." (leaf_name))
-      Short_Gains[account_name] = initialize_account(SHORT_GAINS ":SHORT." (leaf_name))
-    }
 
     # End of if ASSET
   } else if (is_class(account_name, "INCOME")) {

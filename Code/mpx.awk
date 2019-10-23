@@ -1655,10 +1655,15 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 
         # Need to record taxable gains/losses too
         held_time = get_held_time(now, Held_From[a][p])
-        if (held_time >= 31622400)
+        if (held_time >= 31622400) {
+          if (!(a in Long_Gains))
+            Long_Gains[a] = initialize_account(("SPECIAL.TAXABLE.GAINS.LONG") ":LG." Leaf[a])
           adjust_cost(Long_Gains[a], parcel_cost, now)
-        else
+        } else {
+          if (!(a in Short_Gains))
+            Short_Gains[a] = initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SG." Leaf[a])
           adjust_cost(Short_Gains[a], parcel_cost, now)
+        }
       }
     }
   }
@@ -1989,14 +1994,6 @@ function initialize_account(account_name,     class_name, array, p, n,
 
     # Each account also has a number of parcels
     (( account_name in Number_Parcels)?( 0):(Number_Parcels[ account_name] = ( 0)))
-
-    # Capital assets have linked capital gains accounts
-    if (((account_name) ~ /^ASSET\.CAPITAL[.:]/)) {
-      Long_Losses[account_name] = initialize_account(("SPECIAL.TAXABLE.LOSSES.LONG") ":LONG." (leaf_name))
-      Short_Losses[account_name] = initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SHORT" (leaf_name))
-      Long_Gains[account_name] = initialize_account(("SPECIAL.TAXABLE.GAINS.LONG") ":LONG." (leaf_name))
-      Short_Gains[account_name] = initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SHORT." (leaf_name))
-    }
 
     # End of if ASSET
   } else if (((account_name) ~ ("^" ( "INCOME") "[.:]"))) {
@@ -2694,10 +2691,25 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       if (is_realized_flag) {
         # If any of these are non-zero there was a gains event
         # These just apply for the whole account - not parcels
-        long_gains   = get_cost(Long_Gains[a], now)   - get_cost(Long_Gains[a], past)
-        long_losses  = get_cost(Long_Losses[a], now)  - get_cost(Long_Losses[a], past)
-        short_gains  = get_cost(Short_Gains[a], now)  - get_cost(Short_Gains[a], past)
-        short_losses = get_cost(Short_Losses[a], now) - get_cost(Short_Losses[a], past)
+        if (a in Long_Gains)
+          long_gains   = get_cost(Long_Gains[a], now)   - get_cost(Long_Gains[a], past)
+        else
+          long_gains = 0
+
+        if (a in Long_Losses)
+          long_losses  = get_cost(Long_Losses[a], now)  - get_cost(Long_Losses[a], past)
+        else
+          long_losses = 0
+
+        if (a in Short_Gains)
+          short_gains  = get_cost(Short_Gains[a], now)  - get_cost(Short_Gains[a], past)
+        else
+          short_gains = 0
+
+        if (a in Short_Losses)
+          short_losses = get_cost(Short_Losses[a], now) - get_cost(Short_Losses[a], past)
+        else
+          short_losses = 0
         key     = (0)
       } else {
         long_gains = short_gains = long_losses = short_losses = 0
@@ -5639,7 +5651,7 @@ BEGIN {
   # url encoding lookup table
   url_init()
 
-  # Initialize arrays
+  # # Initialize arrays
   # make_array(Account_Term)
   # make_array(Accounting_Cost)
   # make_array(Cost_Basis)
@@ -5671,7 +5683,7 @@ BEGIN {
   # make_array(Units_Held)
 
   # Provisional Carried Loss Arrays
-  ((SUBSEP in Remaining_Losses)?((1)):((0)))
+  #make_array(Remaining_Losses)
   Remaining_Losses[0][SUBSEP] = 0; delete Remaining_Losses[0][SUBSEP]
 
   # This is a CSV file
@@ -6121,8 +6133,12 @@ function set_special_accounts() {
   EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
 
   # Taxable capital gains are in special accounts
-  # Tax Adjustments have potentially been applied to these quantities
-  WRITTEN_BACK   = initialize_account("SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK")
+  # Make sure the parent accounts exist
+  initialize_account(("SPECIAL.TAXABLE.GAINS.LONG")  ":LONG.GAINS")
+  initialize_account(("SPECIAL.TAXABLE.LOSSES.LONG") ":LONG.LOSSES")
+  initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SHORT.GAINS")
+  WRITTEN_BACK   =   initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SHORT.LOSSES")
+
 
   # Taxable carried losses
   TAX_LOSSES       = initialize_account("SPECIAL.LOSSES:TAX.LOSSES")
@@ -7381,11 +7397,16 @@ function save_parcel_gain(a, p, now, x,       held_time) {
     adjust_cost(REALIZED_LOSSES, x, now)
 
     # Taxable losses are based on the reduced cost
-    if (held_time >= 31622400)
+    if (held_time >= 31622400) {
+      if (!(a in Long_Losses))
+        Long_Losses[a] = initialize_account(("SPECIAL.TAXABLE.LOSSES.LONG") ":LL." Leaf[a])
       adjust_cost(Long_Losses[a], x, now)
-    else
+    } else {
+      if (!(a in Short_Losses))
+        Short_Losses[a] = initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SL." Leaf[a])
       adjust_cost(Short_Losses[a], x, now)
-  } else if (((x) < -Epsilon))
+    }
+  } else if (((x) < -Epsilon))s
     adjust_cost(REALIZED_GAINS, x, now)
 
   # Taxable gains
@@ -7396,10 +7417,15 @@ function save_parcel_gain(a, p, now, x,       held_time) {
   # Taxable Gains are based on the adjusted cost
   if (((x) < -Epsilon)) {
     # Taxable losses are based on the reduced cost
-    if (held_time >= 31622400)
+    if (held_time >= 31622400) {
+      if (!(a in Long_Gains))
+        Long_Gains[a] = initialize_account(("SPECIAL.TAXABLE.GAINS.LONG") ":LG." Leaf[a])
       adjust_cost(Long_Gains[a], x, now)
-    else
+    } else {
+      if (!(a in Short_Gains))
+        Short_Gains[a] = initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SG." Leaf[a])
       adjust_cost(Short_Gains[a], x, now)
+    }
   }
 }
 
