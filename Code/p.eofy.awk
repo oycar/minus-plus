@@ -545,8 +545,8 @@ function print_income_gains(now, past, is_detailed, reports_stream,
     printf "%*s %*s\n",
        asset_width + 1, "Total",
        11, print_cash(-sum_gains) > reports_stream
-   underline(9 + asset_width, 6, reports_stream)
-   printf "\n" > reports_stream
+    underline(9 + asset_width, 6, reports_stream)
+    printf "\n" > reports_stream
   }
 
   # Clean up

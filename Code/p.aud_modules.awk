@@ -236,9 +236,6 @@ function income_tax_aud(now, past, benefits,
     carried_losses = write_back_losses(just_before(now), last_year(now), write_back_limit(now), carried_losses, write_stream)
   }
 
-  # Save the loss
-  #set_cost(CARRIED_LOSSES, carried_losses, now)
-
   # Imputation Tax Offsets
   #
 

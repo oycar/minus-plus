@@ -1382,7 +1382,6 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
   printf "\t\tClosing Parcel Cost => %s\n", print_cash(get_parcel_cost(a, p, now))  > STDERR
   printf "\t\tClosing Tax Adjusted => %s\n", print_cash(get_parcel_cost(a, p, now, TRUE))  > STDERR
   printf "\t\tTotal Realized Gains => %s\n", print_cash(- get_delta_cost(REALIZED_GAINS, now))  > STDERR
-
 @endif # LOG
 } # End of adjust_parcel_cost
 
@@ -1467,7 +1466,6 @@ function get_unrealized_gains(a, now,
   # The result
   return gains
 }
-
 
 # Get realized gains at the parcel level
 function get_realized_gains(a, now,

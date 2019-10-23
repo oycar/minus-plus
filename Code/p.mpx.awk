@@ -626,7 +626,6 @@ function set_special_accounts() {
   initialize_account(SHORT_GAINS ":SHORT.GAINS")
   WRITTEN_BACK   =   initialize_account(SHORT_LOSSES ":SHORT.LOSSES")
 
-
   # Taxable carried losses
   TAX_LOSSES       = initialize_account("SPECIAL.LOSSES:TAX.LOSSES")
 
