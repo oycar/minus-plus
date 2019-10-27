@@ -698,13 +698,13 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
     # What was the seperator?
     if ("+" == seps[1])
       # Use year format
-      use_format = FALSE
+      use_format = YEAR_FORMAT
   } else
     suffix_set = FALSE
 
   #
   prefix = get_name_component(name, 1, 1, array)
-
+  account_name = ""
     #
     switch (prefix) {
       case "B" :
@@ -724,8 +724,8 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
         prefix = prefix show_date(now, use_format)
       break;;
 
-      case "I":
-      case "D": # Income
+
+      case "D": # Distribution
         if (is_linked(Account[1]))
           account_name = get_name_component(Leaf[Account[1]], 2)
         else
@@ -737,10 +737,16 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
         else
           prefix = tolower(get_name_component(Account[1], 2)) show_date(now, use_format)
         break;;
+      case "I":  # Income
+        #account_name = get_name_component(Leaf[Account[1]], 1)
+
+        # The second component of the account name is not used here...?
+        prefix = "Income" show_date(now, use_format)
+        break;;
 
       case "C":
       case "E": # Expense or Cost
-        account_name = get_name_component(Leaf[Account[2]], 1)
+        #account_name = get_name_component(Leaf[Account[2]], 1)
 
         # The second component of the account name is not used here...?
         prefix = "Expense" show_date(now, use_format)
@@ -1231,8 +1237,10 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
     # The cost adjustment per unit except for depreciating assets
     if (flag = is_fixed(a))
       adjustment = x / get_cost(a, now)
-    else
+    else {
+      assert(get_units(a, now), "Asset <" Leaf[a] "> has zero units - ensure this transaction occurs before it was sold")
       adjustment = x / get_units(a, now)
+    }
 
     # Debugging
 @ifeq LOG adjust_cost
@@ -1534,7 +1542,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 
 # Print out transactions
 # Generalize for the case of a single entry transaction
-function print_transaction(now, comments, a, b, u, amount, fields, n_field,     matched) {
+function print_transaction(now, comments, a, b, u, amount, fields, n_fields,     matched) {
   if (now > Stop_Time)
     return
 
@@ -1542,13 +1550,13 @@ function print_transaction(now, comments, a, b, u, amount, fields, n_field,     
   match_accounts(matched, Show_Account, a, b)
   if (!Show_Account || matched)
     # Print the transaction out
-    printf "%s\n", transaction_string(now, comments, a, b, u, amount, fields, n_field, matched)
+    printf "%s\n", transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched)
 }
 
 # Describe the transaction as a string
 @ifdef EXPORT_FORMAT
 # Export style
-function transaction_string(now, comments, a, b, u, amount, fields, n_field, matched,      i, string, swop) {
+function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,      i, string, swop) {
   # Print statement
   # This could be a zero, single or double entry transaction
   #
@@ -2082,8 +2090,12 @@ function get_taxable_income(now, tax_left,
   last_threshold = 0
 
   # When the tax left is zero or negative it must be the first band
-  if (!above_zero(tax_left))
+  if (!above_zero(tax_left)) {
+    # If the first band has a zero rate no income is assumed
+    if (near_zero(Tax_Bands[current_key][last_threshold]))
+      return 0
     return tax_left / Tax_Bands[current_key][last_threshold]
+  }
 
   # Now get the tax due on the whole sum
   total_income = 0

@@ -129,36 +129,36 @@ BEGIN {
   # url encoding lookup table
   url_init()
 
-  # # Initialize arrays
-  # make_array(Account_Term)
-  # make_array(Accounting_Cost)
-  # make_array(Cost_Basis)
-  # make_array(Foreign_Offset_Limit)
-  # make_array(Held_From)
-  # make_array(Held_Until)
-  # make_array(Leaf)
-  # make_array(Lifetime)
-  # make_array(Long_Gains)
-  # make_array(Long_Losses)
-  # make_array(Long_Name)
-  # make_array(Maturity_Date)
-  # make_array(Method_Name)
-  # make_array(Number_Parcels)
-  # make_array(Parcel_Proceeds)
-  # make_array(Parcel_Tag)
-  # make_array(Parent_Name)
-  # make_array(Price)
-  # make_array(Payment_Date)
-  # make_array(Qualified_Units)
-  # make_array(Short_Gains)
-  # make_array(Short_Losses)
-  # make_array(Tax_Adjustments)
-  # make_array(Tax_Bands)
-  # make_array(Tax_Credits)
-  # make_array(Threshold_Dates)
-  # make_array(Total_Units)
-  # make_array(Underlying_Asset)
-  # make_array(Units_Held)
+  # Initialize arrays
+  make_array(Account_Term)
+  make_array(Accounting_Cost)
+  make_array(Cost_Basis)
+  make_array(Foreign_Offset_Limit)
+  make_array(Held_From)
+  make_array(Held_Until)
+  make_array(Leaf)
+  make_array(Lifetime)
+  make_array(Long_Gains)
+  make_array(Long_Losses)
+  make_array(Long_Name)
+  make_array(Maturity_Date)
+  make_array(Method_Name)
+  make_array(Number_Parcels)
+  make_array(Parcel_Proceeds)
+  make_array(Parcel_Tag)
+  make_array(Parent_Name)
+  make_array(Price)
+  make_array(Payment_Date)
+  make_array(Qualified_Units)
+  make_array(Short_Gains)
+  make_array(Short_Losses)
+  make_array(Tax_Adjustments)
+  make_array(Tax_Bands)
+  make_array(Tax_Credits)
+  make_array(Threshold_Dates)
+  make_array(Total_Units)
+  make_array(Underlying_Asset)
+  make_array(Units_Held)
 
   # Provisional Carried Loss Arrays
   #make_array(Remaining_Losses)
@@ -1122,7 +1122,7 @@ function parse_transaction(now, a, b, units, amount,
       swop = ""
     }
 
-@ifdef EXPORT_FORMAT
+@ifeq EXPORT_FORMAT 1
     # Export format
     # Needs fixed number of fields
     # A, B, -U, x, b, b*g, (parcel_timestamp || parcel_name), SELL, comment
@@ -1242,7 +1242,7 @@ function parse_transaction(now, a, b, units, amount,
     }
 
     # Record the transaction
-@ifdef EXPORT_FORMAT
+@ifeq EXPORT_FORMAT 1
     # Format is
     # Needs fixed number of fields - we can ignore parcel name etc..
     # A, B, U, x + b, b, b*g, <parcel-name>, BUY, Comments
@@ -1252,7 +1252,7 @@ function parse_transaction(now, a, b, units, amount,
     fields[2] = sprintf("%.*f", PRECISION, g)
     fields[4] = "BUY"
 
-    print_transaction(now, Comments, a, b, Write_Units, amount, fields, 4)
+    print_transaction(now, Comments, a, b, Write_Units, amount - g, fields, 4)
 @else
     # Normal transactions
     # A, B, U, x, b - b*g, <optional-fields>, Comments

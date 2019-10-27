@@ -698,6 +698,10 @@ function get_capital_gains(now, past, is_detailed,
         printf "\t%27s => %14s\n", "Grossed Up Long Gains", print_cash(- income_long_gains) > reports_stream
     }
 
+    # Show total capital gains
+    printf "\n\tCapital Gains Before Application of Losses or Discounts\n" > reports_stream
+    printf "\n\t%27s => %14s\n",  "Total Capital Gains", print_cash(-(capital_long_gains + income_long_gains + capital_short_gains + income_short_gains)) > reports_stream
+
     # Apply long & short losses separately
     # This is not strictly necessary in all cases but useful
     # Save net gains or losses
