@@ -785,7 +785,7 @@ function income_tax_aud(now, past, benefits,
       deferred_tax = 0
       printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > write_stream
     }
-    printf "\tALLOCATED      => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+    printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
 @endif
 
     # Get the change this FY
@@ -800,12 +800,10 @@ function income_tax_aud(now, past, benefits,
   } else
     x = 0
 
-
 @ifeq LOG balance_journal
-printf "\tDeferred Gains => %14s\n", print_cash(- get_cost(DEFERRED_GAINS, now)) > STDERR
-printf "\tDeferred Tax   => %14s\n", print_cash(get_cost(DEFERRED, now)) > STDERR
-printf "\tAdjustent      => %14s\n", print_cash(x) > STDERR
-printf "\tALLOCATED      => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+  printf "\tDeferred  => %14s\n", print_cash(get_cost(DEFERRED, now)) > STDERR
+  printf "\tAdjustent => %14s\n", print_cash(x) > STDERR
+  printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
 @endif
 
   # Set tax values to zero - is this needed?
