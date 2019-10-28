@@ -47,6 +47,10 @@ function eofy_actions(now,      past, allocated_profits,
   if (ALLOCATED != ADJUSTMENTS) {
     allocated_profits = get_cost(ALLOCATED, just_before(now))
     set_cost(ALLOCATED, allocated_profits, now)
+@ifeq LOG balance_journal
+  printf "EOFY Actions\n" > STDERR
+  printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+@endif
   }
   set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", just_before(now)), now)
 
@@ -251,18 +255,24 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             adjusted_cost += get_parcel_cost(a, p, now, TRUE)
 
             # Total gains (accounting gains)
-            gains = get_parcel_proceeds(a, p) + sum_cost_elements(Accounting_Cost[a][p], now) # All elements
+            if (is_sold(a, p, now)) {
+              parcel_proceeds = get_parcel_proceeds(a, p)
+              current_price = - parcel_proceeds / units
+            } else
+              parcel_proceeds = - current_price * Units_Held[a][p]
+            gains = parcel_proceeds + sum_cost_elements(Accounting_Cost[a][p], now) # All elements
 
             # cash in and out
             parcel_cost     =   get_cash_in(a, p, now)
-            if (is_sold(a, p, now)) {
-              parcel_proceeds = - get_parcel_proceeds(a, p)
-              current_price = parcel_proceeds / units
-            } else {
-              parcel_proceeds = current_price * Units_Held[a][p]
-              if (!is_realized_flag)
-                gains -=  parcel_proceeds
-            }
+            # if (is_sold(a, p, now)) {
+            #   parcel_proceeds = - get_parcel_proceeds(a, p)
+            #   current_price = parcel_proceeds / units
+            # } else {
+            #   parcel_proceeds = current_price * Units_Held[a][p]
+            #   if (!is_realized_flag)
+            #     #gains -=  parcel_proceeds
+            #     gains -= get_parcel_proceeds(a, p)
+            # }
             cost           += parcel_cost
             proceeds       += parcel_proceeds
 
@@ -321,7 +331,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                    11, get_date(Held_From[a][p]),
                    10, get_date(key),
                    12, print_cash(current_price),
-                   14, print_cash(parcel_proceeds),
+                   14, print_cash(- parcel_proceeds),
                    14, print_cash(get_parcel_cost(a, p, now)),
                    14, print_cash(get_parcel_cost(a, p, now, TRUE)),
                    14, print_cash(- gains),
@@ -359,7 +369,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                 7, get_date(Held_From[a][0]),
                 10, get_date(last_key),
                 12, print_cash(current_price),
-                14, print_cash(proceeds),
+                14, print_cash(- proceeds),
                 14, print_cash(reduced_cost),
                 14, print_cash(adjusted_cost) > reports_stream
 
@@ -379,12 +389,12 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             break
           if (key) {
             printf "%*s %*s %*s",
-              14, print_cash(proceeds - reduced_cost),
+              14, print_cash(- proceeds - reduced_cost),
               14, key,
               14, print_cash(- Gains_Stack[key]) > reports_stream
             delete Gains_Stack[key]
           } else
-            printf "%14s", print_cash(proceeds - reduced_cost) > reports_stream
+            printf "%14s", print_cash(- proceeds - reduced_cost) > reports_stream
 
           # Extra entries {
           for (key in Gains_Stack) {
@@ -430,7 +440,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   printf "%*s %*s %*s %*s %*s ",
         asset_width + 1, "Totals",
         (27 + 8 * is_detailed), print_cash(sum_cost),
-        53, print_cash(sum_proceeds),
+        53, print_cash(- sum_proceeds),
         14, print_cash(sum_reduced),
         14, print_cash(sum_adjusted)  > reports_stream
 
@@ -439,7 +449,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       break
     if (key) {
       printf "%*s %*s %*s",
-        14, print_cash(sum_proceeds - sum_reduced),
+        14, print_cash(- sum_proceeds - sum_reduced),
         14, key,
         14, print_cash(- Gains_Stack[key]) > reports_stream
       delete Gains_Stack[key]
