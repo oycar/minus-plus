@@ -720,10 +720,6 @@ function income_tax_aud(now, past, benefits,
   # Adjust cost is OK because ALLOCATED/ADJUSTMENTS were reset at comencement of eofy_actions
   # For a none SMSF this is a synonym for ADJUSTMENTS
   adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
-@ifeq LOG balance_journal
-    printf "Income Tax Adjustment\n" > STDERR
-    printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
-@endif
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
