@@ -3113,7 +3113,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3421,7 +3421,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -3464,7 +3464,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3604,7 +3604,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3737,7 +3737,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    if ("/dev/null" != reports_stream) {
@@ -3812,7 +3812,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[fF]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[fF]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3947,7 +3947,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4440,7 +4440,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -5225,7 +5225,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5319,11 +5319,15 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 
 
   # Track reserve and accumulated profits
-  printf "EOFY Balance Journal\n\tDate => %s\n", get_date(now, LONG_FORMAT) > "/dev/stderr"
-  printf "\tAccumulated Profits => %s\n", print_cash(delta_profits + get_cost(ALLOCATED, now)) > "/dev/stderr"
-  printf "\tAllocated Profits   => %s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
-  printf "\tInitial Allocation  => %s\n", print_cash(initial_allocation) > "/dev/stderr"
-  printf "\tDelta Profits       => %s\n", print_cash(delta_profits) > "/dev/stderr"
+  printf "EOFY Balance Journal\n\tDate => %s\n", get_date(now) > "/dev/stderr"
+  printf "\tInitial Allocation     => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
+  printf "\tAccumulated Profits    => %14s\n", print_cash((get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now))) > "/dev/stderr"
+  printf "\t\t Contributions => %14s\n", print_cash(get_cost("*INCOME.CONTRIBUTION",now)) > "/dev/stderr"
+  printf "\t\t Benefits      => %14s\n", print_cash(get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now)) > "/dev/stderr"
+  printf "\t\t Income        => %14s\n", print_cash(- get_cost("*INCOME",now)) > "/dev/stderr"
+  printf "\t\t Expense       => %14s\n", print_cash(- get_cost("*EXPENSE",now)) > "/dev/stderr"
+  printf "\tDelta Profits          => %14s\n", print_cash(delta_profits) > "/dev/stderr"
+  printf "\tAllocated Profits      => %14s\n\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
 
 
   # Update the allocation - a get is before the set
@@ -5335,11 +5339,10 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   x = get_cost(ALLOCATED, now) - get_cost(ALLOCATED, past)
 
   # Track reserve
-  printf "\tAllocated Profits [%s]    => %s\n", get_date(now, LONG_FORMAT), print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
-  printf "\tAllocated Profits [%s]    => %s\n", get_date(((now) - 1), LONG_FORMAT), print_cash(initial_allocation) > "/dev/stderr"
-  printf "\tAllocated but not Applied => %s\n", print_cash(get_cost(ALLOCATED, now) - initial_allocation +                                                            get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)) > "/dev/stderr"
-  printf "\tAllocated Profits [%s]    => %s\n", get_date(past, LONG_FORMAT), print_cash(get_cost(ALLOCATED, past)) > "/dev/stderr"
-  printf "\tChange in Profits         => %s\n", print_cash(x) > "/dev/stderr"
+  printf "\tNew Allocated Profits      => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
+  printf "\tMarket Changes             => %14s\n", print_cash(get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)) > "/dev/stderr"
+  printf "\tAllocated but not Applied  => %14s\n", print_cash(get_cost(ALLOCATED, now) - initial_allocation +                                                            get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)) > "/dev/stderr"
+  printf "\tChange in Profits to Apply => %14s\n", print_cash(x) > "/dev/stderr"
 
 
   # Apply actual profits to the reserve
@@ -5352,8 +5355,8 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
     adjust_cost(RESERVE, -x, now)
 
     # Track reserve
-    printf "\tApplied to Reserve      => %s\n", print_cash(-x) > "/dev/stderr"
-    printf "\tApplied to Members      => %s\n", print_cash(-delta_profits) > "/dev/stderr"
+    printf "\tApplied to Reserve         => %14s\n", print_cash(-x) > "/dev/stderr"
+    #printf "\tApplied to Members         => %14s\n", print_cash(-delta_profits) > "/dev/stderr"
 
   } else
     x = 0
@@ -5368,8 +5371,9 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   adjust_cost(ALLOCATED, (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now), now)
 
   # Track reserve
-  printf "\tDelta Profits                => %s\n", print_cash(delta_profits) > "/dev/stderr"
-  printf "\tAccumulated - Allocated      => %s\n", print_cash((get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now)) > "/dev/stderr"
+#  printf "\tPreviously Allocated       => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
+  printf "\tApplied to Members         => %14s\n", print_cash(delta_profits) > "/dev/stderr"
+  printf "\tUnallocated Profits        => %14s\n", print_cash((get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now)) > "/dev/stderr"
 
 }
 
