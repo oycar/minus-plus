@@ -771,11 +771,12 @@ function income_tax_aud(now, past, benefits,
   # Catch negligible gains
   if (!near_zero(deferred_gains)) {
     # Deferred tax losses can reduce future tax liability so are a deferred tax asset
+    #deferred_gains *= (1.0 - rational_value(CGT_Discount))
     deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
     set_cost(DEFERRED, - deferred_tax, now)
 
 @ifeq LOG balance_journal
-printf "Deferred Tax Adjustment\n" > STDERR
+    printf "Deferred Tax Adjustment\n" > STDERR
     if (above_zero(deferred_tax))
       printf "\t%40s %32s\n", "Deferred Tax Liability", print_cash(deferred_tax) > write_stream
     else if (below_zero(deferred_tax))
@@ -784,7 +785,7 @@ printf "Deferred Tax Adjustment\n" > STDERR
       deferred_tax = 0
       printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > write_stream
     }
-    printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+    printf "\tALLOCATED      => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
 @endif
 
     # Get the change this FY
@@ -796,13 +797,15 @@ printf "Deferred Tax Adjustment\n" > STDERR
       # For a none SMSF this is a synonym for ADJUSTMENTS
       adjust_cost(ALLOCATED, x, now)
     }
-  }
+  } else
+    x = 0
 
 
 @ifeq LOG balance_journal
-printf "\tDeferred  => %14s\n", print_cash(get_cost(DEFERRED, now)) > STDERR
-printf "\tAdjustent => %14s\n", print_cash(x) > STDERR
-printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+printf "\tDeferred Gains => %14s\n", print_cash(- get_cost(DEFERRED_GAINS, now)) > STDERR
+printf "\tDeferred Tax   => %14s\n", print_cash(get_cost(DEFERRED, now)) > STDERR
+printf "\tAdjustent      => %14s\n", print_cash(x) > STDERR
+printf "\tALLOCATED      => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
 @endif
 
   # Set tax values to zero - is this needed?
