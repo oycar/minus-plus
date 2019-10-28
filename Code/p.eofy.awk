@@ -47,12 +47,8 @@ function eofy_actions(now,      past, allocated_profits,
   if (ALLOCATED != ADJUSTMENTS) {
     allocated_profits = get_cost(ALLOCATED, just_before(now))
     set_cost(ALLOCATED, allocated_profits, now)
-@ifeq LOG balance_journal
-  printf "EOFY Actions\n" > STDERR
-  printf "\tDate => %s\n", get_date(now) > STDERR
+@ifeq LOG eofy_actions
   printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
-  printf "\tADJUSTMENTS => %14s\n", print_cash(get_cost(ADJUSTMENTS, now)) > STDERR
-
 @endif
   }
   set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", just_before(now)), now)
@@ -67,11 +63,8 @@ function eofy_actions(now,      past, allocated_profits,
   # Realized gains report
   get_capital_gains(now, past, Show_Extra)
 
-  # And deferred gains
-  #get_deferred_gains(now, past, Show_Extra)
-
   # Print Market Gains
-  print_market_gains(now, past, Show_Extra)
+  get_market_gains(now, past, Show_Extra)
 
   # Print the depreciation schedule
   print_depreciating_holdings(just_after(now), past, Show_Extra)
@@ -467,21 +460,18 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
   # If these are not realized gains
   if (!is_realized_flag) {
-
+    printf "\n" > reports_stream
+    underline(44, 8, reports_stream)
+    printf "\t%27s => %14s\n", "Market Gains",
+                               print_cash(- sum_long_gains - sum_short_gains) > reports_stream
+    printf "\t%27s => %14s\n", "Market Losses",
+                               print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
     # Get the deferred taxable gains
     apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
 
-    printf "\t%27s => %14s\n", "Taxable Deferred Gains",
-                               print_cash(- sum_long_gains - sum_short_gains) > reports_stream
-    printf "\t%27s => %14s\n", "Taxable Deferred Losses",
-                               print_cash(sum_long_losses + sum_short_losses) > reports_stream
-
-    printf "\nAfter Application of Any Losses\n" > reports_stream
-    ##printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
-
      # All done
-     underline(43, 8, reports_stream)
+     underline(44, 8, reports_stream)
   }
 
   printf "\n" > reports_stream
@@ -917,44 +907,44 @@ function get_carried_losses(now, losses, limit,
   return carry_losses(now)
 }
 
-# Compute the deferred gains
-# And print out a schedule
+# # Compute the deferred gains
+# # And print out a schedule
+# #
+# function get_deferred_gains(now, past, is_detailed,       accounting_gains, reports_stream,
+#                                                           gains, losses) {
 #
-function get_deferred_gains(now, past, is_detailed,       accounting_gains, reports_stream,
-                                                          gains, losses) {
-
- # The reports_stream is the pipe to write the schedule out to
- reports_stream = report_deferred(EOFY)
-
- # First print the gains out in detail
- accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
- losses = Gains_Stack[Long_Losses_Key]
- gains  = Gains_Stack[Long_Gains_Key]
- delete Gains_Stack
-
- # Print the deferred gains report
- print Journal_Title > reports_stream
- printf "Deferred Gains Report for Period Ending %s\n", get_date(yesterday(now))  > reports_stream
-
- # Print Capital Gains & Losses
- underline(44, 8, reports_stream)
-
- printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
- printf "\t%27s => %14s\n", "Taxable Deferred Gains",
-                            print_cash(- gains) > reports_stream
- printf "\t%27s => %14s\n", "Taxable Deferred Losses",
-                            print_cash(losses) > reports_stream
-
- printf "\nAfter Application of Any Losses\n" > reports_stream
-
- # Get the deferred taxable gains
- apply_losses(now, reports_stream, "Deferred", gains, losses, DEFERRED_GAINS)
-
-  # All done
-  underline(43, 8, reports_stream)
-  print "\n" > reports_stream
-
-} # End of deferred gains
+#  # The reports_stream is the pipe to write the schedule out to
+#  reports_stream = report_deferred(EOFY)
+#
+#  # First print the gains out in detail
+#  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
+#  losses = Gains_Stack[Long_Losses_Key]
+#  gains  = Gains_Stack[Long_Gains_Key]
+#  delete Gains_Stack
+#
+#  # Print the deferred gains report
+#  print Journal_Title > reports_stream
+#  printf "Deferred Gains Report for Period Ending %s\n", get_date(yesterday(now))  > reports_stream
+#
+#  # Print Capital Gains & Losses
+#  underline(44, 8, reports_stream)
+#
+#  printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
+#  printf "\t%27s => %14s\n", "Taxable Deferred Gains",
+#                             print_cash(- gains) > reports_stream
+#  printf "\t%27s => %14s\n", "Taxable Deferred Losses",
+#                             print_cash(losses) > reports_stream
+#
+#  printf "\nAfter Application of Any Losses\n" > reports_stream
+#
+#  # Get the deferred taxable gains
+#  apply_losses(now, reports_stream, "Deferred", gains, losses, DEFERRED_GAINS)
+#
+#   # All done
+#   underline(43, 8, reports_stream)
+#   print "\n" > reports_stream
+#
+# } # End of deferred gains
 
 # Print out operating statement
 function print_operating_statement(now, past, is_detailed,     reports_stream,
@@ -1237,14 +1227,14 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 }
 
 # Print the holdings at time now
-function print_market_gains(now, past, is_detailed,    reports_stream) {
+function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
    reports_stream = report_market(EOFY)
 
    # First print the gains out in detail
-     print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
-     delete Gains_Stack
+   print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
+   delete Gains_Stack
 }
 
 # Compute annual depreciation

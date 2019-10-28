@@ -45,6 +45,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Control Export format
 
 
@@ -91,9 +93,6 @@ END {
 
 
 # // Default Reports
-
-
-
 
 
 
@@ -2603,11 +2602,8 @@ function eofy_actions(now,      past, allocated_profits,
   # Realized gains report
   get_capital_gains(now, past, Show_Extra)
 
-  # And deferred gains
-  #get_deferred_gains(now, past, Show_Extra)
-
   # Print Market Gains
-  print_market_gains(now, past, Show_Extra)
+  get_market_gains(now, past, Show_Extra)
 
   # Print the depreciation schedule
   print_depreciating_holdings(((now) + 1), past, Show_Extra)
@@ -3003,18 +2999,15 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
   # If these are not realized gains
   if (!is_realized_flag) {
-
+    printf "\n" > reports_stream
+    underline(43, 8, reports_stream)
+    printf "\t%27s => %14s\n", "Market Gains",
+                               print_cash(- sum_long_gains - sum_short_gains) > reports_stream
+    printf "\t%27s => %14s\n", "Market Losses",
+                               print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
     # Get the deferred taxable gains
     apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
-
-    printf "\t%27s => %14s\n", "Taxable Deferred Gains",
-                               print_cash(- sum_long_gains - sum_short_gains) > reports_stream
-    printf "\t%27s => %14s\n", "Taxable Deferred Losses",
-                               print_cash(sum_long_losses + sum_short_losses) > reports_stream
-
-    printf "\nAfter Application of Any Losses\n" > reports_stream
-    ##printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
 
      # All done
      underline(43, 8, reports_stream)
@@ -3142,7 +3135,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3443,44 +3436,44 @@ function get_carried_losses(now, losses, limit,
   return ((now in Remaining_Losses)?( ((__MPX_KEY__ = first_key(Remaining_Losses[now]))?( Remaining_Losses[now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Remaining_Losses[now][0]):( 0))))):( 0))
 }
 
-# Compute the deferred gains
-# And print out a schedule
+# # Compute the deferred gains
+# # And print out a schedule
+# #
+# function get_deferred_gains(now, past, is_detailed,       accounting_gains, reports_stream,
+#                                                           gains, losses) {
 #
-function get_deferred_gains(now, past, is_detailed,       accounting_gains, reports_stream,
-                                                          gains, losses) {
-
- # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
-
- # First print the gains out in detail
- accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
- losses = Gains_Stack[Long_Losses_Key]
- gains  = Gains_Stack[Long_Gains_Key]
- delete Gains_Stack
-
- # Print the deferred gains report
- print Journal_Title > reports_stream
- printf "Deferred Gains Report for Period Ending %s\n", get_date(yesterday(now))  > reports_stream
-
- # Print Capital Gains & Losses
- underline(44, 8, reports_stream)
-
- printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
- printf "\t%27s => %14s\n", "Taxable Deferred Gains",
-                            print_cash(- gains) > reports_stream
- printf "\t%27s => %14s\n", "Taxable Deferred Losses",
-                            print_cash(losses) > reports_stream
-
- printf "\nAfter Application of Any Losses\n" > reports_stream
-
- # Get the deferred taxable gains
- apply_losses(now, reports_stream, "Deferred", gains, losses, DEFERRED_GAINS)
-
-  # All done
-  underline(43, 8, reports_stream)
-  print "\n" > reports_stream
-
-} # End of deferred gains
+#  # The reports_stream is the pipe to write the schedule out to
+#  reports_stream = report_deferred(EOFY)
+#
+#  # First print the gains out in detail
+#  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
+#  losses = Gains_Stack[Long_Losses_Key]
+#  gains  = Gains_Stack[Long_Gains_Key]
+#  delete Gains_Stack
+#
+#  # Print the deferred gains report
+#  print Journal_Title > reports_stream
+#  printf "Deferred Gains Report for Period Ending %s\n", get_date(yesterday(now))  > reports_stream
+#
+#  # Print Capital Gains & Losses
+#  underline(44, 8, reports_stream)
+#
+#  printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
+#  printf "\t%27s => %14s\n", "Taxable Deferred Gains",
+#                             print_cash(- gains) > reports_stream
+#  printf "\t%27s => %14s\n", "Taxable Deferred Losses",
+#                             print_cash(losses) > reports_stream
+#
+#  printf "\nAfter Application of Any Losses\n" > reports_stream
+#
+#  # Get the deferred taxable gains
+#  apply_losses(now, reports_stream, "Deferred", gains, losses, DEFERRED_GAINS)
+#
+#   # All done
+#   underline(43, 8, reports_stream)
+#   print "\n" > reports_stream
+#
+# } # End of deferred gains
 
 # Print out operating statement
 function print_operating_statement(now, past, is_detailed,     reports_stream,
@@ -3493,7 +3486,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3633,7 +3626,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3763,14 +3756,14 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 }
 
 # Print the holdings at time now
-function print_market_gains(now, past, is_detailed,    reports_stream) {
+function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
-     print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
-     delete Gains_Stack
+   print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
+   delete Gains_Stack
 }
 
 # Compute annual depreciation
@@ -3839,7 +3832,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3974,7 +3967,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4467,7 +4460,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4988,7 +4981,6 @@ function income_tax_aud(now, past, benefits,
   # If this is an SMSF this disturbs the member liabilities
   # Adjust cost is OK because ALLOCATED/ADJUSTMENTS were reset at comencement of eofy_actions
   # For a none SMSF this is a synonym for ADJUSTMENTS
-
   adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
 
   # Print out the tax and capital losses carried forward
@@ -5056,10 +5048,7 @@ function income_tax_aud(now, past, benefits,
       # For a none SMSF this is a synonym for ADJUSTMENTS
       adjust_cost(ALLOCATED, x, now)
     }
-  } else
-    x = 0
-
-
+  } 
 
   # Set tax values to zero - is this needed?
   set_cost(PAYG, 0, now)
@@ -5256,7 +5245,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[iI]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5401,8 +5390,8 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
   balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 
-  # Verbose balance printing
-  show_balance = (1)
+  # No default printing
+  show_balance = (0)
 
 
   # Is there an error?
@@ -5433,13 +5422,8 @@ function update_profits_smsf(now,     delta_profits) {
   delta_profits = (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now)
   if (!(((delta_profits) <= Epsilon) && ((delta_profits) >= -Epsilon))) {
 
-
     # Update the Allocated Profits
-    #adjust_cost(ALLOCATED, delta_profits, now, FALSE)
-    set_cost(ALLOCATED, (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)), now, (0))
-
-
-
+    adjust_cost(ALLOCATED, delta_profits, now, (0))
 
     # Update the liabilities
     update_member_liability_smsf(now, delta_profits)
@@ -5992,7 +5976,7 @@ function import_csv_data(array, symbol, name,
   if ("" == EOFY_Window) {
     # Dividend Qualification Window is not yet set
     if ("" == Qualification_Window)
-      Qualification_Window = (0) # Units in days
+      Qualification_Window = (91) # Units in days
 
     # Qualification_Window is set, but since EOFY_Window is unset the units are days
     Qualification_Window *= (86400)
@@ -7450,7 +7434,7 @@ function save_parcel_gain(a, p, now, x,       held_time) {
         Short_Losses[a] = initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SL." Leaf[a])
       adjust_cost(Short_Losses[a], x, now)
     }
-  } else if (((x) < -Epsilon))s
+  } else if (((x) < -Epsilon))
     adjust_cost(REALIZED_GAINS, x, now)
 
   # Taxable gains
@@ -7569,8 +7553,8 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
 
 
-  # Verbose balance printing
-  show_balance = (1)
+  # No default printing
+  show_balance = (0)
 
 
   # Is there an error?

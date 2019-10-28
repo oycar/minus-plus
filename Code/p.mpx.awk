@@ -2054,7 +2054,7 @@ function save_parcel_gain(a, p, now, x,       held_time) {
         Short_Losses[a] = initialize_account(SHORT_LOSSES ":SL." Leaf[a])
       adjust_cost(Short_Losses[a], x, now)
     }
-  } else if (below_zero(x))s
+  } else if (below_zero(x))
     adjust_cost(REALIZED_GAINS, x, now)
 
   # Taxable gains

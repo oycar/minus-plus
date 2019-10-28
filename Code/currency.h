@@ -31,7 +31,7 @@
 # // Add localized State Variables & Scalars
 @define MPX_ARRAYS (SHARED_ARRAYS " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
 @define MPX_SCALARS (SHARED_SCALARS " Balance_Profits_Function Check_Balance_Function ")
-@define QUALIFICATION_WINDOW (0)
+@define QUALIFICATION_WINDOW (91)
 
 # // Carry Forward & Write Back Limits in Years
 # // @defeval CARRY_FORWARD_LIMIT  (0)

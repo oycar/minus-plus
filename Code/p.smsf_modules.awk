@@ -35,16 +35,12 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 
 @ifeq LOG balance_journal
   # Track reserve and accumulated profits
-  printf "EOFY Balance Journal\n\tDate => %s\n", get_date(now) > "/dev/stderr"
+  printf "EOFY Balance Journal\n\tDate => %s\n", get_date(now) > STDERR
   printf "\tDeferred Tax           => %14s\n", print_cash(get_cost(DEFERRED, now)) > STDERR
-  printf "\tInitial Allocation     => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
-  printf "\tAccumulated Profits    => %14s\n", print_cash(accumulated_profits(now)) > "/dev/stderr"
-  printf "\t\t Contributions => %14s\n", print_cash(get_cost("*INCOME.CONTRIBUTION",now)) > "/dev/stderr"
-  printf "\t\t Benefits      => %14s\n", print_cash(get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now)) > "/dev/stderr"
-  printf "\t\t Income        => %14s\n", print_cash(- get_cost("*INCOME",now)) > "/dev/stderr"
-  printf "\t\t Expense       => %14s\n", print_cash(- get_cost("*EXPENSE",now)) > "/dev/stderr"
-  printf "\tDelta Profits          => %14s\n", print_cash(delta_profits) > "/dev/stderr"
-  printf "\tAllocated Profits      => %14s\n\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
+  printf "\tInitial Allocation     => %14s\n", print_cash(initial_allocation) > STDERR
+  printf "\tAccumulated Profits    => %14s\n", print_cash(accumulated_profits(now)) > STDERR
+  printf "\tDelta Profits          => %14s\n", print_cash(delta_profits) > STDERR
+  printf "\tAllocated Profits      => %14s\n\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
 @endif
 
   # Update the allocation - a get is before the set
@@ -56,11 +52,8 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   x = get_cost(ALLOCATED, now) - get_cost(ALLOCATED, past)
 @ifeq LOG balance_journal
   # Track reserve
-  printf "\tNew Allocated Profits      => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
-  printf "\tMarket Changes             => %14s\n", print_cash(get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)) > "/dev/stderr"
-  printf "\tAllocated but not Applied  => %14s\n", print_cash(get_cost(ALLOCATED, now) - initial_allocation + \
-                                                           get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)) > "/dev/stderr"
-  printf "\tChange in Profits to Apply => %14s\n", print_cash(x) > "/dev/stderr"
+  printf "\tNew Allocated Profits      => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+  printf "\tChange in Profits to Apply => %14s\n", print_cash(x) > STDERR
 @endif
 
   # Apply actual profits to the reserve
@@ -73,8 +66,8 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
     adjust_cost(RESERVE, -x, now)
 @ifeq LOG balance_journal
     # Track reserve
-    printf "\tApplied to Reserve         => %14s\n", print_cash(-x) > "/dev/stderr"
-    #printf "\tApplied to Members         => %14s\n", print_cash(-delta_profits) > "/dev/stderr"
+    printf "\tApplied to Reserve         => %14s\n", print_cash(-x) > STDERR
+    #printf "\tApplied to Members         => %14s\n", print_cash(-delta_profits) > STDERR
 @endif
   } else
     x = 0
@@ -89,10 +82,10 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   adjust_cost(ALLOCATED, accumulated_profits(now) - get_cost(ALLOCATED, now), now)
 @ifeq LOG balance_journal
   # Track reserve
-#  printf "\tPreviously Allocated       => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
-  printf "\tApplied to Members         => %14s\n", print_cash(delta_profits) > "/dev/stderr"
-  printf "\tUnallocated Profits        => %14s\n", print_cash(accumulated_profits(now) - get_cost(ALLOCATED, now)) > "/dev/stderr"
-  printf "\tFinal Allocated            => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
+#  printf "\tPreviously Allocated       => %14s\n", print_cash(initial_allocation) > STDERR
+  printf "\tApplied to Members         => %14s\n", print_cash(delta_profits) > STDERR
+  printf "\tUnallocated Profits        => %14s\n", print_cash(accumulated_profits(now) - get_cost(ALLOCATED, now)) > STDERR
+  printf "\tFinal Allocated            => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
 @endif
 }
 
@@ -149,26 +142,9 @@ function update_profits_smsf(now,     delta_profits) {
   # These are the profits accumulated since the last time they were distributed to members
   delta_profits = accumulated_profits(now) - get_cost(ALLOCATED, now)
   if (!near_zero(delta_profits)) {
-@ifeq LOG balance_journal
-    printf "Update_Profits\n" > STDERR
-    printf "\tDate => %s\n", get_date(now) > STDERR
-    printf "\tALLOCATED       => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
-    printf "\tAccumulated Profits    => %14s\n", print_cash(accumulated_profits(now)) > "/dev/stderr"
-    printf "\t\t Contributions => %14s\n", print_cash(get_cost("*INCOME.CONTRIBUTION",now)) > "/dev/stderr"
-    printf "\t\t Benefits      => %14s\n", print_cash(get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now)) > "/dev/stderr"
-    printf "\t\t Income        => %14s\n", print_cash(- get_cost("*INCOME",now)) > "/dev/stderr"
-    printf "\t\t Expense       => %14s\n", print_cash(- get_cost("*EXPENSE",now)) > "/dev/stderr"
-@endif
 
     # Update the Allocated Profits
-    #adjust_cost(ALLOCATED, delta_profits, now, FALSE)
-    set_cost(ALLOCATED, accumulated_profits(now), now, FALSE)
-
-@ifeq LOG balance_journal
-    printf "\tDelta Profits   => %14s\n", print_cash(delta_profits) > STDERR
-    printf "\tALLOCATED       => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
-@endif
-
+    adjust_cost(ALLOCATED, delta_profits, now, FALSE)
 
     # Update the liabilities
     update_member_liability_smsf(now, delta_profits)
