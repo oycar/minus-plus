@@ -384,35 +384,31 @@ function copy_entries(array, target_array, key) {
 }
 
 # Remove all keys before limit
-function remove_keys(array, limit,   key, x, did_remove) {
-  did_remove = FALSE
-  x = 0
+function remove_keys(array, limit,   key, removed_value) {
+  removed_value = ""
 
   # Get each key
   for (key in array) {
-    if (did_remove)
+    if (removed_value)
       delete array[key]
     else {
-      # May not be before the limit
-      x = key - limit # Force numeric comparison
-      if (below_zero(x)) {
+      # Force numeric comparison
+      if (less_than(key, limit)) {
         # The first key before the limit
         # Save the first trimmed value
-        x = array[key]
-        did_remove = TRUE
+        removed_value = array[key]
         delete array[key]
       }
     }
   } # All keys processed
 
-  # If no earlier keys were found sum is zero
-  if (!did_remove)
-    x = 0
-  else {
+  # If removed value is set rebase all entries
+  if (removed_value)
     # Correct the remaining values
-    did_remove = remove_entries(array, x)
-    assert(!did_remove, "remove_keys: Found unexpected negative entries in array")
-  }
+    remove_entries(array, removed_value)
+
+  # Return the adjustment
+  return removed_value
 }
 
 # A function to find the maximum value in a bracketed window

@@ -475,9 +475,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   }
 
   printf "\n" > reports_stream
-
-
-
   return accounting_gains
 } # End of print gains
 
@@ -762,7 +759,7 @@ function get_capital_gains(now, past, is_detailed,
     print "\n" > reports_stream
 
     # If the total capital losses are non zero at the EOFY they must be carried losses
-    carried_losses = get_carried_losses(now, adjusted_gains, CARRY_FORWARD_LIMIT)
+    carried_losses = get_carried_losses(now, adjusted_gains, CARRY_FORWARD_LIMIT, reports_stream)
     if (above_zero(carried_losses))
       printf "\t%27s => %14s\n", "Losses Carried Forward", print_cash(carried_losses) > reports_stream
     else {
@@ -858,23 +855,41 @@ function apply_losses(now, reports_stream, label,
 }
 
 # Get the carried losses - limit how many years a loss can be carried forward
-function get_carried_losses(now, losses, limit,
-                            reports_stream,
+function get_carried_losses(now, losses, limit, reports_stream,
                             past,
                             key) {
 
-  # New Version
   #
-  # Accounts
-  # Remaining_Losses[Now] => Total losses (and maybe gains) in year Now
+  # Remaining_Losses[Now] => Total losses (and maybe gains) in year
   # They have a non-standard double dependence on time
+  #
+
+  # Don't use losses prior to (now - limit) if limit is set
+  if (limit)
+    # Set the limiting time
+    # The passed limit is in units of years
+    limit = now - one_year(now, - limit)
+
   # There would be need to be one set per currency
   past = find_key(Remaining_Losses, just_before(now))
 
   # If there are already earlier losses copy them
-  if (past in Remaining_Losses)
+  if (past in Remaining_Losses) {
     for (key in Remaining_Losses[past])
+      # Copy the most recent set of losses
       Remaining_Losses[now][key] = Remaining_Losses[past][key]
+
+    # If limit is set remove any keys older than limit in latest version
+    if (limit && now in Remaining_Losses) {
+      key = remove_keys(Remaining_Losses[now], limit)
+
+      # Record this
+      if (key && not_zero(key)) {
+        printf "\t%27s => %14s\n", "Losses Prior To",  get_date(limit) > reports_stream
+        printf "\t%27s => %14s\n", "Losses Cancelled",  print_cash(key) > reports_stream
+      }
+    }
+  }
 
   # If there are gains cancel the earliest losses
   if (below_zero(losses)) {
@@ -907,44 +922,6 @@ function get_carried_losses(now, losses, limit,
   return carry_losses(now)
 }
 
-# # Compute the deferred gains
-# # And print out a schedule
-# #
-# function get_deferred_gains(now, past, is_detailed,       accounting_gains, reports_stream,
-#                                                           gains, losses) {
-#
-#  # The reports_stream is the pipe to write the schedule out to
-#  reports_stream = report_deferred(EOFY)
-#
-#  # First print the gains out in detail
-#  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
-#  losses = Gains_Stack[Long_Losses_Key]
-#  gains  = Gains_Stack[Long_Gains_Key]
-#  delete Gains_Stack
-#
-#  # Print the deferred gains report
-#  print Journal_Title > reports_stream
-#  printf "Deferred Gains Report for Period Ending %s\n", get_date(yesterday(now))  > reports_stream
-#
-#  # Print Capital Gains & Losses
-#  underline(44, 8, reports_stream)
-#
-#  printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
-#  printf "\t%27s => %14s\n", "Taxable Deferred Gains",
-#                             print_cash(- gains) > reports_stream
-#  printf "\t%27s => %14s\n", "Taxable Deferred Losses",
-#                             print_cash(losses) > reports_stream
-#
-#  printf "\nAfter Application of Any Losses\n" > reports_stream
-#
-#  # Get the deferred taxable gains
-#  apply_losses(now, reports_stream, "Deferred", gains, losses, DEFERRED_GAINS)
-#
-#   # All done
-#   underline(43, 8, reports_stream)
-#   print "\n" > reports_stream
-#
-# } # End of deferred gains
 
 # Print out operating statement
 function print_operating_statement(now, past, is_detailed,     reports_stream,

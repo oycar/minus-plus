@@ -319,7 +319,6 @@ END {
 
 
 # // Carry Forward & Write Back Limits in Years
-# // @defeval CARRY_FORWARD_LIMIT  (0)
 
 
 
@@ -706,35 +705,31 @@ function copy_entries(array, target_array, key) {
 }
 
 # Remove all keys before limit
-function remove_keys(array, limit,   key, x, did_remove) {
-  did_remove = (0)
-  x = 0
+function remove_keys(array, limit,   key, removed_value) {
+  removed_value = ""
 
   # Get each key
   for (key in array) {
-    if (did_remove)
+    if (removed_value)
       delete array[key]
     else {
-      # May not be before the limit
-      x = key - limit # Force numeric comparison
-      if (((x) < -Epsilon)) {
+      # Force numeric comparison
+      if (((key -  limit) < 0)) {
         # The first key before the limit
         # Save the first trimmed value
-        x = array[key]
-        did_remove = (1)
+        removed_value = array[key]
         delete array[key]
       }
     }
   } # All keys processed
 
-  # If no earlier keys were found sum is zero
-  if (!did_remove)
-    x = 0
-  else {
+  # If removed value is set rebase all entries
+  if (removed_value)
     # Correct the remaining values
-    did_remove = remove_entries(array, x)
-    assert(!did_remove, "remove_keys: Found unexpected negative entries in array")
-  }
+    remove_entries(array, removed_value)
+
+  # Return the adjustment
+  return removed_value
 }
 
 # A function to find the maximum value in a bracketed window
@@ -3000,7 +2995,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   # If these are not realized gains
   if (!is_realized_flag) {
     printf "\n" > reports_stream
-    underline(43, 8, reports_stream)
+    underline(44, 8, reports_stream)
     printf "\t%27s => %14s\n", "Market Gains",
                                print_cash(- sum_long_gains - sum_short_gains) > reports_stream
     printf "\t%27s => %14s\n", "Market Losses",
@@ -3010,13 +3005,10 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
     apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
 
      # All done
-     underline(43, 8, reports_stream)
+     underline(44, 8, reports_stream)
   }
 
   printf "\n" > reports_stream
-
-
-
   return accounting_gains
 } # End of print gains
 
@@ -3135,7 +3127,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("C" ~ /[cC]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3298,7 +3290,7 @@ function get_capital_gains(now, past, is_detailed,
     print "\n" > reports_stream
 
     # If the total capital losses are non zero at the EOFY they must be carried losses
-    carried_losses = get_carried_losses(now, adjusted_gains, (0))
+    carried_losses = get_carried_losses(now, adjusted_gains, (1), reports_stream)
     if (((carried_losses) >  Epsilon))
       printf "\t%27s => %14s\n", "Losses Carried Forward", print_cash(carried_losses) > reports_stream
     else {
@@ -3394,23 +3386,41 @@ function apply_losses(now, reports_stream, label,
 }
 
 # Get the carried losses - limit how many years a loss can be carried forward
-function get_carried_losses(now, losses, limit,
-                            reports_stream,
+function get_carried_losses(now, losses, limit, reports_stream,
                             past,
                             key) {
 
-  # New Version
   #
-  # Accounts
-  # Remaining_Losses[Now] => Total losses (and maybe gains) in year Now
+  # Remaining_Losses[Now] => Total losses (and maybe gains) in year
   # They have a non-standard double dependence on time
+  #
+
+  # Don't use losses prior to (now - limit) if limit is set
+  if (limit)
+    # Set the limiting time
+    # The passed limit is in units of years
+    limit = now - one_year(now, - limit)
+
   # There would be need to be one set per currency
   past = find_key(Remaining_Losses, ((now) - 1))
 
   # If there are already earlier losses copy them
-  if (past in Remaining_Losses)
+  if (past in Remaining_Losses) {
     for (key in Remaining_Losses[past])
+      # Copy the most recent set of losses
       Remaining_Losses[now][key] = Remaining_Losses[past][key]
+
+    # If limit is set remove any keys older than limit in latest version
+    if (limit && now in Remaining_Losses) {
+      key = remove_keys(Remaining_Losses[now], limit)
+
+      # Record this
+      if (key && (((key) > Epsilon) || ((key) < -Epsilon))) {
+        printf "\t%27s => %14s\n", "Losses Prior To",  get_date(limit) > reports_stream
+        printf "\t%27s => %14s\n", "Losses Cancelled",  print_cash(key) > reports_stream
+      }
+    }
+  }
 
   # If there are gains cancel the earliest losses
   if (((losses) < -Epsilon)) {
@@ -3486,7 +3496,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("C" ~ /[oO]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3626,7 +3636,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("C" ~ /[bB]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3759,7 +3769,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("C" ~ /[mM]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3832,7 +3842,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("C" ~ /[dD]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3967,7 +3977,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("C" ~ /[qQ]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4460,7 +4470,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("C" ~ /[tT]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -5245,7 +5255,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[iI]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("C" ~ /[iI]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
