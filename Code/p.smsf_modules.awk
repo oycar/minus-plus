@@ -153,10 +153,16 @@ function update_profits_smsf(now,     delta_profits) {
     printf "Update_Profits\n" > STDERR
     printf "\tDate => %s\n", get_date(now) > STDERR
     printf "\tALLOCATED       => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+    printf "\tAccumulated Profits    => %14s\n", print_cash(accumulated_profits(now)) > "/dev/stderr"
+    printf "\t\t Contributions => %14s\n", print_cash(get_cost("*INCOME.CONTRIBUTION",now)) > "/dev/stderr"
+    printf "\t\t Benefits      => %14s\n", print_cash(get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now)) > "/dev/stderr"
+    printf "\t\t Income        => %14s\n", print_cash(- get_cost("*INCOME",now)) > "/dev/stderr"
+    printf "\t\t Expense       => %14s\n", print_cash(- get_cost("*EXPENSE",now)) > "/dev/stderr"
 @endif
 
     # Update the Allocated Profits
-    adjust_cost(ALLOCATED, delta_profits, now, FALSE)
+    #adjust_cost(ALLOCATED, delta_profits, now, FALSE)
+    set_cost(ALLOCATED, accumulated_profits(now), now, FALSE)
 
 @ifeq LOG balance_journal
     printf "\tDelta Profits   => %14s\n", print_cash(delta_profits) > STDERR

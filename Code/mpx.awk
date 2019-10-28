@@ -104,6 +104,8 @@ END {
 
 
 
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -2588,11 +2590,6 @@ function eofy_actions(now,      past, allocated_profits,
     allocated_profits = get_cost(ALLOCATED, ((now) - 1))
     set_cost(ALLOCATED, allocated_profits, now)
 
-  printf "EOFY Actions\n" > "/dev/stderr"
-  printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
-  printf "\tADJUSTMENTS => %14s\n", print_cash(get_cost(ADJUSTMENTS, now)) > "/dev/stderr"
-
-
   }
   set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", ((now) - 1)), now)
 
@@ -3145,7 +3142,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3453,7 +3450,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -3496,7 +3493,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3636,7 +3633,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3769,7 +3766,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
      print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3842,7 +3839,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[fF]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[fF]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3977,7 +3974,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4470,7 +4467,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4992,13 +4989,7 @@ function income_tax_aud(now, past, benefits,
   # Adjust cost is OK because ALLOCATED/ADJUSTMENTS were reset at comencement of eofy_actions
   # For a none SMSF this is a synonym for ADJUSTMENTS
 
-  printf "Income Tax\n" > "/dev/stderr"
-  printf "\tALLOCATED       => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
-
   adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
-
-  printf "\tTax Adjustments => %14s\n", print_cash(-(tax_cont + tax_owed - get_cost(FRANKING_TAX, now))) > "/dev/stderr"
-  printf "\tALLOCATED       => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
@@ -5055,17 +5046,6 @@ function income_tax_aud(now, past, benefits,
     set_cost(DEFERRED, - deferred_tax, now)
 
 
-    printf "Deferred Tax Adjustment\n" > "/dev/stderr"
-    if (((deferred_tax) >  Epsilon))
-      printf "\t%40s %32s\n", "Deferred Tax Liability", print_cash(deferred_tax) > write_stream
-    else if (((deferred_tax) < -Epsilon))
-      printf "\t%40s %32s\n", "Deferred Tax Asset    ", print_cash(deferred_tax) > write_stream
-    else {
-      deferred_tax = 0
-      printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > write_stream
-    }
-    printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
-
 
     # Get the change this FY
     # If x < 0 EXPENSE
@@ -5079,10 +5059,6 @@ function income_tax_aud(now, past, benefits,
   } else
     x = 0
 
-
-  printf "\tDeferred  => %14s\n", print_cash(get_cost(DEFERRED, now)) > "/dev/stderr"
-  printf "\tAdjustent => %14s\n", print_cash(x) > "/dev/stderr"
-  printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
 
 
   # Set tax values to zero - is this needed?
@@ -5280,7 +5256,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5373,18 +5349,6 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   delta_profits = (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - initial_allocation
 
 
-  # Track reserve and accumulated profits
-  printf "EOFY Balance Journal\n\tDate => %s\n", get_date(now) > "/dev/stderr"
-  printf "\tDeferred Tax           => %14s\n", print_cash(get_cost(DEFERRED, now)) > "/dev/stderr"
-  printf "\tInitial Allocation     => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
-  printf "\tAccumulated Profits    => %14s\n", print_cash((get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now))) > "/dev/stderr"
-  printf "\t\t Contributions => %14s\n", print_cash(get_cost("*INCOME.CONTRIBUTION",now)) > "/dev/stderr"
-  printf "\t\t Benefits      => %14s\n", print_cash(get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now)) > "/dev/stderr"
-  printf "\t\t Income        => %14s\n", print_cash(- get_cost("*INCOME",now)) > "/dev/stderr"
-  printf "\t\t Expense       => %14s\n", print_cash(- get_cost("*EXPENSE",now)) > "/dev/stderr"
-  printf "\tDelta Profits          => %14s\n", print_cash(delta_profits) > "/dev/stderr"
-  printf "\tAllocated Profits      => %14s\n\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
-
 
   # Update the allocation - a get is before the set
   if (!(((delta_profits) <= Epsilon) && ((delta_profits) >= -Epsilon)))
@@ -5393,12 +5357,6 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 
   # Also make adjustments to the reserve - use the updated Allocation
   x = get_cost(ALLOCATED, now) - get_cost(ALLOCATED, past)
-
-  # Track reserve
-  printf "\tNew Allocated Profits      => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
-  printf "\tMarket Changes             => %14s\n", print_cash(get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)) > "/dev/stderr"
-  printf "\tAllocated but not Applied  => %14s\n", print_cash(get_cost(ALLOCATED, now) - initial_allocation +                                                            get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)) > "/dev/stderr"
-  printf "\tChange in Profits to Apply => %14s\n", print_cash(x) > "/dev/stderr"
 
 
   # Apply actual profits to the reserve
@@ -5409,10 +5367,6 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 
     # The only reserve set in eofy actions so use now
     adjust_cost(RESERVE, -x, now)
-
-    # Track reserve
-    printf "\tApplied to Reserve         => %14s\n", print_cash(-x) > "/dev/stderr"
-    #printf "\tApplied to Members         => %14s\n", print_cash(-delta_profits) > "/dev/stderr"
 
   } else
     x = 0
@@ -5425,12 +5379,6 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 
   # Unallocated expenses/income
   adjust_cost(ALLOCATED, (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now), now)
-
-  # Track reserve
-#  printf "\tPreviously Allocated       => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
-  printf "\tApplied to Members         => %14s\n", print_cash(delta_profits) > "/dev/stderr"
-  printf "\tUnallocated Profits        => %14s\n", print_cash((get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now)) > "/dev/stderr"
-  printf "\tFinal Allocated            => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
 
 }
 
@@ -5453,8 +5401,8 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
   balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 
-  # No default printing
-  show_balance = (0)
+  # Verbose balance printing
+  show_balance = (1)
 
 
   # Is there an error?
@@ -5484,8 +5432,14 @@ function update_profits_smsf(now,     delta_profits) {
   # These are the profits accumulated since the last time they were distributed to members
   delta_profits = (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now)
   if (!(((delta_profits) <= Epsilon) && ((delta_profits) >= -Epsilon))) {
+
+
     # Update the Allocated Profits
-    adjust_cost(ALLOCATED, delta_profits, now, (0))
+    #adjust_cost(ALLOCATED, delta_profits, now, FALSE)
+    set_cost(ALLOCATED, (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)), now, (0))
+
+
+
 
     # Update the liabilities
     update_member_liability_smsf(now, delta_profits)
@@ -6038,7 +5992,7 @@ function import_csv_data(array, symbol, name,
   if ("" == EOFY_Window) {
     # Dividend Qualification Window is not yet set
     if ("" == Qualification_Window)
-      Qualification_Window = (91) # Units in days
+      Qualification_Window = (0) # Units in days
 
     # Qualification_Window is set, but since EOFY_Window is unset the units are days
     Qualification_Window *= (86400)
@@ -7615,8 +7569,8 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
 
 
-  # No default printing
-  show_balance = (0)
+  # Verbose balance printing
+  show_balance = (1)
 
 
   # Is there an error?
