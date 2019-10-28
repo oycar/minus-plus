@@ -50,6 +50,8 @@ function eofy_actions(now,      past, allocated_profits,
 @ifeq LOG balance_journal
   printf "EOFY Actions\n" > STDERR
   printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+  printf "\tADJUSTMENTS => %14s\n", print_cash(get_cost(ADJUSTMENTS, now)) > STDERR
+
 @endif
   }
   set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", just_before(now)), now)

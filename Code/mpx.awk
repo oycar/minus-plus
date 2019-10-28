@@ -2590,6 +2590,8 @@ function eofy_actions(now,      past, allocated_profits,
 
   printf "EOFY Actions\n" > "/dev/stderr"
   printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
+  printf "\tADJUSTMENTS => %14s\n", print_cash(get_cost(ADJUSTMENTS, now)) > "/dev/stderr"
+
 
   }
   set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", ((now) - 1)), now)
@@ -5428,6 +5430,7 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 #  printf "\tPreviously Allocated       => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
   printf "\tApplied to Members         => %14s\n", print_cash(delta_profits) > "/dev/stderr"
   printf "\tUnallocated Profits        => %14s\n", print_cash((get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now)) > "/dev/stderr"
+  printf "\tFinal Allocated            => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
 
 }
 
