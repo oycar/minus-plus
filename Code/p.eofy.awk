@@ -49,6 +49,7 @@ function eofy_actions(now,      past, allocated_profits,
     set_cost(ALLOCATED, allocated_profits, now)
 @ifeq LOG balance_journal
   printf "EOFY Actions\n" > STDERR
+  printf "\tDate => %s\n", get_date(now) > STDERR
   printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
   printf "\tADJUSTMENTS => %14s\n", print_cash(get_cost(ADJUSTMENTS, now)) > STDERR
 

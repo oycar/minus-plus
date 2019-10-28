@@ -149,8 +149,20 @@ function update_profits_smsf(now,     delta_profits) {
   # These are the profits accumulated since the last time they were distributed to members
   delta_profits = accumulated_profits(now) - get_cost(ALLOCATED, now)
   if (!near_zero(delta_profits)) {
+@ifeq LOG balance_journal
+    printf "Update_Profits\n" > STDERR
+    printf "\tDate => %s\n", get_date(now) > STDERR
+    printf "\tALLOCATED       => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+@endif
+
     # Update the Allocated Profits
     adjust_cost(ALLOCATED, delta_profits, now, FALSE)
+
+@ifeq LOG balance_journal
+    printf "\tDelta Profits   => %14s\n", print_cash(delta_profits) > STDERR
+    printf "\tALLOCATED       => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+@endif
+
 
     # Update the liabilities
     update_member_liability_smsf(now, delta_profits)
