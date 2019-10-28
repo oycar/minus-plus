@@ -92,6 +92,7 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 #  printf "\tPreviously Allocated       => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
   printf "\tApplied to Members         => %14s\n", print_cash(delta_profits) > "/dev/stderr"
   printf "\tUnallocated Profits        => %14s\n", print_cash(accumulated_profits(now) - get_cost(ALLOCATED, now)) > "/dev/stderr"
+  printf "\tFinal Allocated            => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
 @endif
 }
 
