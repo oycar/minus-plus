@@ -61,7 +61,7 @@ function eofy_actions(now,      past, allocated_profits,
   get_capital_gains(now, past, Show_Extra)
 
   # And deferred gains
-  get_deferred_gains(now, past, Show_Extra)
+  #get_deferred_gains(now, past, Show_Extra)
 
   # Print Market Gains
   print_market_gains(now, past, Show_Extra)
@@ -451,9 +451,29 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       printf "\n%*s %14s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
       delete Gains_Stack[key]
     }
+
+  # If these are not realized gains
+  if (!is_realized_flag) {
+
+
+    # Get the deferred taxable gains
+    apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
+
+    printf "\t%27s => %14s\n", "Taxable Deferred Gains",
+                               print_cash(- sum_long_gains - sum_short_gains) > reports_stream
+    printf "\t%27s => %14s\n", "Taxable Deferred Losses",
+                               print_cash(sum_long_losses + sum_short_losses) > reports_stream
+
+    printf "\nAfter Application of Any Losses\n" > reports_stream
+    ##printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
+
+     # All done
+     underline(43, 8, reports_stream)
+  }
+
   printf "\n" > reports_stream
 
-  # Try
+
 
   return accounting_gains
 } # End of print gains
@@ -1210,10 +1230,8 @@ function print_market_gains(now, past, is_detailed,    reports_stream) {
    reports_stream = report_market(EOFY)
 
    # First print the gains out in detail
-   if (DEVNULL != reports_stream) {
      print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
      delete Gains_Stack
-  }
 }
 
 # Compute annual depreciation

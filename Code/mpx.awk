@@ -2601,7 +2601,7 @@ function eofy_actions(now,      past, allocated_profits,
   get_capital_gains(now, past, Show_Extra)
 
   # And deferred gains
-  get_deferred_gains(now, past, Show_Extra)
+  #get_deferred_gains(now, past, Show_Extra)
 
   # Print Market Gains
   print_market_gains(now, past, Show_Extra)
@@ -2991,9 +2991,29 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       printf "\n%*s %14s", 143 + asset_width + 8 * is_detailed, key, print_cash(- Gains_Stack[key]) > reports_stream
       delete Gains_Stack[key]
     }
+
+  # If these are not realized gains
+  if (!is_realized_flag) {
+
+
+    # Get the deferred taxable gains
+    apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
+
+    printf "\t%27s => %14s\n", "Taxable Deferred Gains",
+                               print_cash(- sum_long_gains - sum_short_gains) > reports_stream
+    printf "\t%27s => %14s\n", "Taxable Deferred Losses",
+                               print_cash(sum_long_losses + sum_short_losses) > reports_stream
+
+    printf "\nAfter Application of Any Losses\n" > reports_stream
+    ##printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
+
+     # All done
+     underline(43, 8, reports_stream)
+  }
+
   printf "\n" > reports_stream
 
-  # Try
+
 
   return accounting_gains
 } # End of print gains
@@ -3113,7 +3133,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3421,7 +3441,7 @@ function get_deferred_gains(now, past, is_detailed,       accounting_gains, repo
                                                           gains, losses) {
 
  # The reports_stream is the pipe to write the schedule out to
- reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+ reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
  # First print the gains out in detail
  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
@@ -3464,7 +3484,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3604,7 +3624,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3737,13 +3757,11 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function print_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
-   if ("/dev/null" != reports_stream) {
      print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
      delete Gains_Stack
-  }
 }
 
 # Compute annual depreciation
@@ -3812,7 +3830,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[fF]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[fF]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3947,7 +3965,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4440,7 +4458,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4963,9 +4981,12 @@ function income_tax_aud(now, past, benefits,
   # For a none SMSF this is a synonym for ADJUSTMENTS
   adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
 
+    printf "Income Tax Adjustment\n" > "/dev/stderr"
+    printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
+
+
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
-  #capital_losses = get_cost(CARRIED_LOSSES, now)
   capital_losses = ((now in Remaining_Losses)?( ((__MPX_KEY__ = first_key(Remaining_Losses[now]))?( Remaining_Losses[now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Remaining_Losses[now][0]):( 0))))):( 0))
   if (!(((capital_losses) <= Epsilon) && ((capital_losses) >= -Epsilon)))
     printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
@@ -5018,6 +5039,17 @@ function income_tax_aud(now, past, benefits,
     set_cost(DEFERRED, - deferred_tax, now)
 
 
+printf "Deferred Tax Adjustment\n" > "/dev/stderr"
+    if (((deferred_tax) >  Epsilon))
+      printf "\t%40s %32s\n", "Deferred Tax Liability", print_cash(deferred_tax) > write_stream
+    else if (((deferred_tax) < -Epsilon))
+      printf "\t%40s %32s\n", "Deferred Tax Asset    ", print_cash(deferred_tax) > write_stream
+    else {
+      deferred_tax = 0
+      printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > write_stream
+    }
+    printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
+
 
     # Get the change this FY
     # If x < 0 EXPENSE
@@ -5029,6 +5061,13 @@ function income_tax_aud(now, past, benefits,
       adjust_cost(ALLOCATED, x, now)
     }
   }
+
+
+
+printf "\tDeferred  => %14s\n", print_cash(get_cost(DEFERRED, now)) > "/dev/stderr"
+printf "\tAdjustent => %14s\n", print_cash(x) > "/dev/stderr"
+printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > "/dev/stderr"
+
 
   # Set tax values to zero - is this needed?
   set_cost(PAYG, 0, now)
@@ -5225,7 +5264,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("M" ~ /[iI]|[aA]/ && "M" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5320,6 +5359,7 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 
   # Track reserve and accumulated profits
   printf "EOFY Balance Journal\n\tDate => %s\n", get_date(now) > "/dev/stderr"
+  printf "\tDeferred Tax           => %14s\n", print_cash(get_cost(DEFERRED, now)) > "/dev/stderr"
   printf "\tInitial Allocation     => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
   printf "\tAccumulated Profits    => %14s\n", print_cash((get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now))) > "/dev/stderr"
   printf "\t\t Contributions => %14s\n", print_cash(get_cost("*INCOME.CONTRIBUTION",now)) > "/dev/stderr"

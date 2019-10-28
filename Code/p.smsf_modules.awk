@@ -36,6 +36,7 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 @ifeq LOG balance_journal
   # Track reserve and accumulated profits
   printf "EOFY Balance Journal\n\tDate => %s\n", get_date(now) > "/dev/stderr"
+  printf "\tDeferred Tax           => %14s\n", print_cash(get_cost(DEFERRED, now)) > STDERR
   printf "\tInitial Allocation     => %14s\n", print_cash(initial_allocation) > "/dev/stderr"
   printf "\tAccumulated Profits    => %14s\n", print_cash(accumulated_profits(now)) > "/dev/stderr"
   printf "\t\t Contributions => %14s\n", print_cash(get_cost("*INCOME.CONTRIBUTION",now)) > "/dev/stderr"

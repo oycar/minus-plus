@@ -720,6 +720,10 @@ function income_tax_aud(now, past, benefits,
   # Adjust cost is OK because ALLOCATED/ADJUSTMENTS were reset at comencement of eofy_actions
   # For a none SMSF this is a synonym for ADJUSTMENTS
   adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
+@ifeq LOG balance_journal
+    printf "Income Tax Adjustment\n" > STDERR
+    printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+@endif
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
@@ -774,7 +778,8 @@ function income_tax_aud(now, past, benefits,
     deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
     set_cost(DEFERRED, - deferred_tax, now)
 
-@ifeq LOG income_tax
+@ifeq LOG balance_journal
+printf "Deferred Tax Adjustment\n" > STDERR
     if (above_zero(deferred_tax))
       printf "\t%40s %32s\n", "Deferred Tax Liability", print_cash(deferred_tax) > write_stream
     else if (below_zero(deferred_tax))
@@ -783,6 +788,7 @@ function income_tax_aud(now, past, benefits,
       deferred_tax = 0
       printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > write_stream
     }
+    printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
 @endif
 
     # Get the change this FY
@@ -795,6 +801,13 @@ function income_tax_aud(now, past, benefits,
       adjust_cost(ALLOCATED, x, now)
     }
   }
+
+
+@ifeq LOG balance_journal
+printf "\tDeferred  => %14s\n", print_cash(get_cost(DEFERRED, now)) > STDERR
+printf "\tAdjustent => %14s\n", print_cash(x) > STDERR
+printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
+@endif
 
   # Set tax values to zero - is this needed?
   set_cost(PAYG, 0, now)
