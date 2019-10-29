@@ -326,6 +326,8 @@ END {
 
 
 
+
+
 # // Capital Loss Window
 # // Unlimited goes all the way to the Epoch
 # // The write back limit
@@ -3289,7 +3291,7 @@ function get_capital_gains(now, past, is_detailed,
     print "\n" > reports_stream
 
     # If the total capital losses are non zero at the EOFY they must be carried losses
-    carried_losses = get_carried_losses(now, Capital_Losses, adjusted_gains, (0), reports_stream)
+    carried_losses = get_carried_losses(now, Capital_Losses, adjusted_gains, 0, reports_stream)
     if (((carried_losses) >  Epsilon))
       printf "\t%27s => %14s\n", "Losses Carried Forward", print_cash(carried_losses) > reports_stream
     else {
@@ -3336,7 +3338,6 @@ function report_losses(now, losses_array, label, write_stream,
   # Return overall losses
   return losses
 }
-
 
 # Default gross up gains
 function gross_up_gains_def(now, past, total_gains, long_gains, short_gains) {
@@ -3438,26 +3439,16 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
     # The oldest losses are cancelled first
     # Remember gains are negative
     # There may be no losses available
-
-    printf "\tDate => %s Net Gains  => %s\n", get_date(now), print_cash(-losses) > "/dev/stderr"
-
     if (now in losses_array)
       remove_entries(losses_array[now], -losses)
   } else if (((losses) >  Epsilon)) {
     # OK no old losses will be extinguished
     # A new loss is added
-
-    printf "\tDate => %s Net Losses => %s\n", get_date(now), print_cash(losses) > "/dev/stderr"
-
     if (now in losses_array)
       sum_entry(losses_array[now], losses, now)
     else
       losses_array[now][now] = losses
   }
-
-  else
-    printf "\tDate => %s Zero Losses\n", get_date(now)  > "/dev/stderr"
-
 
   # Return the value of the income long gains
   return (( now in losses_array)?( ((__MPX_KEY__ = first_key(losses_array[ now]))?( losses_array[ now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( losses_array[ now][0]):( 0))))):( 0))
@@ -4882,7 +4873,7 @@ function income_tax_aud(now, past, benefits,
   # Tax Losses
   #
   # The carried tax losses should be computed using the carried losses function
-  tax_losses = (( past in Tax_Losses)?( ((__MPX_KEY__ = first_key(Tax_Losses[ past]))?( Tax_Losses[ past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Losses[ past][0]):( 0))))):( 0))
+  tax_losses = get_carried_losses(now, Tax_Losses, 0, 0, write_stream)
 
   # Losses can either be extinguished or (if there are new losses) carried forward
   # We can reduce tax_owed to zero, but not increase or generate a loss
@@ -4924,7 +4915,7 @@ function income_tax_aud(now, past, benefits,
     x = 0
 
   # Now we can update the carried tax losses at last
-  tax_losses = get_carried_losses(now, Tax_Losses, x, (0), write_stream)
+  tax_losses = get_carried_losses(now, Tax_Losses, x, 0, write_stream)
 
   # Print the tax owed
   if (!header) {
@@ -5016,7 +5007,7 @@ function income_tax_aud(now, past, benefits,
   }
   if (!(((tax_losses) <= Epsilon) && ((tax_losses) >= -Epsilon)))
     printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > write_stream
-    
+
   # Franking
   if (!(((franking_balance) <= Epsilon) && ((franking_balance) >= -Epsilon)))
     printf "\t%40s %32s\n", "Franking Balance Carried Forward", print_cash(franking_balance) > write_stream
@@ -5035,6 +5026,9 @@ function income_tax_aud(now, past, benefits,
   else
     carry_offsets = 0
   set_cost(CARRY_OFFSETS, -carry_offsets, now)
+
+  # End report
+  printf "\n" > write_stream
 
   # Now we need Deferred Tax - the hypothetical liability that would be due if all
   # assets were liquidated today

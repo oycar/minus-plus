@@ -590,7 +590,7 @@ function income_tax_aud(now, past, benefits,
   # Tax Losses
   #
   # The carried tax losses should be computed using the carried losses function
-  tax_losses = carry_losses(Tax_Losses, past)
+  tax_losses = get_carried_losses(now, Tax_Losses, 0, CARRY_FORWARD_TAX_LIMIT, write_stream)
 
   # Losses can either be extinguished or (if there are new losses) carried forward
   # We can reduce tax_owed to zero, but not increase or generate a loss
@@ -632,7 +632,7 @@ function income_tax_aud(now, past, benefits,
     x = 0
 
   # Now we can update the carried tax losses at last
-  tax_losses = get_carried_losses(now, Tax_Losses, x, CARRY_FORWARD_LIMIT, write_stream)
+  tax_losses = get_carried_losses(now, Tax_Losses, x, CARRY_FORWARD_TAX_LIMIT, write_stream)
 
   # Print the tax owed
   if (!header) {
@@ -743,6 +743,9 @@ function income_tax_aud(now, past, benefits,
   else
     carry_offsets = 0
   set_cost(CARRY_OFFSETS, -carry_offsets, now)
+
+  # End report
+  printf "\n" > write_stream
 
   # Now we need Deferred Tax - the hypothetical liability that would be due if all
   # assets were liquidated today

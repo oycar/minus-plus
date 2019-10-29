@@ -806,7 +806,6 @@ function report_losses(now, losses_array, label, write_stream,
   return losses
 }
 
-
 # Default gross up gains
 function gross_up_gains_def(now, past, total_gains, long_gains, short_gains) {
   # Nothing to do by default
@@ -907,26 +906,16 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
     # The oldest losses are cancelled first
     # Remember gains are negative
     # There may be no losses available
-@ifeq LOG income_tax
-    printf "\tDate => %s Net Gains  => %s\n", get_date(now), print_cash(-losses) > STDERR
-@endif
     if (now in losses_array)
       remove_entries(losses_array[now], -losses)
   } else if (above_zero(losses)) {
     # OK no old losses will be extinguished
     # A new loss is added
-@ifeq LOG income_tax
-    printf "\tDate => %s Net Losses => %s\n", get_date(now), print_cash(losses) > STDERR
-@endif
     if (now in losses_array)
       sum_entry(losses_array[now], losses, now)
     else
       losses_array[now][now] = losses
   }
-@ifeq LOG income_tax
-  else
-    printf "\tDate => %s Zero Losses\n", get_date(now)  > STDERR
-@endif
 
   # Return the value of the income long gains
   return carry_losses(losses_array, now)
