@@ -36,6 +36,8 @@
 # // Carry Forward & Write Back Limits in Years
 # // @defeval CARRY_FORWARD_LIMIT  (0)
 @defeval CARRY_FORWARD_LIMIT  (0)
+@defeval CARRY_FORWARD_TAX_LIMIT @eval (CARRY_FORWARD_LIMIT)
+@defeval CARRY_FORWARD_CAPITAL_LIMIT @eval (CARRY_FORWARD_LIMIT)
 @defeval WRITE_BACK_LIMIT     (0)
 
 @elif JOURNAL_CURRENCY "USD"

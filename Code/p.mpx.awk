@@ -160,9 +160,10 @@ BEGIN {
   make_array(Underlying_Asset)
   make_array(Units_Held)
 
-  # Provisional Carried Loss Arrays
-  #make_array(Remaining_Losses)
-  Remaining_Losses[0][SUBSEP] = 0; delete Remaining_Losses[0][SUBSEP]
+  # Carried Loss Arrays
+  # Capital Losses
+  Capital_Losses[0][SUBSEP] = 0; delete Capital_Losses[0][SUBSEP]
+  Tax_Losses[0][SUBSEP] = 0; delete Tax_Losses[0][SUBSEP]
 
   # This is a CSV file
   read_csv_records()

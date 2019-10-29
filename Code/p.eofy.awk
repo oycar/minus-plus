@@ -123,9 +123,9 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                                                             sum_long_gains, sum_long_losses,
                                                             sum_short_gains, sum_short_losses) {
 
-  # Print the gains report
-  print Journal_Title > reports_stream
-  printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
+  # # Print the gains report
+  # print Journal_Title > reports_stream
+  # printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
 
   # Are we printing out a detailed schedule?
   is_detailed = ternary(is_detailed, is_detailed, FALSE)
@@ -209,6 +209,12 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           if (found_gains || ((is_sold(a, p, now) == is_realized_flag) && is_unsold(a, p, past))) {
 
             if (!gains_event) {
+              # Print the gains report
+              if (no_header_printed) {
+                print Journal_Title > reports_stream
+                printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
+              }
+
               # Two types of header
               if (is_detailed)
                 printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
@@ -260,15 +266,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
             # cash in and out
             parcel_cost     =   get_cash_in(a, p, now)
-            # if (is_sold(a, p, now)) {
-            #   parcel_proceeds = - get_parcel_proceeds(a, p)
-            #   current_price = parcel_proceeds / units
-            # } else {
-            #   parcel_proceeds = current_price * Units_Held[a][p]
-            #   if (!is_realized_flag)
-            #     #gains -=  parcel_proceeds
-            #     gains -= get_parcel_proceeds(a, p)
-            # }
             cost           += parcel_cost
             proceeds       += parcel_proceeds
 
@@ -418,27 +415,28 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   } # End of each asset
 
   # Final lines
-  underline(166 + is_detailed * (9 + asset_width), 6, reports_stream)
-  if (is_detailed)
+  if (!no_header_printed) {
     underline(166 + is_detailed * (9 + asset_width), 6, reports_stream)
+    if (is_detailed)
+      underline(166 + is_detailed * (9 + asset_width), 6, reports_stream)
 
-  # Stack the gains & losses
-  if (not_zero(sum_long_gains))
-    Gains_Stack[Long_Gains_Key]   = sum_long_gains
-  if (not_zero(sum_long_losses))
-    Gains_Stack[Long_Losses_Key]  = sum_long_losses
-  if (not_zero(sum_short_gains))
-    Gains_Stack[Short_Gains_Key]  = sum_short_gains
-  if (not_zero(sum_short_losses))
-    Gains_Stack[Short_Losses_Key] = sum_short_losses
+    # Stack the gains & losses
+    if (not_zero(sum_long_gains))
+      Gains_Stack[Long_Gains_Key]   = sum_long_gains
+    if (not_zero(sum_long_losses))
+      Gains_Stack[Long_Losses_Key]  = sum_long_losses
+    if (not_zero(sum_short_gains))
+      Gains_Stack[Short_Gains_Key]  = sum_short_gains
+    if (not_zero(sum_short_losses))
+      Gains_Stack[Short_Losses_Key] = sum_short_losses
 
-  # Print out a summary
-  printf "%*s %*s %*s %*s %*s ",
-        asset_width + 1, "Totals",
-        (27 + 8 * is_detailed), print_cash(sum_cost),
-        53, print_cash(- sum_proceeds),
-        14, print_cash(sum_reduced),
-        14, print_cash(sum_adjusted)  > reports_stream
+    # Print out a summary
+    printf "%*s %*s %*s %*s %*s ",
+          asset_width + 1, "Totals",
+          (27 + 8 * is_detailed), print_cash(sum_cost),
+          53, print_cash(- sum_proceeds),
+          14, print_cash(sum_reduced),
+          14, print_cash(sum_adjusted)  > reports_stream
 
     # Common entries
     for (key in Gains_Stack)
@@ -458,23 +456,24 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       delete Gains_Stack[key]
     }
 
-  # If these are not realized gains
-  if (!is_realized_flag) {
-    printf "\n" > reports_stream
-    underline(44, 8, reports_stream)
-    printf "\t%27s => %14s\n", "Market Gains",
-                               print_cash(- sum_long_gains - sum_short_gains) > reports_stream
-    printf "\t%27s => %14s\n", "Market Losses",
-                               print_cash(sum_long_losses + sum_short_losses) > reports_stream
+    # If these are not realized gains
+    if (!is_realized_flag) {
+      printf "\n" > reports_stream
+      underline(44, 8, reports_stream)
+      printf "\t%27s => %14s\n", "Market Gains",
+                                 print_cash(- sum_long_gains - sum_short_gains) > reports_stream
+      printf "\t%27s => %14s\n", "Market Losses",
+                                 print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
-    # Get the deferred taxable gains
-    apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
+      # Get the deferred taxable gains
+      apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
 
-     # All done
-     underline(44, 8, reports_stream)
+       # All done
+       underline(44, 8, reports_stream)
+    }
   }
 
-  printf "\n" > reports_stream
+  printf "\n\n" > reports_stream
   return accounting_gains
 } # End of print gains
 
@@ -626,8 +625,8 @@ function get_capital_gains(now, past, is_detailed,
     else
       printf "\t%27s\n", "Zero Accounting Gains" > reports_stream
 
-    # Carried losses from previous years (if any)
-    carried_losses = carry_losses(past)
+    # Carried capital losses from previous years (if any)
+    carried_losses = carry_losses(Capital_Losses, past)
 
     # The taxable long & short gains
     # If there are other income gains (eg from distributions etc)
@@ -759,7 +758,7 @@ function get_capital_gains(now, past, is_detailed,
     print "\n" > reports_stream
 
     # If the total capital losses are non zero at the EOFY they must be carried losses
-    carried_losses = get_carried_losses(now, adjusted_gains, CARRY_FORWARD_LIMIT, reports_stream)
+    carried_losses = get_carried_losses(now, Capital_Losses, adjusted_gains, CARRY_FORWARD_CAPITAL_LIMIT, reports_stream)
     if (above_zero(carried_losses))
       printf "\t%27s => %14s\n", "Losses Carried Forward", print_cash(carried_losses) > reports_stream
     else {
@@ -772,31 +771,41 @@ function get_capital_gains(now, past, is_detailed,
       # Now the income gains report
       print_income_gains(now, past, is_detailed, reports_stream)
 
-      # Report on Carried Losses
-      if (above_zero(carried_losses)) {
-        printf "Carried Losses Report\n" > reports_stream
-
-        printf "\t%14s  %14s\n", "Year", "Carried Losses"  > reports_stream
-        underline(44, 8, reports_stream)
-
-        next_losses = carried_losses
-        for (key in Remaining_Losses[now]) {
-          # The current losses
-          losses = next_losses
-
-          # The next losses
-          next_losses = find_entry(Remaining_Losses[now], just_before(key))
-          printf "\t%14s %14s\n", get_date(key, YEAR_FORMAT), print_cash(losses - next_losses)  > reports_stream
-        }
-        underline(44, 8, reports_stream)
-        printf "\t%14s %14s\n\n", "Total", print_cash(carried_losses) > reports_stream
-      }
-
       # The Realized Gains
       print_gains(now, past, is_detailed, "Realized Gains", reports_stream)
       delete Gains_Stack
     }
 }
+
+# Report on the losses
+function report_losses(now, losses_array, label, write_stream,
+                       losses, next_losses, key) {
+
+  # Get the losses
+  losses = carry_losses(losses_array, now)
+  if (above_zero(losses)) {
+    printf "\n%s Report\n", label > write_stream
+    printf "\t%14s  %14s\n", "Year", label  > write_stream
+    underline(36, 8, write_stream)
+
+    next_losses = losses
+    for (key in losses_array[now]) {
+      # The next losses
+      next_losses = find_entry(losses_array[now], just_before(key))
+      printf "\t%14s %14s\n", get_date(key, YEAR_FORMAT), print_cash(losses - next_losses)  > write_stream
+      losses = next_losses
+    }
+    underline(36, 8, write_stream)
+
+    # Inefficient
+    losses = carry_losses(losses_array, now)
+    printf "\t%14s %14s\n\n", "Total", print_cash(losses) > write_stream
+  }
+
+  # Return overall losses
+  return losses
+}
+
 
 # Default gross up gains
 function gross_up_gains_def(now, past, total_gains, long_gains, short_gains) {
@@ -855,14 +864,15 @@ function apply_losses(now, reports_stream, label,
 }
 
 # Get the carried losses - limit how many years a loss can be carried forward
-function get_carried_losses(now, losses, limit, reports_stream,
+function get_carried_losses(now, losses_array, losses, limit, reports_stream,
                             past,
                             key) {
 
   #
-  # Remaining_Losses[Now] => Total losses (and maybe gains) in year
+  # losses_array[Now] => Total losses (and maybe gains) in year
   # They have a non-standard double dependence on time
   #
+  reports_stream = ternary(reports_stream, reports_stream, DEVNULL)
 
   # Don't use losses prior to (now - limit) if limit is set
   if (limit)
@@ -871,17 +881,17 @@ function get_carried_losses(now, losses, limit, reports_stream,
     limit = now - one_year(now, - limit)
 
   # There would be need to be one set per currency
-  past = find_key(Remaining_Losses, just_before(now))
+  past = find_key(losses_array, just_before(now))
 
   # If there are already earlier losses copy them
-  if (past in Remaining_Losses) {
-    for (key in Remaining_Losses[past])
+  if (past in losses_array) {
+    for (key in losses_array[past])
       # Copy the most recent set of losses
-      Remaining_Losses[now][key] = Remaining_Losses[past][key]
+      losses_array[now][key] = losses_array[past][key]
 
     # If limit is set remove any keys older than limit in latest version
-    if (limit && now in Remaining_Losses) {
-      key = remove_keys(Remaining_Losses[now], limit)
+    if (limit && now in losses_array) {
+      key = remove_keys(losses_array[now], limit)
 
       # Record this
       if (key && not_zero(key)) {
@@ -897,29 +907,29 @@ function get_carried_losses(now, losses, limit, reports_stream,
     # The oldest losses are cancelled first
     # Remember gains are negative
     # There may be no losses available
-@ifeq LOG get_gains
+@ifeq LOG income_tax
     printf "\tDate => %s Net Gains  => %s\n", get_date(now), print_cash(-losses) > STDERR
 @endif
-    if (now in Remaining_Losses)
-      remove_entries(Remaining_Losses[now], -losses)
+    if (now in losses_array)
+      remove_entries(losses_array[now], -losses)
   } else if (above_zero(losses)) {
     # OK no old losses will be extinguished
     # A new loss is added
-@ifeq LOG get_gains
+@ifeq LOG income_tax
     printf "\tDate => %s Net Losses => %s\n", get_date(now), print_cash(losses) > STDERR
 @endif
-    if (now in Remaining_Losses)
-      sum_entry(Remaining_Losses[now], losses, now)
+    if (now in losses_array)
+      sum_entry(losses_array[now], losses, now)
     else
-      Remaining_Losses[now][now] = losses
+      losses_array[now][now] = losses
   }
-@ifeq LOG get_gains
+@ifeq LOG income_tax
   else
     printf "\tDate => %s Zero Losses\n", get_date(now)  > STDERR
 @endif
 
   # Return the value of the income long gains
-  return carry_losses(now)
+  return carry_losses(losses_array, now)
 }
 
 

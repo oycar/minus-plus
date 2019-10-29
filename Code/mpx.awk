@@ -39,12 +39,11 @@ END {
         exit 1
 }
 
+
+# // FIXME: What does filefuncs do?
 @load "filefuncs"
 
-
 # // Control Logging
-
-
 
 
 # // Control Export format
@@ -319,6 +318,7 @@ END {
 
 
 # // Carry Forward & Write Back Limits in Years
+# // @defeval CARRY_FORWARD_LIMIT  (0)
 
 
 
@@ -2657,9 +2657,9 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                                                             sum_long_gains, sum_long_losses,
                                                             sum_short_gains, sum_short_losses) {
 
-  # Print the gains report
-  print Journal_Title > reports_stream
-  printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
+  # # Print the gains report
+  # print Journal_Title > reports_stream
+  # printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
 
   # Are we printing out a detailed schedule?
   is_detailed = ((is_detailed)?( is_detailed):( (0)))
@@ -2743,6 +2743,12 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
           if (found_gains || (((Held_Until[a][ p] <= ( now)) == is_realized_flag) && (Held_Until[a][ p] > ( past)))) {
 
             if (!gains_event) {
+              # Print the gains report
+              if (no_header_printed) {
+                print Journal_Title > reports_stream
+                printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
+              }
+
               # Two types of header
               if (is_detailed)
                 printf "%*s %*s %*s %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
@@ -2794,15 +2800,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
             # cash in and out
             parcel_cost     =   get_cash_in(a, p, now)
-            # if (is_sold(a, p, now)) {
-            #   parcel_proceeds = - get_parcel_proceeds(a, p)
-            #   current_price = parcel_proceeds / units
-            # } else {
-            #   parcel_proceeds = current_price * Units_Held[a][p]
-            #   if (!is_realized_flag)
-            #     #gains -=  parcel_proceeds
-            #     gains -= get_parcel_proceeds(a, p)
-            # }
             cost           += parcel_cost
             proceeds       += parcel_proceeds
 
@@ -2952,27 +2949,28 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   } # End of each asset
 
   # Final lines
-  underline(166 + is_detailed * (9 + asset_width), 6, reports_stream)
-  if (is_detailed)
+  if (!no_header_printed) {
     underline(166 + is_detailed * (9 + asset_width), 6, reports_stream)
+    if (is_detailed)
+      underline(166 + is_detailed * (9 + asset_width), 6, reports_stream)
 
-  # Stack the gains & losses
-  if ((((sum_long_gains) > Epsilon) || ((sum_long_gains) < -Epsilon)))
-    Gains_Stack[Long_Gains_Key]   = sum_long_gains
-  if ((((sum_long_losses) > Epsilon) || ((sum_long_losses) < -Epsilon)))
-    Gains_Stack[Long_Losses_Key]  = sum_long_losses
-  if ((((sum_short_gains) > Epsilon) || ((sum_short_gains) < -Epsilon)))
-    Gains_Stack[Short_Gains_Key]  = sum_short_gains
-  if ((((sum_short_losses) > Epsilon) || ((sum_short_losses) < -Epsilon)))
-    Gains_Stack[Short_Losses_Key] = sum_short_losses
+    # Stack the gains & losses
+    if ((((sum_long_gains) > Epsilon) || ((sum_long_gains) < -Epsilon)))
+      Gains_Stack[Long_Gains_Key]   = sum_long_gains
+    if ((((sum_long_losses) > Epsilon) || ((sum_long_losses) < -Epsilon)))
+      Gains_Stack[Long_Losses_Key]  = sum_long_losses
+    if ((((sum_short_gains) > Epsilon) || ((sum_short_gains) < -Epsilon)))
+      Gains_Stack[Short_Gains_Key]  = sum_short_gains
+    if ((((sum_short_losses) > Epsilon) || ((sum_short_losses) < -Epsilon)))
+      Gains_Stack[Short_Losses_Key] = sum_short_losses
 
-  # Print out a summary
-  printf "%*s %*s %*s %*s %*s ",
-        asset_width + 1, "Totals",
-        (27 + 8 * is_detailed), print_cash(sum_cost),
-        53, print_cash(- sum_proceeds),
-        14, print_cash(sum_reduced),
-        14, print_cash(sum_adjusted)  > reports_stream
+    # Print out a summary
+    printf "%*s %*s %*s %*s %*s ",
+          asset_width + 1, "Totals",
+          (27 + 8 * is_detailed), print_cash(sum_cost),
+          53, print_cash(- sum_proceeds),
+          14, print_cash(sum_reduced),
+          14, print_cash(sum_adjusted)  > reports_stream
 
     # Common entries
     for (key in Gains_Stack)
@@ -2992,23 +2990,24 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       delete Gains_Stack[key]
     }
 
-  # If these are not realized gains
-  if (!is_realized_flag) {
-    printf "\n" > reports_stream
-    underline(44, 8, reports_stream)
-    printf "\t%27s => %14s\n", "Market Gains",
-                               print_cash(- sum_long_gains - sum_short_gains) > reports_stream
-    printf "\t%27s => %14s\n", "Market Losses",
-                               print_cash(sum_long_losses + sum_short_losses) > reports_stream
+    # If these are not realized gains
+    if (!is_realized_flag) {
+      printf "\n" > reports_stream
+      underline(44, 8, reports_stream)
+      printf "\t%27s => %14s\n", "Market Gains",
+                                 print_cash(- sum_long_gains - sum_short_gains) > reports_stream
+      printf "\t%27s => %14s\n", "Market Losses",
+                                 print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
-    # Get the deferred taxable gains
-    apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
+      # Get the deferred taxable gains
+      apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
 
-     # All done
-     underline(44, 8, reports_stream)
+       # All done
+       underline(44, 8, reports_stream)
+    }
   }
 
-  printf "\n" > reports_stream
+  printf "\n\n" > reports_stream
   return accounting_gains
 } # End of print gains
 
@@ -3127,7 +3126,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("C" ~ /[cC]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3160,8 +3159,8 @@ function get_capital_gains(now, past, is_detailed,
     else
       printf "\t%27s\n", "Zero Accounting Gains" > reports_stream
 
-    # Carried losses from previous years (if any)
-    carried_losses = ((past in Remaining_Losses)?( ((__MPX_KEY__ = first_key(Remaining_Losses[past]))?( Remaining_Losses[past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Remaining_Losses[past][0]):( 0))))):( 0))
+    # Carried capital losses from previous years (if any)
+    carried_losses = (( past in Capital_Losses)?( ((__MPX_KEY__ = first_key(Capital_Losses[ past]))?( Capital_Losses[ past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Capital_Losses[ past][0]):( 0))))):( 0))
 
     # The taxable long & short gains
     # If there are other income gains (eg from distributions etc)
@@ -3290,7 +3289,7 @@ function get_capital_gains(now, past, is_detailed,
     print "\n" > reports_stream
 
     # If the total capital losses are non zero at the EOFY they must be carried losses
-    carried_losses = get_carried_losses(now, adjusted_gains, (1), reports_stream)
+    carried_losses = get_carried_losses(now, Capital_Losses, adjusted_gains, (0), reports_stream)
     if (((carried_losses) >  Epsilon))
       printf "\t%27s => %14s\n", "Losses Carried Forward", print_cash(carried_losses) > reports_stream
     else {
@@ -3303,31 +3302,41 @@ function get_capital_gains(now, past, is_detailed,
       # Now the income gains report
       print_income_gains(now, past, is_detailed, reports_stream)
 
-      # Report on Carried Losses
-      if (((carried_losses) >  Epsilon)) {
-        printf "Carried Losses Report\n" > reports_stream
-
-        printf "\t%14s  %14s\n", "Year", "Carried Losses"  > reports_stream
-        underline(44, 8, reports_stream)
-
-        next_losses = carried_losses
-        for (key in Remaining_Losses[now]) {
-          # The current losses
-          losses = next_losses
-
-          # The next losses
-          next_losses = ((__MPX_KEY__ = find_key(Remaining_Losses[now],  ((key) - 1)))?( Remaining_Losses[now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Remaining_Losses[now][0]):( 0))))
-          printf "\t%14s %14s\n", get_date(key, ("%Y")       ), print_cash(losses - next_losses)  > reports_stream
-        }
-        underline(44, 8, reports_stream)
-        printf "\t%14s %14s\n\n", "Total", print_cash(carried_losses) > reports_stream
-      }
-
       # The Realized Gains
       print_gains(now, past, is_detailed, "Realized Gains", reports_stream)
       delete Gains_Stack
     }
 }
+
+# Report on the losses
+function report_losses(now, losses_array, label, write_stream,
+                       losses, next_losses, key) {
+
+  # Get the losses
+  losses = (( now in losses_array)?( ((__MPX_KEY__ = first_key(losses_array[ now]))?( losses_array[ now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( losses_array[ now][0]):( 0))))):( 0))
+  if (((losses) >  Epsilon)) {
+    printf "\n%s Report\n", label > write_stream
+    printf "\t%14s  %14s\n", "Year", label  > write_stream
+    underline(36, 8, write_stream)
+
+    next_losses = losses
+    for (key in losses_array[now]) {
+      # The next losses
+      next_losses = ((__MPX_KEY__ = find_key(losses_array[now],  ((key) - 1)))?( losses_array[now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( losses_array[now][0]):( 0))))
+      printf "\t%14s %14s\n", get_date(key, ("%Y")       ), print_cash(losses - next_losses)  > write_stream
+      losses = next_losses
+    }
+    underline(36, 8, write_stream)
+
+    # Inefficient
+    losses = (( now in losses_array)?( ((__MPX_KEY__ = first_key(losses_array[ now]))?( losses_array[ now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( losses_array[ now][0]):( 0))))):( 0))
+    printf "\t%14s %14s\n\n", "Total", print_cash(losses) > write_stream
+  }
+
+  # Return overall losses
+  return losses
+}
+
 
 # Default gross up gains
 function gross_up_gains_def(now, past, total_gains, long_gains, short_gains) {
@@ -3386,14 +3395,15 @@ function apply_losses(now, reports_stream, label,
 }
 
 # Get the carried losses - limit how many years a loss can be carried forward
-function get_carried_losses(now, losses, limit, reports_stream,
+function get_carried_losses(now, losses_array, losses, limit, reports_stream,
                             past,
                             key) {
 
   #
-  # Remaining_Losses[Now] => Total losses (and maybe gains) in year
+  # losses_array[Now] => Total losses (and maybe gains) in year
   # They have a non-standard double dependence on time
   #
+  reports_stream = ((reports_stream)?( reports_stream):( "/dev/null"))
 
   # Don't use losses prior to (now - limit) if limit is set
   if (limit)
@@ -3402,17 +3412,17 @@ function get_carried_losses(now, losses, limit, reports_stream,
     limit = now - one_year(now, - limit)
 
   # There would be need to be one set per currency
-  past = find_key(Remaining_Losses, ((now) - 1))
+  past = find_key(losses_array, ((now) - 1))
 
   # If there are already earlier losses copy them
-  if (past in Remaining_Losses) {
-    for (key in Remaining_Losses[past])
+  if (past in losses_array) {
+    for (key in losses_array[past])
       # Copy the most recent set of losses
-      Remaining_Losses[now][key] = Remaining_Losses[past][key]
+      losses_array[now][key] = losses_array[past][key]
 
     # If limit is set remove any keys older than limit in latest version
-    if (limit && now in Remaining_Losses) {
-      key = remove_keys(Remaining_Losses[now], limit)
+    if (limit && now in losses_array) {
+      key = remove_keys(losses_array[now], limit)
 
       # Record this
       if (key && (((key) > Epsilon) || ((key) < -Epsilon))) {
@@ -3429,61 +3439,30 @@ function get_carried_losses(now, losses, limit, reports_stream,
     # Remember gains are negative
     # There may be no losses available
 
-    if (now in Remaining_Losses)
-      remove_entries(Remaining_Losses[now], -losses)
+    printf "\tDate => %s Net Gains  => %s\n", get_date(now), print_cash(-losses) > "/dev/stderr"
+
+    if (now in losses_array)
+      remove_entries(losses_array[now], -losses)
   } else if (((losses) >  Epsilon)) {
     # OK no old losses will be extinguished
     # A new loss is added
 
-    if (now in Remaining_Losses)
-      sum_entry(Remaining_Losses[now], losses, now)
+    printf "\tDate => %s Net Losses => %s\n", get_date(now), print_cash(losses) > "/dev/stderr"
+
+    if (now in losses_array)
+      sum_entry(losses_array[now], losses, now)
     else
-      Remaining_Losses[now][now] = losses
+      losses_array[now][now] = losses
   }
+
+  else
+    printf "\tDate => %s Zero Losses\n", get_date(now)  > "/dev/stderr"
 
 
   # Return the value of the income long gains
-  return ((now in Remaining_Losses)?( ((__MPX_KEY__ = first_key(Remaining_Losses[now]))?( Remaining_Losses[now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Remaining_Losses[now][0]):( 0))))):( 0))
+  return (( now in losses_array)?( ((__MPX_KEY__ = first_key(losses_array[ now]))?( losses_array[ now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( losses_array[ now][0]):( 0))))):( 0))
 }
 
-# # Compute the deferred gains
-# # And print out a schedule
-# #
-# function get_deferred_gains(now, past, is_detailed,       accounting_gains, reports_stream,
-#                                                           gains, losses) {
-#
-#  # The reports_stream is the pipe to write the schedule out to
-#  reports_stream = report_deferred(EOFY)
-#
-#  # First print the gains out in detail
-#  accounting_gains = print_gains(now, past, is_detailed, "Deferred Gains", reports_stream)
-#  losses = Gains_Stack[Long_Losses_Key]
-#  gains  = Gains_Stack[Long_Gains_Key]
-#  delete Gains_Stack
-#
-#  # Print the deferred gains report
-#  print Journal_Title > reports_stream
-#  printf "Deferred Gains Report for Period Ending %s\n", get_date(yesterday(now))  > reports_stream
-#
-#  # Print Capital Gains & Losses
-#  underline(44, 8, reports_stream)
-#
-#  printf "\t%27s => %14s\n", "Accounting Deferred Gains", print_cash(- accounting_gains) > reports_stream
-#  printf "\t%27s => %14s\n", "Taxable Deferred Gains",
-#                             print_cash(- gains) > reports_stream
-#  printf "\t%27s => %14s\n", "Taxable Deferred Losses",
-#                             print_cash(losses) > reports_stream
-#
-#  printf "\nAfter Application of Any Losses\n" > reports_stream
-#
-#  # Get the deferred taxable gains
-#  apply_losses(now, reports_stream, "Deferred", gains, losses, DEFERRED_GAINS)
-#
-#   # All done
-#   underline(43, 8, reports_stream)
-#   print "\n" > reports_stream
-#
-# } # End of deferred gains
 
 # Print out operating statement
 function print_operating_statement(now, past, is_detailed,     reports_stream,
@@ -3496,7 +3475,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("C" ~ /[oO]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3636,7 +3615,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("C" ~ /[bB]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3769,7 +3748,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("C" ~ /[mM]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3842,7 +3821,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("C" ~ /[dD]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3977,7 +3956,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("C" ~ /[qQ]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4454,6 +4433,7 @@ function income_tax_aud(now, past, benefits,
 
                                         write_stream,
                                         taxable_gains, carried_losses,
+                                        tax_losses,
                                         market_changes,
                                         accounting_gains, accounting_losses,
                                         foreign_income, exempt_income,
@@ -4461,7 +4441,7 @@ function income_tax_aud(now, past, benefits,
                                         contributions, income_due, other_expenses,
                                         lic_deductions,
                                         other_income, deferred_tax, deferred_gains,
-                                        capital_losses, old_losses, tax_losses,
+                                        capital_losses,
                                         tax_owed, tax_paid, tax_due, tax_with, tax_cont, income_tax,
                                         franking_offsets, foreign_offsets, franking_balance,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
@@ -4470,7 +4450,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("C" ~ /[tT]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4525,7 +4505,7 @@ function income_tax_aud(now, past, benefits,
   # Australia ignores the distinction between long & short term losses
   # The carried losses are based on the remaining losses; although
   # the carry forward limit should be applied
-  taxable_gains = @Get_Taxable_Gains_Function(now, ((past in Remaining_Losses)?( ((__MPX_KEY__ = first_key(Remaining_Losses[past]))?( Remaining_Losses[past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Remaining_Losses[past][0]):( 0))))):( 0))) # FIXME need carry forward limit
+  taxable_gains = @Get_Taxable_Gains_Function(now, (( past in Capital_Losses)?( ((__MPX_KEY__ = first_key(Capital_Losses[ past]))?( Capital_Losses[ past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Capital_Losses[ past][0]):( 0))))):( 0)))
   if (((taxable_gains) < -Epsilon)) {
     # Gains are a negative number
     other_income -= taxable_gains
@@ -4676,6 +4656,9 @@ function income_tax_aud(now, past, benefits,
     # The franking deficit offsets
     franking_deficit_offsets = - get_cost(FRANKING_DEFICIT, now)
 
+    if (!(((franking_deficit_offsets) <= Epsilon) && ((franking_deficit_offsets) >= -Epsilon)))
+      printf "%48s %32s\n\n", "Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
+
 
     # Need to check for franking deficit tax here
     if (((franking_balance) < -Epsilon)) {
@@ -4698,12 +4681,19 @@ function income_tax_aud(now, past, benefits,
       # -f > 0.10 * (-x)
       # 0.1 * (x) - f > 0
 
+      printf "Threshold %s Balance %s\n",  print_cash(x), print_cash(- franking_balance)> write_stream
+
       if (((x - franking_balance) >  Epsilon)) {
         franking_deficit_offsets -= Franking_Deficit_Reduction * franking_balance
+
+        printf "%48s\n", "Franking Deficit Offset Reduction Applied" > write_stream
 
       } else
         franking_deficit_offsets -= franking_balance
 
+
+      if (!(((franking_deficit_offsets) <= Epsilon) && ((franking_deficit_offsets) >= -Epsilon)))
+        printf "%48s %32s\n\n", "New Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
 
 
       # Don't adjust tax due - this is a separate liability
@@ -4750,6 +4740,10 @@ function income_tax_aud(now, past, benefits,
     printf "%s\t%40s %32s\n\n", header, "Foreign Offsets", print_cash(foreign_offsets) > write_stream
     header = ""
 
+    printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(((__MPX_KEY__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Foreign_Offset_Limit[0]):( 0))))) > write_stream
+    if (extra_tax > 0)
+      printf "\t%40s %32s\n\n", "Extra Tax Paid on Foreign Earnings", print_cash(extra_tax) > write_stream
+
   } else
     foreign_offsets = 0
 
@@ -4760,6 +4754,15 @@ function income_tax_aud(now, past, benefits,
     middle_income_offset = get_tax(now, Middle_Income_Offset, taxable_income)
 
     # This is an Australian no-carry offset computed from the taxable income
+
+    if ((((low_income_offset) > Epsilon) || ((low_income_offset) < -Epsilon))) {
+      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(low_income_offset) > write_stream
+      header = ""
+    }
+    if ((((middle_income_offset) > Epsilon) || ((middle_income_offset) < -Epsilon))) {
+      printf "%s\t%40s %32s\n", header, "Middle Income Tax Offset", print_cash(middle_income_offset) > write_stream
+      header = ""
+    }
 
 
     # Set the no_carry offsets
@@ -4781,7 +4784,6 @@ function income_tax_aud(now, past, benefits,
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = -(get_cost(CARRY_OFFSETS, now) - get_cost(CARRY_OFFSETS, past))
-  #carry_offsets = - get_cost(CARRY_OFFSETS, now)
   if (!(((carry_offsets) <= Epsilon) && ((carry_offsets) >= -Epsilon))) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
@@ -4846,16 +4848,16 @@ function income_tax_aud(now, past, benefits,
 
     # Report tax owed
 
+    printf "%48s %32s\n\n", "Income Tax After applying Non-Refundable Offsets", print_cash(tax_owed) > write_stream
+
   } # End of if any attempt to apply non-refundable assets
-
-  # What happens when the tax owed is negative??
-
-
 
   # Now apply refundable offsets - but note these will not generate a tax loss - since they are refunded :)
   if (((refundable_offsets) >  Epsilon)) {
     tax_owed -= refundable_offsets
     printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > write_stream
+
+    printf "%48s %32s\n\n", "Income Tax After applying Refundable Offsets", print_cash(tax_owed) > write_stream
 
   }
 
@@ -4879,56 +4881,50 @@ function income_tax_aud(now, past, benefits,
   #
   # Tax Losses
   #
-  # The carried tax losses
-  tax_losses = old_losses = get_cost(TAX_LOSSES, past)
+  # The carried tax losses should be computed using the carried losses function
+  tax_losses = (( past in Tax_Losses)?( ((__MPX_KEY__ = first_key(Tax_Losses[ past]))?( Tax_Losses[ past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Losses[ past][0]):( 0))))):( 0))
 
-
-  #
+  # Losses can either be extinguished or (if there are new losses) carried forward
   # We can reduce tax_owed to zero, but not increase or generate a loss
+  # Notice tax losses are stored as the income that generates the loss but
+  # tax_owed is actually the tax
   if (((tax_owed) >  Epsilon)) {
     # If tax is owed franking offsets must be all used
     assert((((franking_offsets) <= Epsilon) && ((franking_offsets) >= -Epsilon)), "Can't have remaining franking offsets if tax is still owed")
 
+    # Tax losses available for use - and tax is owed - compute marginal tax change
     if (((tax_losses) >  Epsilon)) {
-      # Tax losses available for use - compute marginal tax change
       # x is the tax that would be paid on the tax_losses
       x = get_tax(now, Tax_Bands, tax_losses + taxable_income) - income_tax
-
-
-    } else # No losses available
+    } else # No tax owed
       x = 0
 
-    # Is the tax owed less than the losses available?
-    # Remember we have tax_owed > 0
+    # We have tax owed for this year (tax_owed)
+    # And we have the tax that would be extinguished by the carried tax losses (x)
+    # Now we need to compute the change in the tax losses this would equate to
     if (tax_owed < x) {
       # Yes so some losses will be extinguished
-      # Which will reduce tax_owed to zero;
-      tax_losses = get_taxable_income(now, x - tax_owed)
-
+      # Which will reduce tax_owed to zero - so the effective reduction
+      # in tax losses is the income that would produce tax equal to tax_owed
+      x = - get_taxable_income(now, tax_owed) # This is effectively a gain - so make it negative
       tax_owed = 0
-    } else {
+    } else if ((((x) > Epsilon) || ((x) < -Epsilon))) {
       # All losses extinguished
       tax_owed -= x
-
-      # So this reduces tax losses to zero
-
-      tax_losses = 0
+      x = - get_taxable_income(now, x) # This is effectively a gain - so make it negative
     }
 
-  # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
+    # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
   } else if (!((tax_owed + refundable_offsets) >  Epsilon)) { # Increase losses
     # This is a bit tricky
     # (unused) franking offsets may still be present here
     # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-    # so adjust the tax losses accordingly
-    # -- so does this work for an individual or smsf?
-    tax_losses -= get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
+    x = - get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
+  } else
+    x = 0
 
-
-  }
-
-  # The carried tax losses
-
+  # Now we can update the carried tax losses at last
+  tax_losses = get_carried_losses(now, Tax_Losses, x, (0), write_stream)
 
   # Print the tax owed
   if (!header) {
@@ -4995,27 +4991,32 @@ function income_tax_aud(now, past, benefits,
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
-  capital_losses = ((now in Remaining_Losses)?( ((__MPX_KEY__ = first_key(Remaining_Losses[now]))?( Remaining_Losses[now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Remaining_Losses[now][0]):( 0))))):( 0))
+  capital_losses = (( now in Capital_Losses)?( ((__MPX_KEY__ = first_key(Capital_Losses[ now]))?( Capital_Losses[ now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Capital_Losses[ now][0]):( 0))))):( 0))
+  if (Show_Extra) {
+    # Report on the losses
+    report_losses(now, Capital_Losses, "Capital Losses", write_stream)
+    x = (( past in Capital_Losses)?( ((__MPX_KEY__ = first_key(Capital_Losses[ past]))?( Capital_Losses[ past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Capital_Losses[ past][0]):( 0))))):( 0))
+    if (((capital_losses -  x) > 0))
+      printf "\t%40s %32s\n", "Capital Losses Generated", print_cash(x - capital_losses) > write_stream
+    else if (((capital_losses -  x) < 0))
+      printf "\t%40s %32s\n", "Capital Losses Extinguished", print_cash(capital_losses - x) > write_stream
+  }
   if (!(((capital_losses) <= Epsilon) && ((capital_losses) >= -Epsilon)))
     printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
-  # The change in tax losses
-  if (!(((tax_losses - old_losses) <= Epsilon) && ((tax_losses - old_losses) >= -Epsilon))) {
-    if (tax_losses > old_losses)
-      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > write_stream
-    else
-      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(old_losses - tax_losses) > write_stream
-  }
+  tax_losses = (( now in Tax_Losses)?( ((__MPX_KEY__ = first_key(Tax_Losses[ now]))?( Tax_Losses[ now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Losses[ now][0]):( 0))))):( 0))
 
-  # The carried tax losses
+  if (Show_Extra) {
+    report_losses(now, Tax_Losses, "Tax Losses", write_stream)
+    x = (( past in Tax_Losses)?( ((__MPX_KEY__ = first_key(Tax_Losses[ past]))?( Tax_Losses[ past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Losses[ past][0]):( 0))))):( 0))
+    if (((tax_losses -  x) > 0))
+      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(x - tax_losses) > write_stream
+    else if (((tax_losses -  x) < 0))
+      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(tax_losses - x) > write_stream
+  }
   if (!(((tax_losses) <= Epsilon) && ((tax_losses) >= -Epsilon)))
     printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > write_stream
-  else
-    tax_losses = 0
-
-  # Save the carried losses
-  set_cost(TAX_LOSSES, tax_losses, now)
-
+    
   # Franking
   if (!(((franking_balance) <= Epsilon) && ((franking_balance) >= -Epsilon)))
     printf "\t%40s %32s\n", "Franking Balance Carried Forward", print_cash(franking_balance) > write_stream
@@ -5047,8 +5048,6 @@ function income_tax_aud(now, past, benefits,
     deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
     set_cost(DEFERRED, - deferred_tax, now)
 
-
-
     # Get the change this FY
     # If x < 0 EXPENSE
     # if x > 0 INCOME
@@ -5058,14 +5057,13 @@ function income_tax_aud(now, past, benefits,
       # For a none SMSF this is a synonym for ADJUSTMENTS
       adjust_cost(ALLOCATED, x, now)
     }
-  } 
+  }
 
   # Set tax values to zero - is this needed?
   set_cost(PAYG, 0, now)
   set_cost(WITHOLDING, 0, now)
   set_cost(CONTRIBUTION_TAX, 0, now)
 }
-
 
 ## This should become jurisdiction specific
 ## There are complications with the discounting
@@ -5255,7 +5253,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("C" ~ /[iI]|[aA]/ && "C" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5721,9 +5719,10 @@ BEGIN {
   ((SUBSEP in Underlying_Asset)?((1)):((0)))
   ((SUBSEP in Units_Held)?((1)):((0)))
 
-  # Provisional Carried Loss Arrays
-  #make_array(Remaining_Losses)
-  Remaining_Losses[0][SUBSEP] = 0; delete Remaining_Losses[0][SUBSEP]
+  # Carried Loss Arrays
+  # Capital Losses
+  Capital_Losses[0][SUBSEP] = 0; delete Capital_Losses[0][SUBSEP]
+  Tax_Losses[0][SUBSEP] = 0; delete Tax_Losses[0][SUBSEP]
 
   # This is a CSV file
   read_csv_records()
@@ -6070,13 +6069,13 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Remaining_Losses Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
-      if (!index(("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Remaining_Losses Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate "), Array_Names[x])) {
+      if (!index(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate "), Array_Names[x])) {
         assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
@@ -6086,7 +6085,7 @@ function initialize_state(    x) {
   } else {
     # Use default read and write list
     Write_Variables = (0)
-    MPX_Arrays = ("Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Remaining_Losses Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
+    MPX_Arrays = ("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Reserve_Rate ")
     MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")

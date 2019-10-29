@@ -141,6 +141,7 @@ function income_tax_aud(now, past, benefits,
 
                                         write_stream,
                                         taxable_gains, carried_losses,
+                                        tax_losses,
                                         market_changes,
                                         accounting_gains, accounting_losses,
                                         foreign_income, exempt_income,
@@ -148,7 +149,7 @@ function income_tax_aud(now, past, benefits,
                                         contributions, income_due, other_expenses,
                                         lic_deductions,
                                         other_income, deferred_tax, deferred_gains,
-                                        capital_losses, old_losses, tax_losses,
+                                        capital_losses,
                                         tax_owed, tax_paid, tax_due, tax_with, tax_cont, income_tax,
                                         franking_offsets, foreign_offsets, franking_balance,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
@@ -212,7 +213,7 @@ function income_tax_aud(now, past, benefits,
   # Australia ignores the distinction between long & short term losses
   # The carried losses are based on the remaining losses; although
   # the carry forward limit should be applied
-  taxable_gains = @Get_Taxable_Gains_Function(now, carry_losses(past)) # FIXME need carry forward limit
+  taxable_gains = @Get_Taxable_Gains_Function(now, carry_losses(Capital_Losses, past, CARRY_FORWARD_TAX_LIMIT))
   if (below_zero(taxable_gains)) {
     # Gains are a negative number
     other_income -= taxable_gains
@@ -491,7 +492,6 @@ function income_tax_aud(now, past, benefits,
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = -(get_cost(CARRY_OFFSETS, now) - get_cost(CARRY_OFFSETS, past))
-  #carry_offsets = - get_cost(CARRY_OFFSETS, now)
   if (!near_zero(carry_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
@@ -560,10 +560,6 @@ function income_tax_aud(now, past, benefits,
 @endif
   } # End of if any attempt to apply non-refundable assets
 
-  # What happens when the tax owed is negative??
-
-
-
   # Now apply refundable offsets - but note these will not generate a tax loss - since they are refunded :)
   if (above_zero(refundable_offsets)) {
     tax_owed -= refundable_offsets
@@ -593,70 +589,50 @@ function income_tax_aud(now, past, benefits,
   #
   # Tax Losses
   #
-  # The carried tax losses
-  tax_losses = old_losses = get_cost(TAX_LOSSES, past)
-@ifeq LOG income_tax
-  if (above_zero(tax_losses))
-    printf "\t%40s %32s\n", "Carried Tax Losses", print_cash(tax_losses) > write_stream
-@endif
+  # The carried tax losses should be computed using the carried losses function
+  tax_losses = carry_losses(Tax_Losses, past)
 
-  #
+  # Losses can either be extinguished or (if there are new losses) carried forward
   # We can reduce tax_owed to zero, but not increase or generate a loss
+  # Notice tax losses are stored as the income that generates the loss but
+  # tax_owed is actually the tax
   if (above_zero(tax_owed)) {
     # If tax is owed franking offsets must be all used
     assert(near_zero(franking_offsets), "Can't have remaining franking offsets if tax is still owed")
 
+    # Tax losses available for use - and tax is owed - compute marginal tax change
     if (above_zero(tax_losses)) {
-      # Tax losses available for use - compute marginal tax change
       # x is the tax that would be paid on the tax_losses
       x = get_tax(now, Tax_Bands, tax_losses + taxable_income) - income_tax
-
-@ifeq LOG income_tax
-      printf "\t%40s %32s\n\n", "Income Tax on Carried Tax Losses", print_cash(x) > write_stream
-@endif
-    } else # No losses available
+    } else # No tax owed
       x = 0
 
-    # Is the tax owed less than the losses available?
-    # Remember we have tax_owed > 0
+    # We have tax owed for this year (tax_owed)
+    # And we have the tax that would be extinguished by the carried tax losses (x)
+    # Now we need to compute the change in the tax losses this would equate to
     if (tax_owed < x) {
       # Yes so some losses will be extinguished
-      # Which will reduce tax_owed to zero;
-      tax_losses = get_taxable_income(now, x - tax_owed)
-@ifeq LOG income_tax
-      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(old_losses - tax_losses) > write_stream
-@endif
+      # Which will reduce tax_owed to zero - so the effective reduction
+      # in tax losses is the income that would produce tax equal to tax_owed
+      x = - get_taxable_income(now, tax_owed) # This is effectively a gain - so make it negative
       tax_owed = 0
-    } else {
+    } else if (not_zero(x)) {
       # All losses extinguished
       tax_owed -= x
-
-      # So this reduces tax losses to zero
-@ifeq LOG income_tax
-      printf "\t%40s %32s\n", "All Tax Losses Extinguished", print_cash(tax_losses) > write_stream
-@endif
-      tax_losses = 0
+      x = - get_taxable_income(now, x) # This is effectively a gain - so make it negative
     }
 
-  # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
+    # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
   } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
     # This is a bit tricky
     # (unused) franking offsets may still be present here
     # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-    # so adjust the tax losses accordingly
-    # -- so does this work for an individual or smsf?
-    tax_losses -= get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
-@ifeq LOG income_tax
-    printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > write_stream
-@endif
+    x = - get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
+  } else
+    x = 0
 
-  }
-
-  # The carried tax losses
-@ifeq LOG income_tax
-  if (above_zero(tax_losses))
-    printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > write_stream
-@endif
+  # Now we can update the carried tax losses at last
+  tax_losses = get_carried_losses(now, Tax_Losses, x, CARRY_FORWARD_LIMIT, write_stream)
 
   # Print the tax owed
   if (!header) {
@@ -723,26 +699,31 @@ function income_tax_aud(now, past, benefits,
 
   # Print out the tax and capital losses carried forward
   # These really are for time now - already computed
-  capital_losses = carry_losses(now)
+  capital_losses = carry_losses(Capital_Losses, now)
+  if (Show_Extra) {
+    # Report on the losses
+    report_losses(now, Capital_Losses, "Capital Losses", write_stream)
+    x = carry_losses(Capital_Losses, past)
+    if (greater_than(capital_losses, x))
+      printf "\t%40s %32s\n", "Capital Losses Generated", print_cash(x - capital_losses) > write_stream
+    else if (less_than(capital_losses, x))
+      printf "\t%40s %32s\n", "Capital Losses Extinguished", print_cash(capital_losses - x) > write_stream
+  }
   if (!near_zero(capital_losses))
     printf "\t%40s %32s\n", "Capital Losses Carried Forward", print_cash(capital_losses) > write_stream
 
-  # The change in tax losses
-  if (!near_zero(tax_losses - old_losses)) {
-    if (tax_losses > old_losses)
-      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - old_losses) > write_stream
-    else
-      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(old_losses - tax_losses) > write_stream
-  }
+  tax_losses = carry_losses(Tax_Losses, now)
 
-  # The carried tax losses
+  if (Show_Extra) {
+    report_losses(now, Tax_Losses, "Tax Losses", write_stream)
+    x = carry_losses(Tax_Losses, past)
+    if (greater_than(tax_losses, x))
+      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(x - tax_losses) > write_stream
+    else if (less_than(tax_losses, x))
+      printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(tax_losses - x) > write_stream
+  }
   if (!near_zero(tax_losses))
     printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > write_stream
-  else
-    tax_losses = 0
-
-  # Save the carried losses
-  set_cost(TAX_LOSSES, tax_losses, now)
 
   # Franking
   if (!near_zero(franking_balance))
@@ -775,18 +756,6 @@ function income_tax_aud(now, past, benefits,
     deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
     set_cost(DEFERRED, - deferred_tax, now)
 
-@ifeq LOG income_tax
-    printf "Deferred Tax Adjustment\n" > STDERR
-    if (above_zero(deferred_tax))
-      printf "\t%40s %32s\n", "Deferred Tax Liability", print_cash(deferred_tax) > write_stream
-    else if (below_zero(deferred_tax))
-      printf "\t%40s %32s\n", "Deferred Tax Asset    ", print_cash(deferred_tax) > write_stream
-    else {
-      deferred_tax = 0
-      printf "\t%40s %32s\n", "Zero Deferred Tax", print_cash(deferred_tax) > write_stream
-    }
-@endif
-
     # Get the change this FY
     # If x < 0 EXPENSE
     # if x > 0 INCOME
@@ -796,14 +765,13 @@ function income_tax_aud(now, past, benefits,
       # For a none SMSF this is a synonym for ADJUSTMENTS
       adjust_cost(ALLOCATED, x, now)
     }
-  } 
+  }
 
   # Set tax values to zero - is this needed?
   set_cost(PAYG, 0, now)
   set_cost(WITHOLDING, 0, now)
   set_cost(CONTRIBUTION_TAX, 0, now)
 }
-
 
 ## This should become jurisdiction specific
 ## There are complications with the discounting

@@ -1,8 +1,9 @@
 @ifndef MPX_H
 @define MPX_H
 @include "assert.awk"
-@load "filefuncs"
 
+# // FIXME: What does filefuncs do?
+@load "filefuncs"
 
 # // Control Logging
 @ifeq LOG 0
@@ -24,10 +25,10 @@
 @define DEVNULL "/dev/null"
 
 # //
-@define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit\
+@define SHARED_ARRAYS "Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit\
  Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date\
  Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units\
- Remaining_Losses Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits\
+ Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
  Threshold_Dates Total_Units Underlying_Asset Units_Held "
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
@@ -259,7 +260,7 @@
 
 # // Include currency definitions
 @include "currency.h"
-@define carry_losses(t) ternary(t in Remaining_Losses, first_entry(Remaining_Losses[t]), 0)
+@define carry_losses(a, t) ternary(t in a, first_entry(a[t]), 0)
 
 # // Capital Loss Window
 # // Unlimited goes all the way to the Epoch
