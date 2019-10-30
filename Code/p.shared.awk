@@ -1413,6 +1413,12 @@ function get_cost(a, now,     i, sum_cost) {
   return 0
 }
 
+# One liner function
+function get_value(a, now) {
+  return ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))
+}
+
+
 # The tax adjustments at time (now)
 # Note that depreciation is always a tax adjustment
 function get_cost_adjustment(a, now,   i, sum_adjustments) {
@@ -1824,7 +1830,7 @@ function filter_data(now, variable_names, show_details,    array_names, name) {
 function filter_array(now, data_array, name, show_blocks,
                            a, p, start_block, end_block, block_id,
                            stack, key, first_key,
-                           earliest_key, latest_key) {
+                           earliest_key, latest_key, s) {
 
   # Record the earlist and latest keys found
   if (show_blocks) {
@@ -1892,12 +1898,13 @@ function filter_array(now, data_array, name, show_blocks,
 
         # get last key and show range of keys
         if (show_blocks && (key in stack)) {
+          s = ternary(is_open(a, now), "*", "")
           if (key != first_key)
             # More than one key
-            printf "%22s\t[%s, %s]\n", Leaf[a], get_date(key), get_date(first_key) > STDERR
+            printf "%22s\t[%s, %s]%s\n", Leaf[a], get_date(key), get_date(first_key), s > STDERR
           else if (!Show_Extra)
             # Only one key in this block - already recorded if Show_Extra set
-            printf "%22s\t[%s]\n", Leaf[a], get_date(first_key) > STDERR
+            printf "%22s\t[%s]%s\n", Leaf[a], get_date(first_key), s > STDERR
 
           # Record earliest key
           earliest_key = min_value(earliest_key, key)

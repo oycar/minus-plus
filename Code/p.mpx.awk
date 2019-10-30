@@ -627,9 +627,6 @@ function set_special_accounts() {
   initialize_account(SHORT_GAINS ":SHORT.GAINS")
   WRITTEN_BACK   =   initialize_account(SHORT_LOSSES ":SHORT.LOSSES")
 
-  # Taxable carried losses
-  TAX_LOSSES       = initialize_account("SPECIAL.LOSSES:TAX.LOSSES")
-
   #
   # Deferred Gains & Losses too (all long...)
   DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
@@ -1971,7 +1968,6 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
   } # End of if splitting a parcel
 
   # The sale price
-  # This is always recorded as cost_element 0 since it is not actually a true cost
   # This must be recorded as cash flowing out of the account
   # A parcel is only ever sold once so we can simply set the cost
   set_parcel_proceeds(a, p, -amount_paid)
@@ -2159,7 +2155,7 @@ function match_parcel(a, p, parcel_tag, parcel_timestamp,
 
 
 # This checks all is ok
-function check_balance(now,        sum_assets, sum_liabilities, sum_equities, sum_expenses, sum_income, sum_adjustments, balance, show_balance) {
+function check_balance(now,        sum_assets, sum_liabilities, sum_equities, sum_expenses, sum_income, sum_adjustments, balance, show_balance, output_stream) {
   # The following should always be true
   # Assets - Liabilities = Income + Expenses
   # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
@@ -2178,29 +2174,37 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
 @ifeq LOG check_balance
   # Verbose balance printing
   show_balance = TRUE
+  output_stream = STDOUT
 @else
   # No default printing
   show_balance = FALSE
+  output_stream = STDERR
 @endif #// LOG
 
   # Is there an error?
   if (!near_zero(balance)) {
-    printf "Problem - Accounts Unbalanced <%s>\n", $0 > STDERR
+    printf "Problem - Accounts Unbalanced <%s>\n", $0 > output_stream
     show_balance = TRUE
   } else
     balance = 0
 
   # // Print the balance if necessary
   if (show_balance) {
-    printf "\tDate => %s\n", get_date(now) > STDERR
-    printf "\tAssets      => %20.2f\n", sum_assets > STDERR
-    printf "\tIncome      => %20.2f\n", sum_income > STDERR
-    printf "\tExpenses    => %20.2f\n", sum_expenses > STDERR
-    printf "\tLiabilities => %20.2f\n", sum_liabilities > STDERR
-    printf "\tEquities    => %20.2f\n", sum_equities > STDERR
+    printf "\tDate => %s\n", get_date(now) > output_stream
+    printf "\tAssets      => %20.2f\n", sum_assets > output_stream
+    printf "\tIncome      => %20.2f\n", sum_income > output_stream
+    printf "\t**<Realized => %20.2f>\n", - get_cost("*INCOME.GAINS.REALIZED", now) > output_stream
+
+    printf "\tExpenses    => %20.2f\n", sum_expenses > output_stream
+    printf "\t**<Realized => %20.2f>\n", - get_cost("*EXPENSE.LOSSES.REALIZED", now) > output_stream
+    printf "\t**<Market   => %20.2f>\n", - get_cost("*EXPENSE.UNREALIZED", now) > output_stream
+
+
+    printf "\tLiabilities => %20.2f\n", sum_liabilities > output_stream
+    printf "\tEquities    => %20.2f\n", sum_equities > output_stream
     if (not_zero(sum_adjustments))
-      printf "\tAdjustments => %20.2f\n", sum_adjustments > STDERR
-    printf "\tBalance     => %20.2f\n", balance > STDERR
+      printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
+    printf "\tBalance     => %20.2f\n", balance > output_stream
     assert(near_zero(balance), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
 }

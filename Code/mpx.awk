@@ -178,7 +178,7 @@ END {
 
 
 # // The current value of an asset
-
+# // @define get_value(a, now) ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))
 
 # // char code lookup
 
@@ -1697,6 +1697,12 @@ function get_cost(a, now,     i, sum_cost) {
   return 0
 }
 
+# One liner function
+function get_value(a, now) {
+  return ((((a) ~ /^ASSET\.CAPITAL[.:]/))?( ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( get_cost(a, now)))
+}
+
+
 # The tax adjustments at time (now)
 # Note that depreciation is always a tax adjustment
 function get_cost_adjustment(a, now,   i, sum_adjustments) {
@@ -2051,7 +2057,7 @@ function filter_data(now, variable_names, show_details,    array_names, name) {
 function filter_array(now, data_array, name, show_blocks,
                            a, p, start_block, end_block, block_id,
                            stack, key, first_key,
-                           earliest_key, latest_key) {
+                           earliest_key, latest_key, s) {
 
   # Record the earlist and latest keys found
   if (show_blocks) {
@@ -2119,12 +2125,13 @@ function filter_array(now, data_array, name, show_blocks,
 
         # get last key and show range of keys
         if (show_blocks && (key in stack)) {
+          s = ((is_open(a, now))?( "*"):( ""))
           if (key != first_key)
             # More than one key
-            printf "%22s\t[%s, %s]\n", Leaf[a], get_date(key), get_date(first_key) > "/dev/stderr"
+            printf "%22s\t[%s, %s]%s\n", Leaf[a], get_date(key), get_date(first_key), s > "/dev/stderr"
           else if (!Show_Extra)
             # Only one key in this block - already recorded if Show_Extra set
-            printf "%22s\t[%s]\n", Leaf[a], get_date(first_key) > "/dev/stderr"
+            printf "%22s\t[%s]%s\n", Leaf[a], get_date(first_key), s > "/dev/stderr"
 
           # Record earliest key
           earliest_key = (((earliest_key) - ( key) < 0)?(earliest_key):( key))
@@ -2787,10 +2794,9 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             else
               key = (0)
 
-            # The held time (will be wrong when last_key is FALSE)
+            # The held time (will be wrong when key is FALSE)
             held_time = get_held_time(key, Held_From[a][p])
-            reduced_cost  += get_parcel_cost(a, p, now)
-            adjusted_cost += get_parcel_cost(a, p, now, (1))
+
 
             # Total gains (accounting gains)
             if ((Held_Until[a][ p] <= ( now))) {
@@ -2803,8 +2809,12 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             # cash in and out
             parcel_cost     =   get_cash_in(a, p, now)
             cost           += parcel_cost
-            proceeds       += parcel_proceeds
-
+            if (key) {
+              proceeds       += parcel_proceeds
+              reduced_cost  += get_parcel_cost(a, p, now)
+              adjusted_cost += get_parcel_cost(a, p, now, (1))
+            }
+            
             # Keep track of accounting gains
             accounting_gains += gains
 
@@ -3128,7 +3138,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("MB" ~ /[cC]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3466,7 +3476,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[oO]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3606,7 +3616,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[bB]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3643,13 +3653,16 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   label = sprintf("Non Current Assets\n")
   class_list["ASSET.TERM"] = (1)
   class_list["ASSET.CURRENT"] = (1)
-  label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed)
+  #label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed)
+  label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_value", now, Epoch, past, Epoch, is_detailed)
   label = print_account_class(reports_stream, label, "not_current_class", "ASSET.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
   delete class_list
 
   # Here we need to adjust for accounting gains & losses
-  assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
-  assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
+  #assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
+  #assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
+  assets[now]  =  get_cost("*ASSET", now)  - get_cost(MARKET_CHANGES, now)  # - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)
+  assets[past] =  get_cost("*ASSET", past) - get_cost(MARKET_CHANGES, past) # - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past)
 
   # Print a nice line
   underline(73, 8, reports_stream)
@@ -3739,7 +3752,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("MB" ~ /[mM]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3812,7 +3825,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[dD]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3947,7 +3960,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[qQ]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4441,7 +4454,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("MB" ~ /[tT]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
@@ -4647,9 +4660,6 @@ function income_tax_aud(now, past, benefits,
     # The franking deficit offsets
     franking_deficit_offsets = - get_cost(FRANKING_DEFICIT, now)
 
-    if (!(((franking_deficit_offsets) <= Epsilon) && ((franking_deficit_offsets) >= -Epsilon)))
-      printf "%48s %32s\n\n", "Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
-
 
     # Need to check for franking deficit tax here
     if (((franking_balance) < -Epsilon)) {
@@ -4672,19 +4682,12 @@ function income_tax_aud(now, past, benefits,
       # -f > 0.10 * (-x)
       # 0.1 * (x) - f > 0
 
-      printf "Threshold %s Balance %s\n",  print_cash(x), print_cash(- franking_balance)> write_stream
-
       if (((x - franking_balance) >  Epsilon)) {
         franking_deficit_offsets -= Franking_Deficit_Reduction * franking_balance
-
-        printf "%48s\n", "Franking Deficit Offset Reduction Applied" > write_stream
 
       } else
         franking_deficit_offsets -= franking_balance
 
-
-      if (!(((franking_deficit_offsets) <= Epsilon) && ((franking_deficit_offsets) >= -Epsilon)))
-        printf "%48s %32s\n\n", "New Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
 
 
       # Don't adjust tax due - this is a separate liability
@@ -4731,10 +4734,6 @@ function income_tax_aud(now, past, benefits,
     printf "%s\t%40s %32s\n\n", header, "Foreign Offsets", print_cash(foreign_offsets) > write_stream
     header = ""
 
-    printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(((__MPX_KEY__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Foreign_Offset_Limit[0]):( 0))))) > write_stream
-    if (extra_tax > 0)
-      printf "\t%40s %32s\n\n", "Extra Tax Paid on Foreign Earnings", print_cash(extra_tax) > write_stream
-
   } else
     foreign_offsets = 0
 
@@ -4745,15 +4744,6 @@ function income_tax_aud(now, past, benefits,
     middle_income_offset = get_tax(now, Middle_Income_Offset, taxable_income)
 
     # This is an Australian no-carry offset computed from the taxable income
-
-    if ((((low_income_offset) > Epsilon) || ((low_income_offset) < -Epsilon))) {
-      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(low_income_offset) > write_stream
-      header = ""
-    }
-    if ((((middle_income_offset) > Epsilon) || ((middle_income_offset) < -Epsilon))) {
-      printf "%s\t%40s %32s\n", header, "Middle Income Tax Offset", print_cash(middle_income_offset) > write_stream
-      header = ""
-    }
 
 
     # Set the no_carry offsets
@@ -4839,16 +4829,12 @@ function income_tax_aud(now, past, benefits,
 
     # Report tax owed
 
-    printf "%48s %32s\n\n", "Income Tax After applying Non-Refundable Offsets", print_cash(tax_owed) > write_stream
-
   } # End of if any attempt to apply non-refundable assets
 
   # Now apply refundable offsets - but note these will not generate a tax loss - since they are refunded :)
   if (((refundable_offsets) >  Epsilon)) {
     tax_owed -= refundable_offsets
     printf "\t%40s %32s>\n", "<Refundable Offsets Used", print_cash(refundable_offsets) > write_stream
-
-    printf "%48s %32s\n\n", "Income Tax After applying Refundable Offsets", print_cash(tax_owed) > write_stream
 
   }
 
@@ -5247,7 +5233,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("MB" ~ /[iI]|[aA]/ && "MB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5392,8 +5378,8 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
   balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 
-  # No default printing
-  show_balance = (0)
+  # Verbose balance printing
+  show_balance = (1)
 
 
   # Is there an error?
@@ -6171,9 +6157,6 @@ function set_special_accounts() {
   initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SHORT.GAINS")
   WRITTEN_BACK   =   initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SHORT.LOSSES")
 
-  # Taxable carried losses
-  TAX_LOSSES       = initialize_account("SPECIAL.LOSSES:TAX.LOSSES")
-
   #
   # Deferred Gains & Losses too (all long...)
   DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
@@ -6949,7 +6932,7 @@ function checkset(now, a, account, units, amount, is_check,
     switch(action) {
       case "VALUE" :
         assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[account])))
-        quantity = ((((account) ~ /^ASSET\.CAPITAL[.:]/))?( ((__MPX_KEY__ = find_key(Price[account],   now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[account],    now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0))))):( get_cost(account,  now))); break
+        quantity = get_value(account, now); break
       case "PRICE" :
         assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[account])))
         quantity = ((__MPX_KEY__ = find_key(Price[account],  now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))); break
@@ -7367,7 +7350,6 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
   } # End of if splitting a parcel
 
   # The sale price
-  # This is always recorded as cost_element 0 since it is not actually a true cost
   # This must be recorded as cash flowing out of the account
   # A parcel is only ever sold once so we can simply set the cost
   (Parcel_Proceeds[a][ p] = ( -amount_paid))
@@ -7539,7 +7521,7 @@ function match_parcel(a, p, parcel_tag, parcel_timestamp,
 
 
 # This checks all is ok
-function check_balance(now,        sum_assets, sum_liabilities, sum_equities, sum_expenses, sum_income, sum_adjustments, balance, show_balance) {
+function check_balance(now,        sum_assets, sum_liabilities, sum_equities, sum_expenses, sum_income, sum_adjustments, balance, show_balance, output_stream) {
   # The following should always be true
   # Assets - Liabilities = Income + Expenses
   # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
@@ -7556,28 +7538,35 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
 
 
-  # No default printing
-  show_balance = (0)
+  # Verbose balance printing
+  show_balance = (1)
+  output_stream = "/dev/stdout"
 
 
   # Is there an error?
   if (!(((balance) <= Epsilon) && ((balance) >= -Epsilon))) {
-    printf "Problem - Accounts Unbalanced <%s>\n", $0 > "/dev/stderr"
+    printf "Problem - Accounts Unbalanced <%s>\n", $0 > output_stream
     show_balance = (1)
   } else
     balance = 0
 
   # // Print the balance if necessary
   if (show_balance) {
-    printf "\tDate => %s\n", get_date(now) > "/dev/stderr"
-    printf "\tAssets      => %20.2f\n", sum_assets > "/dev/stderr"
-    printf "\tIncome      => %20.2f\n", sum_income > "/dev/stderr"
-    printf "\tExpenses    => %20.2f\n", sum_expenses > "/dev/stderr"
-    printf "\tLiabilities => %20.2f\n", sum_liabilities > "/dev/stderr"
-    printf "\tEquities    => %20.2f\n", sum_equities > "/dev/stderr"
+    printf "\tDate => %s\n", get_date(now) > output_stream
+    printf "\tAssets      => %20.2f\n", sum_assets > output_stream
+    printf "\tIncome      => %20.2f\n", sum_income > output_stream
+    printf "\t**<Realized => %20.2f>\n", - get_cost("*INCOME.GAINS.REALIZED", now) > output_stream
+
+    printf "\tExpenses    => %20.2f\n", sum_expenses > output_stream
+    printf "\t**<Realized => %20.2f>\n", - get_cost("*EXPENSE.LOSSES.REALIZED", now) > output_stream
+    printf "\t**<Market   => %20.2f>\n", - get_cost("*EXPENSE.UNREALIZED", now) > output_stream
+
+
+    printf "\tLiabilities => %20.2f\n", sum_liabilities > output_stream
+    printf "\tEquities    => %20.2f\n", sum_equities > output_stream
     if ((((sum_adjustments) > Epsilon) || ((sum_adjustments) < -Epsilon)))
-      printf "\tAdjustments => %20.2f\n", sum_adjustments > "/dev/stderr"
-    printf "\tBalance     => %20.2f\n", balance > "/dev/stderr"
+      printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
+    printf "\tBalance     => %20.2f\n", balance > output_stream
     assert((((balance) <= Epsilon) && ((balance) >= -Epsilon)), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
 }

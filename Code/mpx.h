@@ -153,7 +153,7 @@
 @define is_linked(a) ((Leaf[a]) ~ /^(DIV|DIST|FOR|GAINS)\./)
 
 # // The current value of an asset
-@define get_value(a, now) ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))
+# // @define get_value(a, now) ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))
 
 # // char code lookup
 @define get_char(c) ternary(c in URL_Lookup, URL_Lookup[c], (0))

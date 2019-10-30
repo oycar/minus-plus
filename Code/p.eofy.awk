@@ -251,10 +251,9 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             else
               key = FALSE
 
-            # The held time (will be wrong when last_key is FALSE)
+            # The held time (will be wrong when key is FALSE)
             held_time = get_held_time(key, Held_From[a][p])
-            reduced_cost  += get_parcel_cost(a, p, now)
-            adjusted_cost += get_parcel_cost(a, p, now, TRUE)
+
 
             # Total gains (accounting gains)
             if (is_sold(a, p, now)) {
@@ -267,8 +266,12 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             # cash in and out
             parcel_cost     =   get_cash_in(a, p, now)
             cost           += parcel_cost
-            proceeds       += parcel_proceeds
-
+            if (key) {
+              proceeds       += parcel_proceeds
+              reduced_cost  += get_parcel_cost(a, p, now)
+              adjusted_cost += get_parcel_cost(a, p, now, TRUE)
+            }
+            
             # Keep track of accounting gains
             accounting_gains += gains
 
@@ -1110,13 +1113,16 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   label = sprintf("Non Current Assets\n")
   class_list["ASSET.TERM"] = TRUE
   class_list["ASSET.CURRENT"] = TRUE
-  label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed)
+  #label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed)
+  label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_value", now, Epoch, past, Epoch, is_detailed)
   label = print_account_class(reports_stream, label, "not_current_class", "ASSET.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
   delete class_list
 
   # Here we need to adjust for accounting gains & losses
-  assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
-  assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
+  #assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
+  #assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
+  assets[now]  =  get_cost("*ASSET", now)  - get_cost(MARKET_CHANGES, now)  # - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)
+  assets[past] =  get_cost("*ASSET", past) - get_cost(MARKET_CHANGES, past) # - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past)
 
   # Print a nice line
   underline(73, 8, reports_stream)
