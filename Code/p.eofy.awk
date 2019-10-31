@@ -20,12 +20,8 @@
 
 # Handle EOFY processing for mpx
 function eofy_actions(now,      past, allocated_profits,
-                                benefits) {
+                                benefits, unrealized_gains) {
   # EOFY actions
-  # Turn on reporting?
-  ##if (now > Start_Time)
-  ##  EOFY = STDERR
-
   # past is referred to now
   past = last_year(now)
 
@@ -51,7 +47,16 @@ function eofy_actions(now,      past, allocated_profits,
   printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
 @endif
   }
-  set_cost(MARKET_CHANGES, get_asset_gains("get_unrealized_gains", just_before(now)), now)
+
+  # Save unrealized gains; notice that the asset class must be updated too for balancing
+  unrealized_gains = get_asset_gains("get_unrealized_gains", now)
+  set_cost(UNREALIZED, unrealized_gains, now)
+
+  # Get the change since previous transaction
+  unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
+
+  # Adjust the market gains and the asset values
+  set_cost("*ASSET", get_cost("*ASSET", just_before(now)) - unrealized_gains, now)
 
   # Do we need to check for dividend qualification
   if (Qualification_Window)
@@ -271,7 +276,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
               reduced_cost  += get_parcel_cost(a, p, now)
               adjusted_cost += get_parcel_cost(a, p, now, TRUE)
             }
-            
+
             # Keep track of accounting gains
             accounting_gains += gains
 
@@ -978,8 +983,8 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   print_account_class(reports_stream, label, "select_class", "ASSET.CAPITAL", "", "get_unrealized_gains", now, past, past, more_past, is_detailed, -1) # Block Depreciating Assets
 
   # Obtain the market gains per year
-  market_gains[now]  = - (get_cost(MARKET_CHANGES, now) - (x = get_cost(MARKET_CHANGES, past)))
-  market_gains[past] = - (x - get_cost(MARKET_CHANGES, more_past))
+  market_gains[now]  = - (get_cost(UNREALIZED, now) - (x = get_cost(UNREALIZED, past)))
+  market_gains[past] = - (x - get_cost(UNREALIZED, more_past))
 
   # Print the total unrealized gains
   print_line(past, reports_stream)
@@ -1113,16 +1118,13 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
   label = sprintf("Non Current Assets\n")
   class_list["ASSET.TERM"] = TRUE
   class_list["ASSET.CURRENT"] = TRUE
-  #label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_cost", now, Epoch, past, Epoch, is_detailed)
   label = print_account_class(reports_stream, label, "block_class_list", "ASSET", class_list, "get_value", now, Epoch, past, Epoch, is_detailed)
   label = print_account_class(reports_stream, label, "not_current_class", "ASSET.TERM", "", "get_cost", now, Epoch, past, Epoch, is_detailed)
   delete class_list
 
   # Here we need to adjust for accounting gains & losses
-  #assets[now]  =  get_cost("*ASSET", now)  - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)  - get_cost(MARKET_CHANGES, now)
-  #assets[past] =  get_cost("*ASSET", past) - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past) - get_cost(MARKET_CHANGES, past)
-  assets[now]  =  get_cost("*ASSET", now)  - get_cost(MARKET_CHANGES, now)  # - get_cost("*INCOME.GAINS.REALIZED", now)  - get_cost("*EXPENSE.LOSSES.REALIZED", now)
-  assets[past] =  get_cost("*ASSET", past) - get_cost(MARKET_CHANGES, past) # - get_cost("*INCOME.GAINS.REALIZED", past) - get_cost("*EXPENSE.LOSSES.REALIZED", past)
+  assets[now]  =  get_cost("*ASSET", now)
+  assets[past] =  get_cost("*ASSET", past)
 
   # Print a nice line
   underline(73, 8, reports_stream)

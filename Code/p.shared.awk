@@ -1536,7 +1536,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
   # Reduced cost by default
   sum = sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
   if (adjusted)
-    sum -= find_entry(Tax_Adjustments[a][p], now) ## Needs all elements
+    sum -= find_entry(Tax_Adjustments[a][p], now)
 
   # The parcel cost
   return sum

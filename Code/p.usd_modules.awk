@@ -90,7 +90,7 @@ function income_tax_usd(now, past, benefits,
   reports_stream = report_tax(EOFY)
 
   # Get market changes
-  market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
+  market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
 
   # Let's go
   printf "%s\n", Journal_Title > EOFY
