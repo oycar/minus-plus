@@ -21,42 +21,36 @@
 # Handle EOFY processing for mpx
 function eofy_actions(now,      past, allocated_profits,
                                 benefits, unrealized_gains) {
-  # EOFY actions
-  # past is referred to now
-  past = last_year(now)
-
 @ifeq LOG eofy_actions
   # EOFY actions
   printf "EOFY Actions\n\tDate => %s\n", get_date(now) > STDERR
 @endif
 
-  # Depreciate everything - at EOFY
-  depreciate_all(now)
+  # past is one year earlier
+  past = last_year(now)
 
-  # Set EOFY accounts
-  # Very careful ordering of get/set actions is required
-  # the tax statements adjust costs and so this must be reproducible
-  # Therefore affected accounts need to be reset to the input value
-  set_cost(ADJUSTMENTS, get_cost(ADJUSTMENTS, just_before(now)), now)
+  # Are these actions already processed in the accounts?
+  if (Start_Journal) {
+    # No this is the first time through
+    # Depreciate everything - at EOFY
+    depreciate_all(now)
 
-  # For the case of ALLOCATED being a separate account
+    # Save unrealized gains; notice that the asset class must be updated too for balancing
+    unrealized_gains = get_asset_gains("get_unrealized_gains", now)
+
+    # Get the change since previous transaction
+    unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
+
+    # Adjust the market gains and the asset values
+    adjust_cost("*ASSET", - unrealized_gains, now)
+    adjust_cost(UNREALIZED, unrealized_gains, now)
+  }
+
+  # This seems redundant
   if (ALLOCATED != ADJUSTMENTS) {
     allocated_profits = get_cost(ALLOCATED, just_before(now))
     set_cost(ALLOCATED, allocated_profits, now)
-@ifeq LOG eofy_actions
-  printf "\tALLOCATED => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
-@endif
   }
-
-  # Save unrealized gains; notice that the asset class must be updated too for balancing
-  unrealized_gains = get_asset_gains("get_unrealized_gains", now)
-  set_cost(UNREALIZED, unrealized_gains, now)
-
-  # Get the change since previous transaction
-  unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
-
-  # Adjust the market gains and the asset values
-  set_cost("*ASSET", get_cost("*ASSET", just_before(now)) - unrealized_gains, now)
 
   # Do we need to check for dividend qualification
   if (Qualification_Window)
@@ -82,7 +76,8 @@ function eofy_actions(now,      past, allocated_profits,
   @Income_Tax_Function(now, past, benefits)
 
   # A Super fund must allocate assets to members - this requires account balancing
-  @Balance_Profits_Function(now, past, allocated_profits)
+  if (Start_Journal)
+    @Balance_Profits_Function(now, past, allocated_profits)
 
   # Print the balance sheet
   print_balance_sheet(now, past, 1)
@@ -1300,7 +1295,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = report_fixed(EOFY)
+  reports_stream = report_depreciation(EOFY)
   if (DEVNULL == reports_stream)
     return
 

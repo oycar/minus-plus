@@ -26,9 +26,9 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   # Balance the books - including the reserve
   # Note that this is only needed to be done once
   # Reset the liabilities to just before now so that they are correct even if balance journal is re-run
-  for (x in Member_Liability)
-    set_cost(x, get_cost(x, just_before(now)), now)
-  set_cost(RESERVE, get_cost(RESERVE, just_before(now)), now)
+  # for (x in Member_Liability)
+  #   set_cost(x, get_cost(x, just_before(now)), now)
+  # set_cost(RESERVE, get_cost(RESERVE, just_before(now)), now)
 
   # Adjust member liability
   delta_profits = accumulated_profits(now) - initial_allocation
@@ -43,7 +43,7 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   printf "\tAllocated Profits      => %14s\n\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
 @endif
 
-  # Update the allocation - a get is before the set
+  # Update the allocation
   if (!near_zero(delta_profits))
     # Update the Allocated Profits - this adds to changes made in print_tax_statement
     adjust_cost(ALLOCATED, delta_profits, now)
@@ -67,7 +67,6 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 @ifeq LOG balance_journal
     # Track reserve
     printf "\tApplied to Reserve         => %14s\n", print_cash(-x) > STDERR
-    #printf "\tApplied to Members         => %14s\n", print_cash(-delta_profits) > STDERR
 @endif
   } else
     x = 0
@@ -90,13 +89,13 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 }
 
 # This checks all is ok
-function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustments, sum_future, balance, show_balance) {
+function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustments, sum_future, balance, show_balance, output_stream) {
   # The following should always be true (Equity is treated a special case of liability)
   # Assets - Liabilities = 0 (SMSFs have a simplified equation)
   # A complication exists if back payments are included so we have innstead
   # Assets - Liabilities = Future_Payments
   # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
-  sum_assets =  get_cost("*ASSET", now) - get_cost("*INCOME.GAINS.REALIZED", now) - get_cost("*EXPENSE.LOSSES.REALIZED", now) - get_cost("*EXPENSE.UNREALIZED", now)
+  sum_assets =  get_cost("*ASSET", now)
 
   # Work out the total assets etc
   sum_liabilities = - get_cost("*LIABILITY", now)
@@ -110,28 +109,40 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
 @ifeq LOG check_balance
   # Verbose balance printing
   show_balance = TRUE
+  output_stream = STDOUT
 @else
   # No default printing
   show_balance = FALSE
+  output_stream = STDERR
 @endif #// LOG
 
   # Is there an error?
   if (!near_zero(balance)) {
-    printf "Problem - Accounts Unbalanced <%s>\n", $0
+    printf "Problem - Accounts Unbalanced <%s>\n", $0 > output_stream
     show_balance = TRUE
   } else
     balance = 0
 
   # // Print the balance if necessary
   if (show_balance) {
-    printf "\tDate => %s\n", get_date(now)
-    printf "\tAssets      => %20.2f\n", sum_assets
-    printf "\tLiabilities => %20.2f\n", sum_liabilities
-    if (not_zero(sum_adjustments))
-      printf "\tAdjustments => %20.2f\n", sum_adjustments
+    printf "\tDate => %s\n", get_date(now) > output_stream
+    printf "\tAssets      => %20.2f\n", sum_assets > output_stream
+    printf "\tLiabilities => %20.2f\n", sum_liabilities > output_stream
+    if (not_zero(sum_adjustments)) {
+      printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
+      printf "\tIncome      => %20.2f\n",  get_cost("*INCOME", now) > output_stream
+      printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
+      printf "\t**<Contribution => %20.2f>\n", get_cost("*INCOME.CONTRIBUTION", now) > output_stream
+      printf "\tExpenses    => %20.2f\n", get_cost("*EXPENSE", now) > output_stream
+      printf "\t**<Benefits => %20.2f>\n", get_cost("*EXPENSE.BENEFIT", now) > output_stream
+      printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
+      printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
+      printf "\t**<Allocated=> %20.2f>\n", get_cost(ALLOCATED, now) > output_stream
+    }
+    
     if (not_zero(sum_future))
-      printf "\tFuture      => %20.2f\n", sum_future
-    printf "\tBalance     => %20.2f\n", balance
+      printf "\tFuture      => %20.2f\n", sum_future > output_stream
+    printf "\tBalance     => %20.2f\n", balance > output_stream
     assert(near_zero(balance), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
 }

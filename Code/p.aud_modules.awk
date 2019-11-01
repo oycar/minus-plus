@@ -35,14 +35,6 @@ BEGIN {
   if ("" == Epoch)
     set_epoch()
 
-  # # // Can set constants here
-  # if (!Qualification_Window)
-  #   EOFY_Window = Qualification_Window = 0
-  # else {
-  #   Qualification_Window = 91 * ONE_DAY # seconds
-  #   EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
-  # }
-
   # Start of FY
   if ("" == FY_Date)
     FY_Date = "Jul 01"
@@ -650,7 +642,9 @@ function income_tax_aud(now, past, benefits,
   # The residual tax liability is tax computed to be due but not actually paid or refunded
   # Careful when adjusting cost - a second run will continue to increase it
   # Either explicitly set the cost or reset it first
-  set_cost(RESIDUAL, get_cost(RESIDUAL, just_before(now)) + get_cost(TAX, just_before(now)), now)
+  if (Start_Journal)
+    #set_cost(RESIDUAL, get_cost(RESIDUAL, just_before(now)) + get_cost(TAX, just_before(now)), now)
+    adjust_cost(RESIDUAL, get_cost(TAX, now), now)
 
   # Adjust Levys
 
@@ -695,8 +689,8 @@ function income_tax_aud(now, past, benefits,
   # If this is an SMSF this disturbs the member liabilities
   # Adjust cost is OK because ALLOCATED/ADJUSTMENTS were reset at comencement of eofy_actions
   # For a none SMSF this is a synonym for ADJUSTMENTS
-  adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
-
+  if (Start_Journal)
+    adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
 
   # This seems over complex
   # The increased liability is a future liability

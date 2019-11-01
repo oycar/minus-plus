@@ -109,7 +109,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
     A) Show_Reports="A";;   # All
     B) Show_Reports+="B";;  # Balance
     C) Show_Reports+="C";;  # Capital Gains
-    F) Show_Reports+="D";;  # Fixed Asset Depreciation
+    D) Show_Reports+="D";;  # Fixed Asset Depreciation
     I) Show_Reports+="I";;  # Imputation
     M) Show_Reports+="M";;  # Market Gains
     O) Show_Reports+="O";;  # Operating Statement

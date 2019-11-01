@@ -1536,6 +1536,7 @@ END {
   else if (Stop_Time < Future) {
     # We need to produce statements
     do {
+
       # Get each EOFY in turn
       eofy_actions(FY_Time)
 
@@ -1977,20 +1978,19 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   } # End of if splitting a parcel
 
   # Save realized gains
-  # FIXME
-  if (!is_fixed(a))
-    gains = save_parcel_gain(a, p, now, - amount_paid)
+  if (is_fixed(a))
+    gains = sell_fixed_parcel(a, p, now, - amount_paid)
   else
-    gains = sell_fixed_parcel(a, p, now)
+    gains = save_parcel_gain(a, p, now, - amount_paid)
+
+  # Don't need to set the accounting cost to zero because get_cost will pick that up automatically
+  # But the capital gain or loss needs to be balanced in the asset sums
+  update_cost(a, -gains, now)
 
   # The sale price
   # This must be recorded as cash flowing out of the account
   # A parcel is only ever sold once so we can simply set the cost
   set_parcel_proceeds(a, p, -amount_paid)
-
-  # Don't need to set the accounting cost to zero because get_cost will pick that up automatically
-  # But the capital gain or loss needs to be balanced in the asset sums
-  update_cost(a, -gains, now)
 
 @ifeq LOG sell_units
   printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n",
@@ -2008,31 +2008,33 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
 #
 # When a parcel of a fixed asset is sold
 # it changes the depreciation amounts
-# these are effected at time now
-function sell_fixed_parcel(a, p, now,     cost) {
+function sell_fixed_parcel(a, p, now, gains,    cost) {
   # A depreciating asset will neither have capital gains nor losses
-  # so it will have accounting cost zero
+  # Suppose current value => c  (c >= 0)
+  # Proceeds received     => p  (p <= 0)
+  #
+  # After sale value      => 0
+  # Depreciation          => c + p <= 0
+  # Appreciation             c + p >  0
 
-  # Only need to save depreciation or appreciation
-  cost = sum_cost_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset
-
+  gains += sum_cost_elements(Accounting_Cost[a][p], now)
 @ifeq LOG sell_units
-  if (above_zero(cost)) # This was a DEPRECIATION expense
-    printf "\tDepreciation => %s\n", print_cash(cost) > STDERR
-  else if (below_zero(cost)) # This was an APPRECIATION income
-    printf "\tAppreciation => %s\n", print_cash(-cost) > STDERR
+  if (above_zero(gains)) # This was a DEPRECIATION expense
+    printf "\tDepreciation => %s\n", print_cash(gains) > STDERR
+  else if (below_zero(gains)) # This was an APPRECIATION income
+    printf "\tAppreciation => %s\n", print_cash(-gains) > STDERR
   else
     printf "\tZero Depreciation\n" > STDERR
 @endif # LOG
 
   # Any excess income or expenses are recorded
-  if (above_zero(cost)) # This was a DEPRECIATION expense
-    adjust_cost(SOLD_DEPRECIATION, cost, now)
-  else if (below_zero(cost)) # This was APPRECIATION income
-    adjust_cost(SOLD_APPRECIATION, cost, now)
+  if (above_zero(gains)) # This was a DEPRECIATION expense
+    adjust_cost(SOLD_DEPRECIATION, gains, now)
+  else if (below_zero(gains)) # This was APPRECIATION income
+    adjust_cost(SOLD_APPRECIATION, gains, now)
 
-  # return parcel cost
-  return cost
+  # return parcel gains
+  return gains
 }
 
 # Save a capital gain
@@ -2040,13 +2042,13 @@ function sell_fixed_parcel(a, p, now,     cost) {
 # current cost; if the price is greater a capital gain will result
 # if less a capital loss; these losses and gains will be retained
 # in the cost basis...
-function save_parcel_gain(a, p, now, gains,   held_time) {
+function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
   # Get the held time
   held_time = get_held_time(now, Held_From[a][p])
 
   # Accounting gains or Losses - based on reduced cost
   # Also taxable losses are based on the reduced cost...
-  gains += sum_cost_elements(Accounting_Cost[a][p], now) # Needs all elements
+  gains += sum_cost_elements(Accounting_Cost[a][p], now)
   if (above_zero(gains)) {
     adjust_cost(REALIZED_LOSSES, gains, now)
 
@@ -2066,19 +2068,19 @@ function save_parcel_gain(a, p, now, gains,   held_time) {
   # Taxable gains
   # after application of tax adjustments
   # This works if tax adjustments are negative
-  gains -= find_entry(Tax_Adjustments[a][p], now)
+  tax_gains = gains - find_entry(Tax_Adjustments[a][p], now)
 
   # Taxable Gains are based on the adjusted cost
-  if (below_zero(gains)) {
+  if (below_zero(tax_gains)) {
     # Taxable losses are based on the reduced cost
     if (held_time >= CGT_PERIOD) {
       if (!(a in Long_Gains))
         Long_Gains[a] = initialize_account(LONG_GAINS ":LG." Leaf[a])
-      adjust_cost(Long_Gains[a], gains, now)
+      adjust_cost(Long_Gains[a], tax_gains, now)
     } else {
       if (!(a in Short_Gains))
         Short_Gains[a] = initialize_account(SHORT_GAINS ":SG." Leaf[a])
-      adjust_cost(Short_Gains[a], gains, now)
+      adjust_cost(Short_Gains[a], tax_gains, now)
     }
   }
 

@@ -1354,7 +1354,10 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
   printf "\t\t\tRealized Gains => %s\n",  print_cash(-parcel_cost) > STDERR
 @endif # LOG
 
-      # Adjust tax adjustment too
+      # The capital gain needs to be balanced in the asset sums
+      update_cost(a, -parcel_cost, now)
+
+      # Update tax adjustment too
       if (parcel_adjustment < parcel_cost)
         sum_entry(Tax_Adjustments[a][p], parcel_cost, now)
       else {

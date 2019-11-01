@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Control Export format
 
 
@@ -92,8 +94,6 @@ END {
 
 
 # // Default Reports
-
-
 
 
 
@@ -1648,7 +1648,10 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 
 
 
-      # Adjust tax adjustment too
+      # The capital gain needs to be balanced in the asset sums
+      update_cost(a, -parcel_cost, now)
+
+      # Update tax adjustment too
       if (parcel_adjustment < parcel_cost)
         sum_entry(Tax_Adjustments[a][p], parcel_cost, now)
       else {
@@ -2571,37 +2574,33 @@ function add_months(now, number_months,   y, m, d,
 # Handle EOFY processing for mpx
 function eofy_actions(now,      past, allocated_profits,
                                 benefits, unrealized_gains) {
-  # EOFY actions
-  # past is referred to now
+
+
+  # past is one year earlier
   past = ((now) - one_year(now, -1))
 
+  # Are these actions already processed in the accounts?
+  if (Start_Journal) {
+    # No this is the first time through
+    # Depreciate everything - at EOFY
+    depreciate_all(now)
 
+    # Save unrealized gains; notice that the asset class must be updated too for balancing
+    unrealized_gains = get_asset_gains("get_unrealized_gains", now)
 
-  # Depreciate everything - at EOFY
-  depreciate_all(now)
+    # Get the change since previous transaction
+    unrealized_gains -= get_cost(UNREALIZED, (find_key(Cost_Basis[UNREALIZED], (( ((now) - 1)) - 1))))
 
-  # Set EOFY accounts
-  # Very careful ordering of get/set actions is required
-  # the tax statements adjust costs and so this must be reproducible
-  # Therefore affected accounts need to be reset to the input value
-  set_cost(ADJUSTMENTS, get_cost(ADJUSTMENTS, ((now) - 1)), now)
+    # Adjust the market gains and the asset values
+    adjust_cost("*ASSET", - unrealized_gains, now)
+    adjust_cost(UNREALIZED, unrealized_gains, now)
+  }
 
-  # For the case of ALLOCATED being a separate account
+  # This seems redundant
   if (ALLOCATED != ADJUSTMENTS) {
     allocated_profits = get_cost(ALLOCATED, ((now) - 1))
     set_cost(ALLOCATED, allocated_profits, now)
-
   }
-
-  # Save unrealized gains; notice that the asset class must be updated too for balancing
-  unrealized_gains = get_asset_gains("get_unrealized_gains", now)
-  set_cost(UNREALIZED, unrealized_gains, now)
-
-  # Get the change since previous transaction
-  unrealized_gains -= get_cost(UNREALIZED, (find_key(Cost_Basis[UNREALIZED], (( ((now) - 1)) - 1))))
-
-  # Adjust the market gains and the asset values
-  set_cost("*ASSET", get_cost("*ASSET", ((now) - 1)) - unrealized_gains, now)
 
   # Do we need to check for dividend qualification
   if (Qualification_Window)
@@ -2627,7 +2626,8 @@ function eofy_actions(now,      past, allocated_profits,
   @Income_Tax_Function(now, past, benefits)
 
   # A Super fund must allocate assets to members - this requires account balancing
-  @Balance_Profits_Function(now, past, allocated_profits)
+  if (Start_Journal)
+    @Balance_Profits_Function(now, past, allocated_profits)
 
   # Print the balance sheet
   print_balance_sheet(now, past, 1)
@@ -3145,7 +3145,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3483,7 +3483,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3623,7 +3623,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3756,7 +3756,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3829,7 +3829,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3964,7 +3964,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4335,14 +4335,6 @@ BEGIN {
   if ("" == Epoch)
     set_epoch()
 
-  # # // Can set constants here
-  # if (!Qualification_Window)
-  #   EOFY_Window = Qualification_Window = 0
-  # else {
-  #   Qualification_Window = 91 * ONE_DAY # seconds
-  #   EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
-  # }
-
   # Start of FY
   if ("" == FY_Date)
     FY_Date = "Jul 01"
@@ -4458,7 +4450,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -4923,7 +4915,9 @@ function income_tax_aud(now, past, benefits,
   # The residual tax liability is tax computed to be due but not actually paid or refunded
   # Careful when adjusting cost - a second run will continue to increase it
   # Either explicitly set the cost or reset it first
-  set_cost(RESIDUAL, get_cost(RESIDUAL, ((now) - 1)) + get_cost(TAX, ((now) - 1)), now)
+  if (Start_Journal)
+    #set_cost(RESIDUAL, get_cost(RESIDUAL, just_before(now)) + get_cost(TAX, just_before(now)), now)
+    adjust_cost(RESIDUAL, get_cost(TAX, now), now)
 
   # Adjust Levys
 
@@ -4968,8 +4962,8 @@ function income_tax_aud(now, past, benefits,
   # If this is an SMSF this disturbs the member liabilities
   # Adjust cost is OK because ALLOCATED/ADJUSTMENTS were reset at comencement of eofy_actions
   # For a none SMSF this is a synonym for ADJUSTMENTS
-  adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
-
+  if (Start_Journal)
+    adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
 
   # This seems over complex
   # The increased liability is a future liability
@@ -5242,7 +5236,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5327,16 +5321,16 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   # Balance the books - including the reserve
   # Note that this is only needed to be done once
   # Reset the liabilities to just before now so that they are correct even if balance journal is re-run
-  for (x in Member_Liability)
-    set_cost(x, get_cost(x, ((now) - 1)), now)
-  set_cost(RESERVE, get_cost(RESERVE, ((now) - 1)), now)
+  # for (x in Member_Liability)
+  #   set_cost(x, get_cost(x, just_before(now)), now)
+  # set_cost(RESERVE, get_cost(RESERVE, just_before(now)), now)
 
   # Adjust member liability
   delta_profits = (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - initial_allocation
 
 
 
-  # Update the allocation - a get is before the set
+  # Update the allocation
   if (!(((delta_profits) <= Epsilon) && ((delta_profits) >= -Epsilon)))
     # Update the Allocated Profits - this adds to changes made in print_tax_statement
     adjust_cost(ALLOCATED, delta_profits, now)
@@ -5369,13 +5363,13 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 }
 
 # This checks all is ok
-function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustments, sum_future, balance, show_balance) {
+function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustments, sum_future, balance, show_balance, output_stream) {
   # The following should always be true (Equity is treated a special case of liability)
   # Assets - Liabilities = 0 (SMSFs have a simplified equation)
   # A complication exists if back payments are included so we have innstead
   # Assets - Liabilities = Future_Payments
   # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
-  sum_assets =  get_cost("*ASSET", now) - get_cost("*INCOME.GAINS.REALIZED", now) - get_cost("*EXPENSE.LOSSES.REALIZED", now) - get_cost("*EXPENSE.UNREALIZED", now)
+  sum_assets =  get_cost("*ASSET", now)
 
   # Work out the total assets etc
   sum_liabilities = - get_cost("*LIABILITY", now)
@@ -5387,27 +5381,38 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
   balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 
-  # Verbose balance printing
-  show_balance = (1)
+  # No default printing
+  show_balance = (0)
+  output_stream = "/dev/stderr"
 
 
   # Is there an error?
   if (!(((balance) <= Epsilon) && ((balance) >= -Epsilon))) {
-    printf "Problem - Accounts Unbalanced <%s>\n", $0
+    printf "Problem - Accounts Unbalanced <%s>\n", $0 > output_stream
     show_balance = (1)
   } else
     balance = 0
 
   # // Print the balance if necessary
   if (show_balance) {
-    printf "\tDate => %s\n", get_date(now)
-    printf "\tAssets      => %20.2f\n", sum_assets
-    printf "\tLiabilities => %20.2f\n", sum_liabilities
-    if ((((sum_adjustments) > Epsilon) || ((sum_adjustments) < -Epsilon)))
-      printf "\tAdjustments => %20.2f\n", sum_adjustments
+    printf "\tDate => %s\n", get_date(now) > output_stream
+    printf "\tAssets      => %20.2f\n", sum_assets > output_stream
+    printf "\tLiabilities => %20.2f\n", sum_liabilities > output_stream
+    if ((((sum_adjustments) > Epsilon) || ((sum_adjustments) < -Epsilon))) {
+      printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
+      printf "\tIncome      => %20.2f\n",  get_cost("*INCOME", now) > output_stream
+      printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
+      printf "\t**<Contribution => %20.2f>\n", get_cost("*INCOME.CONTRIBUTION", now) > output_stream
+      printf "\tExpenses    => %20.2f\n", get_cost("*EXPENSE", now) > output_stream
+      printf "\t**<Benefits => %20.2f>\n", get_cost("*EXPENSE.BENEFIT", now) > output_stream
+      printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
+      printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
+      printf "\t**<Allocated=> %20.2f>\n", get_cost(ALLOCATED, now) > output_stream
+    }
+    
     if ((((sum_future) > Epsilon) || ((sum_future) < -Epsilon)))
-      printf "\tFuture      => %20.2f\n", sum_future
-    printf "\tBalance     => %20.2f\n", balance
+      printf "\tFuture      => %20.2f\n", sum_future > output_stream
+    printf "\tBalance     => %20.2f\n", balance > output_stream
     assert((((balance) <= Epsilon) && ((balance) >= -Epsilon)), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
 }
@@ -7020,6 +7025,7 @@ END {
   else if (Stop_Time < Future) {
     # We need to produce statements
     do {
+
       # Get each EOFY in turn
       eofy_actions(FY_Time)
 
@@ -7368,20 +7374,19 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   } # End of if splitting a parcel
 
   # Save realized gains
-  # FIXME
-  if (!((a) ~ /^ASSET\.FIXED[.:]/))
-    gains = save_parcel_gain(a, p, now, - amount_paid)
+  if (((a) ~ /^ASSET\.FIXED[.:]/))
+    gains = sell_fixed_parcel(a, p, now, - amount_paid)
   else
-    gains = sell_fixed_parcel(a, p, now)
+    gains = save_parcel_gain(a, p, now, - amount_paid)
+
+  # Don't need to set the accounting cost to zero because get_cost will pick that up automatically
+  # But the capital gain or loss needs to be balanced in the asset sums
+  update_cost(a, -gains, now)
 
   # The sale price
   # This must be recorded as cash flowing out of the account
   # A parcel is only ever sold once so we can simply set the cost
   (Parcel_Proceeds[a][ p] = ( -amount_paid))
-
-  # Don't need to set the accounting cost to zero because get_cost will pick that up automatically
-  # But the capital gain or loss needs to be balanced in the asset sums
-  update_cost(a, -gains, now)
 
 
 
@@ -7392,24 +7397,26 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
 #
 # When a parcel of a fixed asset is sold
 # it changes the depreciation amounts
-# these are effected at time now
-function sell_fixed_parcel(a, p, now,     cost) {
+function sell_fixed_parcel(a, p, now, gains,    cost) {
   # A depreciating asset will neither have capital gains nor losses
-  # so it will have accounting cost zero
+  # Suppose current value => c  (c >= 0)
+  # Proceeds received     => p  (p <= 0)
+  #
+  # After sale value      => 0
+  # Depreciation          => c + p <= 0
+  # Appreciation             c + p >  0
 
-  # Only need to save depreciation or appreciation
-  cost = sum_cost_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset
-
+  gains += sum_cost_elements(Accounting_Cost[a][p], now)
 
 
   # Any excess income or expenses are recorded
-  if (((cost) >  Epsilon)) # This was a DEPRECIATION expense
-    adjust_cost(SOLD_DEPRECIATION, cost, now)
-  else if (((cost) < -Epsilon)) # This was APPRECIATION income
-    adjust_cost(SOLD_APPRECIATION, cost, now)
+  if (((gains) >  Epsilon)) # This was a DEPRECIATION expense
+    adjust_cost(SOLD_DEPRECIATION, gains, now)
+  else if (((gains) < -Epsilon)) # This was APPRECIATION income
+    adjust_cost(SOLD_APPRECIATION, gains, now)
 
-  # return parcel cost
-  return cost
+  # return parcel gains
+  return gains
 }
 
 # Save a capital gain
@@ -7417,13 +7424,13 @@ function sell_fixed_parcel(a, p, now,     cost) {
 # current cost; if the price is greater a capital gain will result
 # if less a capital loss; these losses and gains will be retained
 # in the cost basis...
-function save_parcel_gain(a, p, now, gains,   held_time) {
+function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
   # Get the held time
   held_time = get_held_time(now, Held_From[a][p])
 
   # Accounting gains or Losses - based on reduced cost
   # Also taxable losses are based on the reduced cost...
-  gains += sum_cost_elements(Accounting_Cost[a][p], now) # Needs all elements
+  gains += sum_cost_elements(Accounting_Cost[a][p], now)
   if (((gains) >  Epsilon)) {
     adjust_cost(REALIZED_LOSSES, gains, now)
 
@@ -7443,19 +7450,19 @@ function save_parcel_gain(a, p, now, gains,   held_time) {
   # Taxable gains
   # after application of tax adjustments
   # This works if tax adjustments are negative
-  gains -= ((__MPX_KEY__ = find_key(Tax_Adjustments[a][p],  now))?( Tax_Adjustments[a][p][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Adjustments[a][p][0]):( 0))))
+  tax_gains = gains - ((__MPX_KEY__ = find_key(Tax_Adjustments[a][p],  now))?( Tax_Adjustments[a][p][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Adjustments[a][p][0]):( 0))))
 
   # Taxable Gains are based on the adjusted cost
-  if (((gains) < -Epsilon)) {
+  if (((tax_gains) < -Epsilon)) {
     # Taxable losses are based on the reduced cost
     if (held_time >= 31622400) {
       if (!(a in Long_Gains))
         Long_Gains[a] = initialize_account(("SPECIAL.TAXABLE.GAINS.LONG") ":LG." Leaf[a])
-      adjust_cost(Long_Gains[a], gains, now)
+      adjust_cost(Long_Gains[a], tax_gains, now)
     } else {
       if (!(a in Short_Gains))
         Short_Gains[a] = initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SG." Leaf[a])
-      adjust_cost(Short_Gains[a], gains, now)
+      adjust_cost(Short_Gains[a], tax_gains, now)
     }
   }
 
@@ -7559,9 +7566,9 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
 
 
-  # Verbose balance printing
-  show_balance = (1)
-  output_stream = "/dev/stdout"
+  # No default printing
+  show_balance = (0)
+  output_stream = "/dev/stderr"
 
 
   # Is there an error?
