@@ -23,15 +23,6 @@ BEGIN {
 
   make_array(Capital_Gains_Tax_Bands)
 
-
-  # # // Can set constants here
-  # if ("" == Qualification_Window)
-  #   EOFY_Window = Qualification_Window = 0
-  # else {
-  #   Qualification_Window = 121 * ONE_DAY # seconds
-  #   EOFY_Window = 0.5 * (Qualification_Window - ONE_DAY)
-  # }
-
   # Start of FY - arbitrary date
   if ("" == FY_Date)
     FY_Date = "Jan 01"
@@ -99,7 +90,7 @@ function income_tax_usd(now, past, benefits,
   reports_stream = report_tax(EOFY)
 
   # Get market changes
-  market_changes = get_cost(MARKET_CHANGES, now) - get_cost(MARKET_CHANGES, past)
+  market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
 
   # Let's go
   printf "%s\n", Journal_Title > EOFY

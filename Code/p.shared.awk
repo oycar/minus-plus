@@ -305,16 +305,6 @@ function first_key(array,    key) {
   return ""
 }
 
-# The first entry
-function first_entry(array,   key) {
-  key = first_key(array)
-  if ("" == key)
-    return key
-
-  # Must be in the array
-  return array[key]
-}
-
 # delete duplicated values
 function delete_duplicate_entries(array,      k, j, v, w) {
 @ifeq LOG DEBUG
@@ -354,6 +344,71 @@ function sum_entry(array, x, now,   key, delta) {
 
   # Finished
   array[now] = x + array[key]
+}
+
+# Remove the oldest entries from the reverse ordered array
+function remove_entries(array, x,     key, delta) {
+@ifeq LOG DEBUG
+    assert(isarray(array), "<" $0 "> remove-entries:  needs an array")
+@endif
+  # If current sum > x  then sum -= x
+  # If current sum <=x  then sum = 0
+@ifeq LOG get_gains
+  printf "Remove Entries: Adjust => %f\n", x > STDERR
+@endif
+
+  for (key in array) {
+    delta = array[key] - x
+    if (above_zero(delta)) {
+@ifeq LOG get_gains
+      printf "\t%s %f => %f\n", get_date(key), array[key], delta > STDERR
+@endif
+      array[key] = delta
+    } else {
+@ifeq LOG get_gains
+      printf "\t%s Delete %f\n", get_date(key), array[key] > STDERR
+@endif
+
+      # Remove negligible and negative entries
+      delete array[key]
+    }
+  }
+
+  # Return TRUE if any entries were removed that were actually negative
+  return below_zero(delta)
+}
+
+function copy_entries(array, target_array, key) {
+  for (key in array)
+    target_array[key] = array[key]
+}
+
+# Remove all keys before limit
+function remove_keys(array, limit,   key, removed_value) {
+  removed_value = ""
+
+  # Get each key
+  for (key in array) {
+    if (removed_value)
+      delete array[key]
+    else {
+      # Force numeric comparison
+      if (less_than(key, limit)) {
+        # The first key before the limit
+        # Save the first trimmed value
+        removed_value = array[key]
+        delete array[key]
+      }
+    }
+  } # All keys processed
+
+  # If removed value is set rebase all entries
+  if (removed_value)
+    # Correct the remaining values
+    remove_entries(array, removed_value)
+
+  # Return the adjustment
+  return removed_value
 }
 
 # A function to find the maximum value in a bracketed window
@@ -604,7 +659,7 @@ function parse_line(now,    i, j, x, number_accounts) {
 
 
 # A document name may contain a filetype suffix
-function parse_document_name(name, now,    prefix, suffix, account_name, array, suffix_set) {
+function parse_document_name(name, now,    prefix, suffix, account_name, array, seps, suffix_set, use_format) {
 
   # Looks for special strings accompanied by a literal string
   #
@@ -618,22 +673,34 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
   #   [:]        => just the date
   #   [literal]  => just the literal
   #
+  #   The code character "+" can be used instead in which case one extra month is added to the date -
+  #   This is useful if the holding statement is in the next month
+  #
   #  If the colon is needed in a string literal a different Document_Shortcut code can be set in the Journal file
   #
   # <<, Document_Shortcut, =,>>
   # 2008 Jun 30, INCOME.FOREIGN:FOR.PXUPA.ASX,          CASH,          0,      726.63, [PX:UPA Distribution=], # PX:UPA distribution
   # <<, Document_Shortcut, :,>>
 
-    # Split the code name
-    # Use name component because we want the capture all the components apart from the first
-    if (split(name, array, Document_Shortcut) > 1) {
-      suffix = get_name_component(name, 2, -1, array)
-      suffix_set = TRUE
-    } else
-      suffix_set = FALSE
+  # The YYYY Mon format is standard
+  use_format = SHORT_FORMAT
 
-    prefix = get_name_component(name, 1, 1, array)
+  # Split the code name
+  # Use name component because we want to capture all the components apart from the first
+  if (split(name, array, Document_Shortcut, seps) > 1) {
+    suffix = get_name_component(name, 2, -1, array)
+    suffix_set = TRUE
 
+    # What was the seperator?
+    if ("+" == seps[1])
+      # Use year format
+      use_format = YEAR_FORMAT
+  } else
+    suffix_set = FALSE
+
+  #
+  prefix = get_name_component(name, 1, 1, array)
+  account_name = ""
     #
     switch (prefix) {
       case "B" :
@@ -650,11 +717,11 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
         }
 
         # Add the date
-        prefix = prefix " " get_date(now, SHORT_FORMAT)
+        prefix = prefix show_date(now, use_format)
       break;;
 
-      case "I":
-      case "D": # Income
+
+      case "D": # Distribution
         if (is_linked(Account[1]))
           account_name = get_name_component(Leaf[Account[1]], 2)
         else
@@ -662,29 +729,34 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
 
         # The second component of the account name (unless this is accrued income)
         if (is_class(Account[1], "ASSET.CURRENT.ACCRUED"))
-          prefix = "Distribution " get_date(now, SHORT_FORMAT)
+          prefix = "Distribution" show_date(now, use_format)
         else
-          prefix = tolower(get_name_component(Account[1], 2)) " " get_date(now, SHORT_FORMAT)
+          prefix = tolower(get_name_component(Account[1], 2)) show_date(now, use_format)
+        break;;
+      case "I":  # Income
+        #account_name = get_name_component(Leaf[Account[1]], 1)
+
+        # The second component of the account name is not used here...?
+        prefix = "Income" show_date(now, use_format)
         break;;
 
       case "C":
       case "E": # Expense or Cost
-        account_name = get_name_component(Leaf[Account[2]], 1)
+        #account_name = get_name_component(Leaf[Account[2]], 1)
 
         # The second component of the account name is not used here...?
-        prefix = "Expense " get_date(now, SHORT_FORMAT)
-        #prefix = tolower(get_name_component(Account[2], 2)) " " get_date(now, SHORT_FORMAT)
+        prefix = "Expense" show_date(now, use_format)
         break;;
 
       case "T": # Annual Tax Statement
         account_name = get_name_component(Leaf[Account[2]], 1)
-        prefix = "Annual Tax Statement " get_year_number(now)
+        prefix = "Annual Tax Statement" show_date(now, YEAR_FORMAT)
         break;;
 
       default: # no match - assume this is a literal string
         # When a distinct suffix is present add the date
         if (suffix_set)
-          prefix = add_field(prefix, get_date(now, SHORT_FORMAT), " ")
+          prefix = add_field(prefix, show_date(now, use_format))
 
         account_name = ""
         break;;
@@ -1058,12 +1130,12 @@ function held_to(ac, now,     p, latest_sale) {
   return latest_sale # returns the date the parcel was sold
 }
 
-# Initialize cost element arrays
-function zero_costs(array, now,     e) {
-  # Set all true cost elements to zero - ie elements I-V
-  for (e in Elements)
-    array[e][now] = 0
-}
+# # Initialize cost element arrays
+# function set_array_entries(array, key,     e) {
+#   # Set all true cost elements to zero - ie elements I-V
+#   for (e in Elements)
+#     array[e][now] = 0
+# }
 
 # This splits up a branch name or a leaf name into dotted components
 function get_name_component(name, i, number_components, array,    name_length, s, dot) {
@@ -1161,8 +1233,10 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
     # The cost adjustment per unit except for depreciating assets
     if (flag = is_fixed(a))
       adjustment = x / get_cost(a, now)
-    else
+    else {
+      assert(get_units(a, now), "Asset <" Leaf[a] "> has zero units - ensure this transaction occurs before it was sold")
       adjustment = x / get_units(a, now)
+    }
 
     # Debugging
 @ifeq LOG adjust_cost
@@ -1215,13 +1289,22 @@ function update_cost(a, x, now,      p) {
   update_cost(p, x, now)
 }
 
-function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,        cost_base) {
+function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
+                            parcel_cost,
+                            held_time) {
+  # Ignore negligible adjustments
+  if (near_zero(parcel_adjustment))
+    return
+
 @ifeq LOG adjust_cost
   printf "%s\n", a > STDERR
   printf "\tTimeStamp => %s\n", get_date(now) > STDERR
-  printf "\t\tParcel  => %05d", p  > STDERR
-  printf " Opening Parcel Cost[%s]=> %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > STDERR
-  printf "\t\t\t\tParcel Adjustment => %s\n", print_cash(parcel_adjustment) > STDERR
+  printf "\t\tParcel  => %05d\n", p  > STDERR
+  printf "\t\tParcel Cost         => %s\n", print_cash(get_parcel_cost(a, p, now))  > STDERR
+  printf "\t\tParcel Tax Adjusted => %s\n", print_cash(get_parcel_cost(a, p, now, TRUE))  > STDERR
+  printf "\t\tParcel Adjustment   => %s\n", print_cash(parcel_adjustment) > STDERR
+  printf "\t\tAdjust Tax          => %s\n", ternary(adjust_tax, "TRUE", "FALSE")
+  printf "\t\t\tOpening Element Cost[%s]=> %s\n", element, print_cash(get_element_cost(a, p, element, now)) > STDERR
 @endif # LOG
 
   # save the cost adjustment/reduction related to this parcel
@@ -1236,41 +1319,84 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,  
     #   here the tax adjustment is still negative but the accounting adjustment is zero
     if (parcel_adjustment > 0)
       # A tax adjustment for an undeductible but legitimate expense
-      sum_entry(Tax_Adjustments[a][p][element], - parcel_adjustment, now)
+      sum_entry(Tax_Adjustments[a][p], - parcel_adjustment, now)
     else { # A tax adjustment for deferred tax or depreciation &c
       sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
-      sum_entry(Tax_Adjustments[a][p][element], parcel_adjustment, now)
+      sum_entry(Tax_Adjustments[a][p], parcel_adjustment, now)
     }
   } else
     # Update the accounting cost
     sum_entry(Accounting_Cost[a][p][element], parcel_adjustment, now)
 
   # Equities do not have tax adjustments and can indeed have a negative cost base
+  # but check instead in the EOFY processing....
   if (!is_equity(a)) {
-    # Now this is tricky -
-    #   The cost base can be negative
-    #   but not after the tax adjustment
-    # Also if this parcel was sold on the same day (so time==now)
-    # a term will be included in cash_out - so overrule that
-    cost_base =  sum_cost_elements(Accounting_Cost[a][p], now) - get_cash_out(a, p, now)
-    if (cost_base < sum_cost_elements(Tax_Adjustments[a][p], now)) {
-      # Cannot create a negative cost base (for long)
-      save_parcel_gain(a, p, now)
+    #   Ensure that the parcel cost base is not negative
+    parcel_cost = get_parcel_cost(a, p, now)
+    if (below_zero(parcel_cost)) {
+@ifeq LOG adjust_cost
+  printf "\t\t\tNegative Parcel Cost Base [%05d] => %s\n", p, print_cash(parcel_cost) > STDERR
+@endif # LOG
 
-      # We are cashing the tax adjustments out so adjust both cost bases to zero
-      zero_costs(Accounting_Cost[a][p], now)
-      zero_costs(Tax_Adjustments[a][p], now)
+      # Get the tax adjustment - this will influence the taxable gains
+      parcel_adjustment = find_entry(Tax_Adjustments[a][p], now)
+
+      # If the overall parcel cost is (P)
+      # and if the cost of this element is now (E)
+      # then the cost of the other elements is (P-E)
+      # so that an overall zero parcel cost is achieved if this element has cost (E-P)
+      sum_entry(Accounting_Cost[a][p][element], - parcel_cost, now)
+
+      # This will create a capital gain
+      adjust_cost(REALIZED_GAINS, parcel_cost, now)
+
+@ifeq LOG adjust_cost
+  printf "\t\t\tRealized Gains => %s\n",  print_cash(-parcel_cost) > STDERR
+@endif # LOG
+
+      # The capital gain needs to be balanced in the asset sums
+      update_cost(a, -parcel_cost, now)
+
+      # Update tax adjustment too
+      if (parcel_adjustment < parcel_cost)
+        sum_entry(Tax_Adjustments[a][p], parcel_cost, now)
+      else {
+        parcel_cost -= parcel_adjustment
+
+        # This tax adjustment has been used
+        set_entry(Tax_Adjustments[a][p], 0, now)
+@ifeq LOG adjust_cost
+        printf "\t\t\tTaxable Gains => %s\n",  print_cash(-parcel_cost) > STDERR
+@endif # LOG
+        # Need to record taxable gains/losses too
+        held_time = get_held_time(now, Held_From[a][p])
+        if (held_time >= CGT_PERIOD) {
+          if (!(a in Long_Gains))
+            Long_Gains[a] = initialize_account(LONG_GAINS ":LG." Leaf[a])
+          adjust_cost(Long_Gains[a], parcel_cost, now)
+        } else {
+          if (!(a in Short_Gains))
+            Short_Gains[a] = initialize_account(SHORT_GAINS ":SG." Leaf[a])
+          adjust_cost(Short_Gains[a], parcel_cost, now)
+        }
+      }
     }
   }
 
-  # Debugging
 @ifeq LOG adjust_cost
-  printf "\t\t\t\tReduced Parcel Cost[%s] => %s\n", element, print_cash(get_parcel_element(a, p, element, now)) > STDERR
+  # Debugging
+  printf "\t\t\tClosing Element Cost[%s] => %s\n", element, print_cash(get_element_cost(a, p, element, now)) > STDERR
+  printf "\t\tClosing Parcel Cost => %s\n", print_cash(get_parcel_cost(a, p, now))  > STDERR
+  printf "\t\tClosing Tax Adjusted => %s\n", print_cash(get_parcel_cost(a, p, now, TRUE))  > STDERR
+  printf "\t\tTotal Realized Gains => %s\n", print_cash(- get_delta_cost(REALIZED_GAINS, now))  > STDERR
 @endif # LOG
 } # End of adjust_parcel_cost
 
 # The idea of the "cost" of the account
 # This is the same as the reduced cost
+# Returns 0 for sold assets
+# What would happen if REALIZED were not populated and it returned the gains/losses for sold assets?
+#
 function get_cost(a, now,     i, sum_cost) {
   # Adjustments for units bought
   if (is_unitized(a)) {
@@ -1281,7 +1407,7 @@ function get_cost(a, now,     i, sum_cost) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-        sum_cost += sum_cost_elements(Accounting_Cost[a][i], now)
+        sum_cost += sum_cost_elements(Accounting_Cost[a][i], now) # cost elements
     }
     return sum_cost
   } else if (a in Cost_Basis) # Cash-like
@@ -1289,6 +1415,12 @@ function get_cost(a, now,     i, sum_cost) {
 
   return 0
 }
+
+# One liner function
+function get_value(a, now) {
+  return ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))
+}
+
 
 # The tax adjustments at time (now)
 # Note that depreciation is always a tax adjustment
@@ -1303,14 +1435,12 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
       if (Held_From[a][i] > now) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-        sum_adjustments += sum_cost_elements(Tax_Adjustments[a][i], now)
+        sum_adjustments += find_entry(Tax_Adjustments[a][i], now)
     }
   }
 
   return sum_adjustments
 }
-
-
 
 # set the cost to a specified value (new_cost)
 function set_cost(a, new_cost, now,     initial_cost) {
@@ -1321,61 +1451,66 @@ function set_cost(a, new_cost, now,     initial_cost) {
   adjust_cost(a, new_cost - initial_cost, now, FALSE)
 }
 
-# Unrealized or market gains
-function sum_market_gains(now,     sum, a) {
+# Get unrealized or realized gains
+function get_asset_gains(gains_function, now,   sum, a) {
   sum = 0
 
-  # Cash-like assets can be ignored
+  # Just sum the lower level function
   for (a in Leaf)
-    if (is_capital(a) && is_open(a, now))
-      # The asset must be active
-      sum += get_cost(a, now) - find_entry(Price[a], now) * get_units(a, now)
+    sum += @gains_function(a, now)
 
   # All done - negative values are gains
   return sum
 }
 
-# Sum  the cost elements
+# Get unrealized gains at the account level
+function get_unrealized_gains(a, now,
+                              gains) {
+
+  # The asset must be active
+  if (is_closed(a, now))
+    return 0 # No unrealized gains
+
+  if (is_capital(a))
+    gains = get_cost(a, now) - find_entry(Price[a], now) * get_units(a, now)
+  else
+    gains = 0
+
+  # The result
+  return gains
+}
+
+# Get realized gains at the parcel level
+function get_realized_gains(a, now,
+                              gains, i) {
+  # The asset must be active
+  if (is_open(a, now))
+    return 0 # No realized gains
+
+  # Must be a capital asset
+  if (is_capital(a)) {
+    for (i = 0; i < Number_Parcels[a]; i ++) {
+      if (Held_From[a][i] > now) # All further transactions occured after (now)
+        break # All done
+      if (is_sold(a, i, now)) # This is a sold parcel at time (now)
+        gains += get_parcel_proceeds(a, i) + sum_cost_elements(Accounting_Cost[a][i], now) # All cost elements
+    }
+  } else
+    gains = 0
+
+  return gains
+}
+
+# Sum only the cost elements
 function sum_cost_elements(array, now,     sum_elements, e) {
 @ifeq LOG DEBUG
   assert(isarray(array), "<" $0 "> sum_cost_elements:  needs an array")
 @endif
 
   sum_elements = 0
-  for (e in array) # Should this include [0] or not?
+  for (e in array) # Exclude element [0]
     sum_elements += find_entry(array[e], now)
   return sum_elements
-}
-
-# Get the specified cost element
-function get_cost_element(a, element, now,      i, sum_cost) {
-  # Initial cost
-  sum_cost = 0
-
-  # Only assets have cost elements - equity is just for simplicity
-  if (is_unitized(a)) {
-    for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
-        break # All done
-      if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
-        sum_cost += find_entry(Accounting_Cost[a][i][element], now)
-    }
-  }
-
-  return sum_cost
-}
-
-# The parcel cost
-function get_parcel_element(a, p, element, now, adjusted) {
-  # Adjusted or reduced cost?
-  if (adjusted)
-    # The adjusted parcel cost
-    adjusted = get_parcel_tax_adjustment(a, p, element, now)
-  else
-    adjusted = 0
-
-  # This elements costs
-  return find_entry(Accounting_Cost[a][p][element], now) - adjusted
 }
 
 # The initial cost
@@ -1384,53 +1519,35 @@ function get_cash_in(a, i, now) {
   # Is the account open?
   if (now >= Held_From[a][i])
     # Yes - always element I
-    return find_entry(Accounting_Cost[a][i][I], Held_From[a][i]) # The Held_From time ensures  that later element I costs do not impact the result
+    return get_element_cost(a, i, I, Held_From[a][i]) # The Held_From time ensures  that later element I costs do not impact the result
 
   # No - so no activity
-  return 0
-}
-
-# The cash paid out of the asset when sold
-function get_cash_out(a, i, now) {
-  # We are only interested in the sale payment for this parcel - the zeroth element
-  if (is_sold(a, i, now))
-    # Each parcel can only be sold once - so if sold it is the first entry
-    return get_parcel_proceeds(a, i)
-
-  # Not sold yet
   return 0
 }
 
 # The cost reductions
 function get_cost_modifications(a, p, now,  sum) {
   # This should exclude cash_in and cash_out
-  sum = sum_cost_elements(Accounting_Cost[a][p], now)
+  sum = sum_cost_elements(Accounting_Cost[a][p], now) # No I
 
   # Think about edge effects
-  return sum - get_cash_out(a, p, now) - get_cash_in(a, p, now)
+  return sum - get_cash_in(a, p, now)
 }
 
 # A shorthand - ignores final cost
 function get_parcel_cost(a, p, now, adjusted,    sum) {
-  # Adjusted or reduced cost?
   # Reduced cost by default
-  adjusted = ("" == adjusted) ? 0 : adjusted
+  sum = sum_cost_elements(Accounting_Cost[a][p], now) # No element 0
+  if (adjusted)
+    sum -= find_entry(Tax_Adjustments[a][p], now)
 
-  # Clunky
-  if (0 != adjusted)
-    # The adjusted parcel cost
-    adjusted = sum_cost_elements(Tax_Adjustments[a][p], now)
-
-  # This should exclude cash_in and cash_out
-  sum = sum_cost_elements(Accounting_Cost[a][p], now) - adjusted
-
-  # Remove the cash out component
-  return sum - get_cash_out(a, p, now)
+  # The parcel cost
+  return sum
 }
 
 # Print out transactions
 # Generalize for the case of a single entry transaction
-function print_transaction(now, comments, a, b, u, amount, fields, n_field,     matched) {
+function print_transaction(now, comments, a, b, u, amount, fields, n_fields,     matched) {
   if (now > Stop_Time)
     return
 
@@ -1438,13 +1555,13 @@ function print_transaction(now, comments, a, b, u, amount, fields, n_field,     
   match_accounts(matched, Show_Account, a, b)
   if (!Show_Account || matched)
     # Print the transaction out
-    printf "%s\n", transaction_string(now, comments, a, b, u, amount, fields, n_field, matched)
+    printf "%s\n", transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched)
 }
 
 # Describe the transaction as a string
 @ifdef EXPORT_FORMAT
 # Export style
-function transaction_string(now, comments, a, b, u, amount, fields, n_field, matched,      i, string, swop) {
+function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,      i, string, swop) {
   # Print statement
   # This could be a zero, single or double entry transaction
   #
@@ -1642,16 +1759,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     # capital gains and losses
     # Stored (as sums) by parcel, cost element and time
     # eg Accounting_Cost[account][parcel][element][time]
-    Accounting_Cost[account_name][0][0][SUBSEP] = 0
-    zero_costs(Accounting_Cost[account_name][0], SUBSEP)
-    for (p in Accounting_Cost[account_name][0])
-      delete Accounting_Cost[account_name][0][p][SUBSEP]
 
-    # Ditto for tax adjustments
-    Tax_Adjustments[account_name][0][0][SUBSEP] = 0
-    zero_costs(Tax_Adjustments[account_name][0], SUBSEP)
-    for (p in Tax_Adjustments[account_name][0])
-      delete Tax_Adjustments[account_name][0][p][SUBSEP]
 
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel
@@ -1661,7 +1769,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     Total_Units[account_name][Epoch]     = 0
     Qualified_Units[account_name][SUBSEP]; delete Qualified_Units[account_name][SUBSEP]
 
-    # Each parcel also has a number of parcels
+    # Each account also has a number of parcels
     set_key(Number_Parcels, account_name, 0)
 
     # End of if ASSET
@@ -1669,7 +1777,7 @@ function initialize_account(account_name,     class_name, array, p, n,
     # Set an Underlying_Asset if the leaf name
     # is of the appropriate format
     #
-    # (DIV|DIST|FOR).LEAF => LEAF
+    # (DIV|DIST|FOR|GAINS).LEAF => LEAF
     #
     if (is_linked(account_name)) {
       # Probably a better way to do this using a regex
@@ -1725,7 +1833,7 @@ function filter_data(now, variable_names, show_details,    array_names, name) {
 function filter_array(now, data_array, name, show_blocks,
                            a, p, start_block, end_block, block_id,
                            stack, key, first_key,
-                           earliest_key, latest_key) {
+                           earliest_key, latest_key, s) {
 
   # Record the earlist and latest keys found
   if (show_blocks) {
@@ -1793,12 +1901,13 @@ function filter_array(now, data_array, name, show_blocks,
 
         # get last key and show range of keys
         if (show_blocks && (key in stack)) {
+          s = ternary(is_open(a, now), "*", "")
           if (key != first_key)
             # More than one key
-            printf "%22s\t[%s, %s]\n", Leaf[a], get_date(key), get_date(first_key) > STDERR
+            printf "%22s\t[%s, %s]%s\n", Leaf[a], get_date(key), get_date(first_key), s > STDERR
           else if (!Show_Extra)
             # Only one key in this block - already recorded if Show_Extra set
-            printf "%22s\t[%s]\n", Leaf[a], get_date(first_key) > STDERR
+            printf "%22s\t[%s]%s\n", Leaf[a], get_date(first_key), s > STDERR
 
           # Record earliest key
           earliest_key = min_value(earliest_key, key)
@@ -1878,7 +1987,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       assert(open_key - Epoch >= 0, sprintf("%s: No earlier depreciation record than %s", get_short_name(a), get_date(now)))
 
       # The opening value - cost element I
-      open_value = get_parcel_element(a, p, I, open_key)
+      open_value = Accounting_Cost[a][p][I][open_key]
 
 @ifeq LOG depreciate_now
       # Debugging
@@ -1891,7 +2000,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
       # Refine factor at parcel level
       if (first_year_factor) {
         # First year sometimes has modified depreciation
-        if (near_zero(get_parcel_tax_adjustment(a, p, I, now)))
+        if (near_zero(find_entry(Tax_Adjustments[a][p], now)))
           delta = first_year_factor
         else
           delta = factor
@@ -1987,8 +2096,12 @@ function get_taxable_income(now, tax_left,
   last_threshold = 0
 
   # When the tax left is zero or negative it must be the first band
-  if (!above_zero(tax_left))
+  if (!above_zero(tax_left)) {
+    # If the first band has a zero rate no income is assumed
+    if (near_zero(Tax_Bands[current_key][last_threshold]))
+      return 0
     return tax_left / Tax_Bands[current_key][last_threshold]
+  }
 
   # Now get the tax due on the whole sum
   total_income = 0
@@ -2182,6 +2295,7 @@ function set_months(   i, month_name, mon) {
     Lookup_Month[tolower(substr(month_name[i], 1, 1)) substr(month_name[i], 2)] = i
   }
 
+  # Remove temporary array
   delete month_name
 }
 
@@ -2219,6 +2333,7 @@ function add_months(now, number_months,   y, m, d,
   if (2 == m && 29 == d && !leap_year(y)) {
     # February 29 can only exist in a leap year
     # Reset m & d to March 1st
+    ## This might be dealt with by mktime automatically
     m = 3
     d = 1
   }

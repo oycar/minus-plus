@@ -39,12 +39,8 @@
 # To Do =>
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
-#   Need to break down capital and carried losses by year
-#   Need INCOME.GAINS:LONG.LLC.ASX etc then this could be computed programmatically - i.e. gains distributed
-#        in a AMMA statement have taxable consequences which depend on whether any losses are available or not
-#        fixing this in general would make multiple currencies viable too
+#   Accumulated profits should not include unrealized losses/gains which are classified as capital 
 #   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
-#   Consider breaking out income/expenses in  the same way as the tax return does?
 #   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
 #
 #
@@ -52,7 +48,6 @@
 #   More flexible ordering of optional fields?
 #   other tax_statement calculations (eg UK, US, NZ etc...)
 #
-#   Tax Adjustments / could be simplified?
 #   Allow non-rectangular arrays, i.e. only have [a][p][e] for active elements
 #   Allow other currencies or commodities (eg USD, AU, AG, etc)
 #   Read single entry transactions
@@ -75,7 +70,7 @@ BEGIN {
   make_array(Documents)
 
   # A Document shortcut code
-  Document_Shortcut = ":"
+  Document_Shortcut = "[:+]"
 
   # And a gains stack
   make_array(Gains_Stack)
@@ -141,15 +136,20 @@ BEGIN {
   make_array(Held_Until)
   make_array(Leaf)
   make_array(Lifetime)
+  make_array(Long_Gains)
+  make_array(Long_Losses)
   make_array(Long_Name)
   make_array(Maturity_Date)
   make_array(Method_Name)
   make_array(Number_Parcels)
+  make_array(Parcel_Proceeds)
   make_array(Parcel_Tag)
   make_array(Parent_Name)
   make_array(Price)
   make_array(Payment_Date)
   make_array(Qualified_Units)
+  make_array(Short_Gains)
+  make_array(Short_Losses)
   make_array(Tax_Adjustments)
   make_array(Tax_Bands)
   make_array(Tax_Credits)
@@ -157,6 +157,11 @@ BEGIN {
   make_array(Total_Units)
   make_array(Underlying_Asset)
   make_array(Units_Held)
+
+  # Carried Loss Arrays
+  # Capital Losses
+  Capital_Losses[0][SUBSEP] = 0; delete Capital_Losses[0][SUBSEP]
+  Tax_Losses[0][SUBSEP] = 0; delete Tax_Losses[0][SUBSEP]
 
   # This is a CSV file
   read_csv_records()
@@ -232,7 +237,7 @@ BEGIN {
   # The last recorded timestamp in a state file
   # is Last_State - also initialized to -1
   Last_State = - 1
-  FY_Time = -1
+  Last_FY = FY_Time = -1
   FY_Year = -1 # Not set yet
 } # End of BEGIN block
 
@@ -413,6 +418,8 @@ function import_csv_data(array, symbol, name,
   Initialize_Tax_Function = "initialize_tax_" tolower(Journal_Currency)
   Dividend_Qualification_Function = "dividend_qualification_" tolower(Journal_Currency)
   Imputation_Report_Function      = "imputation_report_" tolower(Journal_Currency)
+  Gross_Up_Gains_Function   = "gross_up_gains_" tolower(Journal_Currency)
+  Get_Taxable_Gains_Function   = "get_taxable_gains_" tolower(Journal_Currency)
 
   # These functions are not dependent on currency
   Balance_Profits_Function  = "balance_journal"
@@ -449,6 +456,7 @@ function import_csv_data(array, symbol, name,
   #
   # Initialize state file information
   initialize_state()
+  Last_FY = last_year(FY_Time)
 
   # All done
   next
@@ -464,6 +472,7 @@ function set_financial_year(now,   new_fy) {
   new_fy = read_date(FY_Year "-" FY_Date, 0)
   assert(new_fy > just_before(FY_Time), "Cannot regress financial year: Current FY => " get_date(FY_Time) " New FY => " get_date(new_fy))
   FY_Time = new_fy
+  Last_FY = last_year(FY_Time)
 
   # Get the day number for the FY_Date
   FY_Day = get_day_number(FY_Time)
@@ -601,25 +610,20 @@ function set_special_accounts() {
   # Accounting capital gains accounts
   REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
   REALIZED_LOSSES = initialize_account("EXPENSE.LOSSES.REALIZED:LOSSES")
-  MARKET_CHANGES  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
+  UNREALIZED  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
 
   # Extra capital gains accounts which can be manipulated independently of asset revaluations
-  INCOME_LONG        = initialize_account("INCOME.GAINS:INCOME.LONG")
-  INCOME_SHORT       = initialize_account("INCOME.GAINS:INCOME.SHORT")
-  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES:EXPENSE.LONG")
-  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES:EXPENSE.SHORT")
+  INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")
+  INCOME_SHORT       = initialize_account("INCOME.GAINS.SHORT:INCOME.SHORT")
+  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES.LONG:EXPENSE.LONG")
+  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
 
   # Taxable capital gains are in special accounts
-  # Tax Adjustments have potentially been applied to these quantities
-  LONG_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.LONG:LONG.GAINS")
-  LONG_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.LONG:LONG.LOSSES")
-  SHORT_GAINS    = initialize_account("SPECIAL.TAXABLE.GAINS.SHORT:SHORT.GAINS")
-  SHORT_LOSSES   = initialize_account("SPECIAL.TAXABLE.LOSSES.SHORT:SHORT.LOSSES")
-  WRITTEN_BACK   = initialize_account("SPECIAL.TAXABLE.LOSSES:WRITTEN.BACK")
-  CARRIED_LOSSES = initialize_account("SPECIAL.CARRIED:CARRIED.LOSSES")
-
-  # Taxable carried losses
-  TAX_LOSSES       = initialize_account("SPECIAL.CARRIED:TAX.LOSSES")
+  # Make sure the parent accounts exist
+  initialize_account(LONG_GAINS  ":LONG.GAINS")
+  initialize_account(LONG_LOSSES ":LONG.LOSSES")
+  initialize_account(SHORT_GAINS ":SHORT.GAINS")
+  WRITTEN_BACK   =   initialize_account(SHORT_LOSSES ":SHORT.LOSSES")
 
   #
   # Deferred Gains & Losses too (all long...)
@@ -795,6 +799,7 @@ function read_input_record(   t, n, a, threshold) {
 
       # Update FY length
       FY_Length = get_year_length(FY_Year, FY_Day)
+      Last_FY = FY_Time
       FY_Time = next_year(FY_Time)
     }
   } else # Check for semi-monotonicity
@@ -835,7 +840,8 @@ function parse_transaction(now, a, b, units, amount,
                            current_brokerage, gst,
                            member_name,
                            correct_order, tax_credits,
-                           fields, number_fields) {
+                           fields, number_fields,
+                           unrealized_gains) {
   # No member name set
   member_name = ""
 
@@ -872,7 +878,15 @@ function parse_transaction(now, a, b, units, amount,
     # But there is another complication - this needs to consider
     # unrealized gains too => so important assets are priced accurately
     #
-    set_cost(MARKET_CHANGES, sum_market_gains(just_before(now)), just_before(now))
+    # Save unrealized gains; notice that the asset class must be updated too for balancing
+    unrealized_gains = get_asset_gains("get_unrealized_gains", now)
+
+    # Get the change since previous transaction
+    unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
+
+    # Adjust the market gains and the asset values
+    adjust_cost("*ASSET", - unrealized_gains, now)
+    adjust_cost(UNREALIZED, unrealized_gains, now)
 
     # This will change proportions so update the profits first
     @Update_Profits_Function(now)
@@ -1113,7 +1127,7 @@ function parse_transaction(now, a, b, units, amount,
       swop = ""
     }
 
-@ifdef EXPORT_FORMAT
+@ifeq EXPORT_FORMAT 1
     # Export format
     # Needs fixed number of fields
     # A, B, -U, x, b, b*g, (parcel_timestamp || parcel_name), SELL, comment
@@ -1233,7 +1247,7 @@ function parse_transaction(now, a, b, units, amount,
     }
 
     # Record the transaction
-@ifdef EXPORT_FORMAT
+@ifeq EXPORT_FORMAT 1
     # Format is
     # Needs fixed number of fields - we can ignore parcel name etc..
     # A, B, U, x + b, b, b*g, <parcel-name>, BUY, Comments
@@ -1243,7 +1257,7 @@ function parse_transaction(now, a, b, units, amount,
     fields[2] = sprintf("%.*f", PRECISION, g)
     fields[4] = "BUY"
 
-    print_transaction(now, Comments, a, b, Write_Units, amount, fields, 4)
+    print_transaction(now, Comments, a, b, Write_Units, amount - g, fields, 4)
 @else
     # Normal transactions
     # A, B, U, x, b - b*g, <optional-fields>, Comments
@@ -1520,6 +1534,7 @@ END {
   else if (Stop_Time < Future) {
     # We need to produce statements
     do {
+
       # Get each EOFY in turn
       eofy_actions(FY_Time)
 
@@ -1528,6 +1543,7 @@ END {
 
       # Update FY length
       FY_Length = get_year_length(FY_Year, FY_Day)
+      Last_FY = FY_Time
       FY_Time = next_year(FY_Time)
     } while (FY_Time + EOFY_Window < Last_Record)
 
@@ -1536,6 +1552,7 @@ END {
     FY_Length = get_year_length(FY_Year, FY_Day)
 
     FY_Time = last_year(FY_Time)
+    Last_FY = last_year(FY_Time)
   }
 
   # Write out code state - it sould be ok to do this after all processing now
@@ -1655,44 +1672,6 @@ function get_held_time(now, from,     held_time) {
   return held_time
 }
 
-# This is the hard way to do it
-# another way is return (Cost_Basis_change - market_value_change)
-# this way is being used ATM for consistency checking reasons
-function get_unrealized_gains(a, now,
-                              current_price, p, gains, x) {
-  if (is_closed(a, now))
-    return 0 # NO unrealized gains
-
-  # Sum the total value of the asset
-  gains = 0
-  current_price = find_entry(Price[a], now)
-
-@ifeq LOG get_unrealized_gains
-  printf "Get Unrealized Gains (%s)\n", get_short_name(a) > STDERR
-  printf "\tDate => %s\n",  get_date(now) > STDERR
-  printf "\tPrice => %s\n", print_cash(current_price) > STDERR
-  printf "\tAdjustments => %s\n", print_cash(gains) > STDERR
-@endif # LOG
-
-  # Unrealized gains held at time t are those in unsold parcels
-  for (p = 0; p < Number_Parcels[a]; p++) {
-    if (greater_than(Held_From[a][p], now)) # All further transactions occured after (now)
-      break # All done
-    if (is_unsold(a, p, now)) # This is an unsold parcel at time (now)
-      # If value > cash_in this is an unrealized gain
-      gains += sum_cost_elements(Accounting_Cost[a][p], now) - Units_Held[a][p] * current_price
-  }
-
-@ifeq LOG get_unrealized_gains
-  printf "\tGains   => %s\n", print_cash(gains) > STDERR
-  printf "\tParcels => %03d\n", p > STDERR
-  printf "\tUnits   => %05d\n", get_units(a, now) > STDERR
-@endif # LOG
-
-  # The result
-  return gains
-}
-
 # Buy a parcel of u units at the cost of x
 function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
                                              last_parcel, p) {
@@ -1739,7 +1718,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 
   # Buy u units for x
   u = Units_Held[a][last_parcel]
-  x = sum_cost_elements(Accounting_Cost[a][last_parcel], now) # This must be just the cash paid
+  x = get_element_cost(a, last_parcel, I, now) # Element I is all important
 
   # Passive revaluation
   p = x / u
@@ -1759,7 +1738,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 }
 
 # Create or modify a parcel
-function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, i) {
+function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
   # Purchases made at the same time can be averaged
   # So only increment the parcel counter if a new parcel name specified
   last_parcel = Number_Parcels[ac] - 1
@@ -1769,12 +1748,12 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, i) {
 
     # This adds a new parcel - always cost element I
     # We have to initialize  this parcels cost elements
-    Accounting_Cost[ac][last_parcel][0][Epoch] = 0
-    zero_costs(Accounting_Cost[ac][last_parcel], Epoch)
+    Parcel_Proceeds[ac][last_parcel] = 0
+    for (key in Elements)
+      Accounting_Cost[ac][last_parcel][key][Epoch] = 0
 
-    # Ditto for tax adjustments
-    Tax_Adjustments[ac][last_parcel][0][Epoch] = 0
-    zero_costs(Tax_Adjustments[ac][last_parcel], Epoch)
+    # The tax adjustments
+    Tax_Adjustments[ac][last_parcel][Epoch] = 0
 
     # A new purchase is always cost element I
     Accounting_Cost[ac][last_parcel][I][now] = x
@@ -1953,7 +1932,15 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
   update_cost(ac, -x, now)
 }
 
-function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
+#
+# sell part or all a parcel at time now
+# account  a
+# parcel   p
+# sell     du units
+# proceeds amount_paid
+# time     now
+
+function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   # The sale date
   Held_Until[a][p] = now
 
@@ -1988,11 +1975,20 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
     Number_Parcels[a] += 1
   } # End of if splitting a parcel
 
+  # Save realized gains
+  if (is_fixed(a))
+    gains = sell_fixed_parcel(a, p, now, - amount_paid)
+  else
+    gains = save_parcel_gain(a, p, now, - amount_paid)
+
+  # Don't need to set the accounting cost to zero because get_cost will pick that up automatically
+  # But the capital gain or loss needs to be balanced in the asset sums
+  update_cost(a, -gains, now)
+
   # The sale price
-  # This is always recorded as cost_element 0 since it is not actually a true cost
   # This must be recorded as cash flowing out of the account
   # A parcel is only ever sold once so we can simply set the cost
-  set_entry(Accounting_Cost[a][p][0], -amount_paid, now)
+  set_parcel_proceeds(a, p, -amount_paid)
 
 @ifeq LOG sell_units
   printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n",
@@ -2000,14 +1996,8 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
     get_date(Held_From[a][p]), get_date(Held_Until[a][p]),
     print_cash(get_cost_modifications(a, p, now)),
     print_cash(get_parcel_cost(a, p, now)),
-    print_cash(get_cash_out(a, p, now)) > STDERR
+    print_cash(get_parcel_proceeds(a, p)) > STDERR
 @endif # LOG
-
-  # Save realized gains
-  if (!is_fixed(a))
-    save_parcel_gain(a, p, now)
-  else
-    sell_fixed_parcel(a, p, now)
 
   # Was a parcel split
   return is_split
@@ -2016,69 +2006,84 @@ function sell_parcel(a, p, du, amount_paid, now,      i, is_split) {
 #
 # When a parcel of a fixed asset is sold
 # it changes the depreciation amounts
-# these are effected at time now
-function sell_fixed_parcel(a, p, now,     x) {
+function sell_fixed_parcel(a, p, now, gains,    cost) {
   # A depreciating asset will neither have capital gains nor losses
-  # so it will have accounting cost zero
+  # Suppose current value => c  (c >= 0)
+  # Proceeds received     => p  (p <= 0)
+  #
+  # After sale value      => 0
+  # Depreciation          => c + p <= 0
+  # Appreciation             c + p >  0
 
-  # Only need to save depreciation or appreciation
-  x = sum_cost_elements(Accounting_Cost[a][p], now) # The cost of a depreciating asset
-
-  # Set it to zero (use element 0)
-  sum_entry(Accounting_Cost[a][p][0], -x, now)
-
-  # We need to adjust the asset sums by this too
-  update_cost(a, -x, now)
-
+  gains += sum_cost_elements(Accounting_Cost[a][p], now)
 @ifeq LOG sell_units
-  if (above_zero(x)) # This was a DEPRECIATION expense
-    printf "\tDepreciation => %s\n", print_cash(x) > STDERR
-  else if (below_zero(x)) # This was an APPRECIATION income
-    printf "\tAppreciation => %s\n", print_cash(-x) > STDERR
+  if (above_zero(gains)) # This was a DEPRECIATION expense
+    printf "\tDepreciation => %s\n", print_cash(gains) > STDERR
+  else if (below_zero(gains)) # This was an APPRECIATION income
+    printf "\tAppreciation => %s\n", print_cash(-gains) > STDERR
   else
     printf "\tZero Depreciation\n" > STDERR
 @endif # LOG
 
   # Any excess income or expenses are recorded
-  if (above_zero(x)) # This was a DEPRECIATION expense
-    adjust_cost(SOLD_DEPRECIATION, x, now)
-  else if (below_zero(x)) # This was APPRECIATION income
-    adjust_cost(SOLD_APPRECIATION, x, now)
+  if (above_zero(gains)) # This was a DEPRECIATION expense
+    adjust_cost(SOLD_DEPRECIATION, gains, now)
+  else if (below_zero(gains)) # This was APPRECIATION income
+    adjust_cost(SOLD_APPRECIATION, gains, now)
+
+  # return parcel gains
+  return gains
 }
 
 # Save a capital gain
-# The gain was made at time "now" on at asset purchased at "date_purchased"
-function save_parcel_gain(a, p, now,    x, held_time) {
+# The price paid for an asset will probably not match its
+# current cost; if the price is greater a capital gain will result
+# if less a capital loss; these losses and gains will be retained
+# in the cost basis...
+function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
   # Get the held time
   held_time = get_held_time(now, Held_From[a][p])
 
   # Accounting gains or Losses - based on reduced cost
   # Also taxable losses are based on the reduced cost...
-  x = sum_cost_elements(Accounting_Cost[a][p], now)
-  if (above_zero(x)) {
-    adjust_cost(REALIZED_LOSSES, x, now)
+  gains += sum_cost_elements(Accounting_Cost[a][p], now)
+  if (above_zero(gains)) {
+    adjust_cost(REALIZED_LOSSES, gains, now)
 
     # Taxable losses are based on the reduced cost
-    if (held_time >= CGT_PERIOD)
-      adjust_cost(LONG_LOSSES, x, now)
-    else
-      adjust_cost(SHORT_LOSSES, x, now)
-  } else if (below_zero(x))
-    adjust_cost(REALIZED_GAINS, x, now)
+    if (held_time >= CGT_PERIOD) {
+      if (!(a in Long_Losses))
+        Long_Losses[a] = initialize_account(LONG_LOSSES ":LL." Leaf[a])
+      adjust_cost(Long_Losses[a], gains, now)
+    } else {
+      if (!(a in Short_Losses))
+        Short_Losses[a] = initialize_account(SHORT_LOSSES ":SL." Leaf[a])
+      adjust_cost(Short_Losses[a], gains, now)
+    }
+  } else if (below_zero(gains))
+    adjust_cost(REALIZED_GAINS, gains, now)
 
   # Taxable gains
   # after application of tax adjustments
   # This works if tax adjustments are negative
-  x -= sum_cost_elements(Tax_Adjustments[a][p], now)
+  tax_gains = gains - find_entry(Tax_Adjustments[a][p], now)
 
   # Taxable Gains are based on the adjusted cost
-  if (below_zero(x)) {
+  if (below_zero(tax_gains)) {
     # Taxable losses are based on the reduced cost
-    if (held_time >= CGT_PERIOD)
-      adjust_cost(LONG_GAINS, x, now)
-    else
-      adjust_cost(SHORT_GAINS, x, now)
+    if (held_time >= CGT_PERIOD) {
+      if (!(a in Long_Gains))
+        Long_Gains[a] = initialize_account(LONG_GAINS ":LG." Leaf[a])
+      adjust_cost(Long_Gains[a], tax_gains, now)
+    } else {
+      if (!(a in Short_Gains))
+        Short_Gains[a] = initialize_account(SHORT_GAINS ":SG." Leaf[a])
+      adjust_cost(Short_Gains[a], tax_gains, now)
+    }
   }
+
+  # Return gains
+  return gains
 }
 
 # Copy and split parcels
@@ -2091,6 +2096,7 @@ function copy_parcel(ac, p, q,     e, key) {
   Units_Held[ac][q]  = Units_Held[ac][p]
   Held_From[ac][q] = Held_From[ac][p]
   Held_Until[ac][q] = Held_Until[ac][p]
+  Parcel_Proceeds[ac][q] = Parcel_Proceeds[ac][p]
 
   # Copy all entries
   # Note keys will not match so need to delete old entries from parcel q
@@ -2099,9 +2105,8 @@ function copy_parcel(ac, p, q,     e, key) {
   for (e in Accounting_Cost[ac][p])
     for (key in Accounting_Cost[ac][p][e])
         Accounting_Cost[ac][q][e][key] = Accounting_Cost[ac][p][e][key]
-  for (e in Tax_Adjustments[ac][p])
-    for (key in Tax_Adjustments[ac][p][e])
-      Tax_Adjustments[ac][q][e][key]  = Tax_Adjustments[ac][p][e][key]
+  for (key in Tax_Adjustments[ac][p])
+    Tax_Adjustments[ac][q][key]  = Tax_Adjustments[ac][p][key]
 }
 
 function split_parcel(ac, p, du,   fraction_kept, e, key) {
@@ -2119,6 +2124,9 @@ function split_parcel(ac, p, du,   fraction_kept, e, key) {
   Held_From[ac][p + 1]  = Held_From[ac][p]
   Held_Until[ac][p + 1] = Future
 
+  # Parcel Proceeds
+  Parcel_Proceeds[ac][p + 1] = 0
+
   # The New Adjustments
   # Need to delete old arrays because
   # they will exist with different keys
@@ -2129,16 +2137,15 @@ function split_parcel(ac, p, du,   fraction_kept, e, key) {
   for (e in Accounting_Cost[ac][p])
     for (key in Accounting_Cost[ac][p][e])
         Accounting_Cost[ac][p + 1][e][key] = fraction_kept * Accounting_Cost[ac][p][e][key]
-  for (e in Tax_Adjustments[ac][p])
-    for (key in Tax_Adjustments[ac][p][e])
-      Tax_Adjustments[ac][p + 1][e][key]  = fraction_kept * Tax_Adjustments[ac][p][e][key]
+  for (key in Tax_Adjustments[ac][p])
+      Tax_Adjustments[ac][p + 1][key]  = fraction_kept * Tax_Adjustments[ac][p][key]
 
+  # The balance
   for (e in Accounting_Cost[ac][p])
     for (key in Accounting_Cost[ac][p][e])
         Accounting_Cost[ac][p][e][key] -= Accounting_Cost[ac][p + 1][e][key]
-  for (e in Tax_Adjustments[ac][p])
-    for (key in Tax_Adjustments[ac][p][e])
-      Tax_Adjustments[ac][p][e][key]  -= Tax_Adjustments[ac][p + 1][e][key]
+  for (key in Tax_Adjustments[ac][p])
+    Tax_Adjustments[ac][p][key]  -= Tax_Adjustments[ac][p + 1][key]
 }
 
 # Find a parcel that can be sold
@@ -2160,11 +2167,11 @@ function match_parcel(a, p, parcel_tag, parcel_timestamp,
 
 
 # This checks all is ok
-function check_balance(now,        sum_assets, sum_liabilities, sum_equities, sum_expenses, sum_income, sum_adjustments, balance, show_balance) {
+function check_balance(now,        sum_assets, sum_liabilities, sum_equities, sum_expenses, sum_income, sum_adjustments, balance, show_balance, output_stream) {
   # The following should always be true
   # Assets - Liabilities = Income + Expenses
-  # This compares the cost paid - so it ignores the impact of revaluations and realized gains & losses
-  sum_assets =  get_cost("*ASSET", now) - get_cost("*INCOME.GAINS.REALIZED", now) - get_cost("*EXPENSE.LOSSES.REALIZED", now) - get_cost("*EXPENSE.UNREALIZED", now)
+  # This compares the cost paid - so it ignores the impact of revaluations
+  sum_assets =  get_cost("*ASSET", now)
 
   # Work out the total assets etc
   sum_liabilities = - get_cost("*LIABILITY", now)
@@ -2179,29 +2186,37 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
 @ifeq LOG check_balance
   # Verbose balance printing
   show_balance = TRUE
+  output_stream = STDOUT
 @else
   # No default printing
   show_balance = FALSE
+  output_stream = STDERR
 @endif #// LOG
 
   # Is there an error?
   if (!near_zero(balance)) {
-    printf "Problem - Accounts Unbalanced <%s>\n", $0 > STDERR
+    printf "Problem - Accounts Unbalanced <%s>\n", $0 > output_stream
     show_balance = TRUE
   } else
     balance = 0
 
   # // Print the balance if necessary
   if (show_balance) {
-    printf "\tDate => %s\n", get_date(now) > STDERR
-    printf "\tAssets      => %20.2f\n", sum_assets > STDERR
-    printf "\tIncome      => %20.2f\n", sum_income > STDERR
-    printf "\tExpenses    => %20.2f\n", sum_expenses > STDERR
-    printf "\tLiabilities => %20.2f\n", sum_liabilities > STDERR
-    printf "\tEquities    => %20.2f\n", sum_equities > STDERR
+    printf "\tDate => %s\n", get_date(now) > output_stream
+    printf "\tAssets      => %20.2f\n", sum_assets > output_stream
+    printf "\tIncome      => %20.2f\n", sum_income > output_stream
+    printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
+
+    printf "\tExpenses    => %20.2f\n", sum_expenses > output_stream
+    printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
+    printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
+
+
+    printf "\tLiabilities => %20.2f\n", sum_liabilities > output_stream
+    printf "\tEquities    => %20.2f\n", sum_equities > output_stream
     if (not_zero(sum_adjustments))
-      printf "\tAdjustments => %20.2f\n", sum_adjustments > STDERR
-    printf "\tBalance     => %20.2f\n", balance > STDERR
+      printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
+    printf "\tBalance     => %20.2f\n", balance > output_stream
     assert(near_zero(balance), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }
 }

@@ -1,8 +1,9 @@
 @ifndef MPX_H
 @define MPX_H
 @include "assert.awk"
-@load "filefuncs"
 
+# // FIXME: What does filefuncs do?
+@load "filefuncs"
 
 # // Control Logging
 @ifeq LOG 0
@@ -24,14 +25,18 @@
 @define DEVNULL "/dev/null"
 
 # //
-@define SHARED_ARRAYS "Account_Term Accounting_Cost Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf \
-Lifetime Long_Name Maturity_Date Method_Name Number_Parcels \
-Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Tax_Adjustments Tax_Bands \
-Tax_Credits Threshold_Dates Total_Units Underlying_Asset Units_Held "
+@define SHARED_ARRAYS "Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit\
+ Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date\
+ Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units\
+ Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
+ Threshold_Dates Total_Units Underlying_Asset Units_Held "
 
-@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Root EOFY_Window FY_Day FY_Date FY_Length \
-FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED \
-Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
+@define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
+ Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency\
+ Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED\
+ Dividend_Qualification_Function Get_Taxable_Gains_Function\
+ Gross_Up_Gains_Function Imputation_Report_Function\
+ Income_Tax_Function Initialize_Tax_Function "
 
 # // Some constants
 @define DITTO ("^")
@@ -64,19 +69,29 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define   SHOW_REPORTS "bcot"
 @endif # // SHOW_REPORTS
 
-@define report_balance(s)    ternary(SHOW_REPORTS ~ /[bB]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_capital(s)    ternary(SHOW_REPORTS ~ /[cC]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_deferred(s)   ternary(SHOW_REPORTS ~ /[dD]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_fixed(s)      ternary(SHOW_REPORTS ~ /[fF]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_imputation(s) ternary(SHOW_REPORTS ~ /[iI]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_market(s)     ternary(SHOW_REPORTS ~ /[mM]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_operating(s)  ternary(SHOW_REPORTS ~ /[oO]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_dividend(s)   ternary(SHOW_REPORTS ~ /[qQ]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
-@define report_tax(s)        ternary(SHOW_REPORTS ~ /[tT]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define ternary(a, b, c) ((a)?(b):(c))
+@define report_balance(s)      ternary(SHOW_REPORTS ~ /[bB]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_capital(s)      ternary(SHOW_REPORTS ~ /[cC]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_depreciation(s) ternary(SHOW_REPORTS ~ /[dD]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_imputation(s)   ternary(SHOW_REPORTS ~ /[iI]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_market(s)       ternary(SHOW_REPORTS ~ /[mM]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_operating(s)    ternary(SHOW_REPORTS ~ /[oO]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_dividend(s)     ternary(SHOW_REPORTS ~ /[qQ]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
+@define report_tax(s)          ternary(SHOW_REPORTS ~ /[tT]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
 
 # // Default Asset Prefix for Price Lists
 @define ASSET_PREFIX ("ASSET.CAPITAL.SHARES")
 @define ASSET_SUFFIX ("ASX")
+
+# // Start Defining Special Account Names
+@define TAXABLE_GAINS ("SPECIAL.TAXABLE")
+@define LONG_GAINS    ("SPECIAL.TAXABLE.GAINS.LONG")
+@define LONG_LOSSES   ("SPECIAL.TAXABLE.LOSSES.LONG")
+@define SHORT_GAINS   ("SPECIAL.TAXABLE.GAINS.SHORT")
+@define SHORT_LOSSES  ("SPECIAL.TAXABLE.LOSSES.SHORT")
+@define star(s)       ternary(is_star(s), (s), ("*" (s)))
+@define is_star(a)    ((a) ~ /^\*/)
+
 
 # // The Epoch and minimum time difference
 @define EPOCH_START        (2000)
@@ -96,10 +111,14 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define RESERVED_CLASSES  /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL/
 
 # // Useful inline functions - this may be overdoing it
-@define ternary(a, b, c) ((a)?(b):(c))
 @define make_array(array)  ternary(SUBSEP in array,TRUE,FALSE)
 
 @define find_entry(array, now) ternary(__MPX_KEY__ = find_key(array, now), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
+@define first_entry(array) ternary(__MPX_KEY__ = first_key(array), array[__MPX_KEY__], ternary(0 == __MPX_KEY__, array[0], 0))
+
+# // This is not efficient
+@define get_delta(array, t) (find_entry(array, t) - find_entry(array, just_before(t)))
+
 @define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
 #
@@ -130,26 +149,22 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define is_franking_deficit(a) ((a) ~ /^SPECIAL\.OFFSET\.FRANKING_DEFICIT[.:]/)
 
 # // Is a leaf name in a linked account format i.e. first component is
-# // (DIV|DIST|FOR).LEAF => LEAF
-@define is_linked(a) ((Leaf[a]) ~ /^(DIV|DIST|FOR)\./)
-
+# // (DIV|DIST|FOR|GAINS).LEAF => LEAF
+@define is_linked(a) ((Leaf[a]) ~ /^(DIV|DIST|FOR|GAINS)\./)
 
 # // The current value of an asset
-@define get_value(a, now) ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))
+# // @define get_value(a, now) ternary(is_capital(a), find_entry(Price[a], now) * get_units(a, now), get_cost(a, now))
 
 # // char code lookup
 @define get_char(c) ternary(c in URL_Lookup, URL_Lookup[c], (0))
 
-
-
 # //
-@define is_star(a) ((a) ~ /^*/)
 @define is_individual (Journal_Type ~ /^IND$/)
 @define is_smsf (Journal_Type ~ /^SMSF$/)
 @define is_company (Journal_Type ~ /^(PTY|CORP|LTD)$/)
 @define is_trust (Journal_Type ~ /^TRUST$/)
 @define match_accounts(m,x,a,b) ternary(m=x,ternary(m=match_account(a, x), m, m=match_account(b, x)),m="")
-@define set_entry(array, x, now) (array[(now)] = (x))
+@define set_entry(array, x, t) (array[t] = (x))
 
 # // Rounding etc
 @define near_zero(x) (((x) <= Epsilon) && ((x) >= -Epsilon))
@@ -178,15 +193,17 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 @define is_closed(a, now) (!is_open((a), (now)))
 @define is_new(a) ("" == first_key(Cost_Basis[a]))
-@define ever_held(a) (Held_From[(a)][0] > Epoch)
-@define is_sold(a, p, now) (Held_Until[(a)][(p)] <= (now))
-@define is_unsold(a, p, now) (Held_Until[(a)][(p)] > (now))
-@define get_short_name(name) (Leaf[(name)])
+@define ever_held(a) (Held_From[a][0] > Epoch)
+@define is_sold(a, p, now) (Held_Until[a][p] <= (now))
+@define is_unsold(a, p, now) (Held_Until[a][p] > (now))
+@define get_short_name(name) (Leaf[name])
 @define get_reduced_cost(a, now) (get_cost(a, now))
-@define get_parcel_tax_adjustment(a, p, element, now) (find_entry(Tax_Adjustments[a][p][element], (now)))
-@define get_parcel_proceeds(a, p) (first_entry(Accounting_Cost[a][p][0]))
+@define get_element_cost(a, p, e, now) (find_entry(Accounting_Cost[a][p][e], (now)))
+@define get_parcel_proceeds(a, p) (Parcel_Proceeds[a][p])
+@define set_parcel_proceeds(a, p, x) (Parcel_Proceeds[a][p] = (x))
 
-# // Get a single tranaction from the account
+
+# // Get a single transaction from the account
 @define get_delta_cost(a, now) (get_cost(a, now) - get_cost(a, just_before(now)))
 @define get_latest_transaction(a, now) (find_key(Cost_Basis[a], now))
 @define get_previous_transaction(a, now) (find_key(Cost_Basis[a], just_before(now)))
@@ -211,6 +228,8 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 @define get_year_number(t) (strftime("%Y", (t), UTC) + 0)
 @define get_day_number(t)  (strftime("%j", (t), UTC) + 0)
 @define YYMMDD_date(x) (substr((x), 1, 2) "-" substr((x), 3, 2) "-" substr((x), 5, 2))
+
+@define show_date(t, format) ternary(format, (" " get_date(t, format)), "")
 
 # //
 # // The length of a year ending at time (y, d)
@@ -241,7 +260,7 @@ Dividend_Qualification_Function Income_Tax_Function Initialize_Tax_Function "
 
 # // Include currency definitions
 @include "currency.h"
-
+@define carry_losses(a, t) ternary(t in a, first_entry(a[t]), 0)
 
 # // Capital Loss Window
 # // Unlimited goes all the way to the Epoch
