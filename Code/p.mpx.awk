@@ -39,10 +39,8 @@
 # To Do =>
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
-#   Need to break down carried tax losses by year
-#   Need to enforce CARRY_FORWARD_LIMIT or carried capital losses
+#   Accumulated profits should not include unrealized losses/gains which are classified as capital 
 #   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
-#   Consider breaking out income/expenses in  the same way as the tax return does?
 #   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
 #
 #

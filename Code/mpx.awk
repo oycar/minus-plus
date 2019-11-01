@@ -51,8 +51,6 @@ END {
 # // Control Export format
 
 
-
-
 # // Logic conventions
 
 
@@ -1844,46 +1842,54 @@ function print_transaction(now, comments, a, b, u, amount, fields, n_fields,    
 
 # Describe the transaction as a string
 
-
-# Normal style
-# Describe the transaction as a string
-function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,     i, string) {
+# Export style
+function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,      i, string, swop) {
   # Print statement
   # This could be a zero, single or double entry transaction
   #
+  # # floating point precision
+  # float_precision = ternary("" == float_precision, PRECISION, float_precision)
 
   # First the date
   string = sprintf("%11s", get_date(now))
+
+  # Export format always makes the matched account account b - the DEBIT account
+  if (match_account(a, Show_Account)) {
+    # Swop accounts
+    swop = b
+    b = a
+    a = swop
+
+    # Reverse amount
+    amount = -amount
+  }
 
   # Is it not zero entry?
   if ("" != a)
     # At least single entry
     string = string sprintf(", %13s, ", Leaf[a])
 
-  # Is it double entry?
+  #
   if ("" != b)
     string = string sprintf("%13s, ", Leaf[b])
 
-  # Cost element and cost entry - if at least one entry
-  if (a || b) {
+  # Cost element and cost entry
+  if ("" != u)
+    # This is the normal case
     string = string sprintf("%10s, %11.2f", u, amount)
-
-    # Do we need to show the balance?
-    if (matched)
-      # From the start of the ledger
-      string = string sprintf(", %14s", print_cash(get_cost(matched, now)))
-    else
-      # Optional Fields
-      for (i = 1; i <= n_fields; i ++)
-        string = string ", " fields[i]
-  }
+  else
+    # When export format is used and elements not provided
+    string = string sprintf("%11.2f", amount)
 
   # Finish off the line
+  for (i = 1; i <= n_fields; i ++)
+    string = string ", " fields[i]
   string = string ", " comments
 
   # All done
   return string
 } # End of printing a transaction
+
 
 
 function initialize_account(account_name,     class_name, array, p, n,
@@ -3145,7 +3151,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3483,7 +3489,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3623,7 +3629,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3756,7 +3762,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3829,7 +3835,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3964,7 +3970,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4450,7 +4456,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5236,7 +5242,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5592,10 +5598,8 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
 # To Do =>
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
-#   Need to break down carried tax losses by year
-#   Need to enforce CARRY_FORWARD_LIMIT or carried capital losses
+#   Accumulated profits should not include unrealized losses/gains which are classified as capital 
 #   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
-#   Consider breaking out income/expenses in  the same way as the tax return does?
 #   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
 #
 #
@@ -6666,21 +6670,24 @@ function parse_transaction(now, a, b, units, amount,
     }
 
 
-    # Record the transaction
-    if (!(((current_brokerage) <= Epsilon) && ((current_brokerage) >= -Epsilon)))
-      fields[++ number_fields] = sprintf("%.*f", (2), current_brokerage - g) # Always use 1st field
+    # Export format
+    # Needs fixed number of fields
+    # A, B, -U, x, b, b*g, (parcel_timestamp || parcel_name), SELL, comment
 
+    # Record the GST on the brokerage
+    fields[1] = sprintf("%.*f", (2), current_brokerage) # Always use 1st field
+    fields[2] = sprintf("%.*f", (2), g)
     # Need to save the parcel_name, or alternatively parcel_timestamp, if present
     if ((-1) != Extra_Timestamp) # No timestamp
-      fields[++ number_fields] = get_date(Extra_Timestamp)
+      fields[3] = get_date(Extra_Timestamp)
+    else
+      # Otherwise save the parcel name
+      fields[3] = Parcel_Name
 
-    # Normally next field is  the parcel name
-    if ("" != Parcel_Name)
-      fields[++ number_fields] = Parcel_Name
-
-    # Normal format is much the same - but number of fields is not fixed
-    # A, B, -U, x + bg, (optional_fields), comment
-    print_transaction(now, Comments, a, b, Write_Units, amount + g, fields, number_fields)
+    fields[3] = fields[1]
+    fields[4] = "SELL"
+    # Exclude brokerage here because the importing package usually expects to find the consideration alone
+    print_transaction(now, Comments, a, b, Write_Units, amount + g, fields, 4)
 
 
   } else if (units > 0) {
@@ -6767,12 +6774,16 @@ function parse_transaction(now, a, b, units, amount,
 
     # Record the transaction
 
-    # Normal transactions
-    # A, B, U, x, b - b*g, <optional-fields>, Comments
-    # Record the adjustment due to brokerage and gst
-    if (!(((current_brokerage) <= Epsilon) && ((current_brokerage) >= -Epsilon)))
-      fields[++ number_fields] = sprintf("%.*f", (2), current_brokerage - g)
-    print_transaction(now, Comments, a, b, Write_Units, amount - g, fields, number_fields)
+    # Format is
+    # Needs fixed number of fields - we can ignore parcel name etc..
+    # A, B, U, x + b, b, b*g, <parcel-name>, BUY, Comments
+    # Record the GST on the brokerage
+    fields[3] = Parcel_Name
+    fields[1] = sprintf("%.*f", (2), current_brokerage) # Always use 2nd field
+    fields[2] = sprintf("%.*f", (2), g)
+    fields[4] = "BUY"
+
+    print_transaction(now, Comments, a, b, Write_Units, amount - g, fields, 4)
 
   } else if (Automatic_Depreciation) {
     # This is automatic depreciation
