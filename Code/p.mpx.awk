@@ -39,7 +39,7 @@
 # To Do =>
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
-#   Accumulated profits should not include unrealized losses/gains which are classified as capital 
+#   Accumulated profits should not include unrealized losses/gains which are classified as capital
 #   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
 #   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
 #
@@ -873,8 +873,32 @@ function parse_transaction(now, a, b, units, amount,
     print_transaction(now, "Increase Franking Balance", FRANKING_STAMPED, FRANKING, 0, amount)
   }
 
-  # A SMSF member benefit
-  if (is_class(b, "EXPENSE.NON-DEDUCTIBLE.BENEFIT")) {
+  # For a SMSF process member benefits
+  #@Process_Member_Benefits(now, a, b , amount)
+
+  # A complication for SMSF are transfers into a pension sub-account
+  taxable_account = ""
+  if (is_class(a, "LIABILITY.MEMBER.PENSION")) {
+    if (!is_suffix(a, "TAXABLE") && !is_suffix(a, "TAX-FREE")) {
+      # Naming convention
+      #
+      # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
+      #
+      # Initialize accounts as needed
+      use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), get_name_component(Leaf[a], 1), Leaf[a])
+      Pension_Liability[taxable_account] = taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
+
+      # Replace account a with tax-free account
+      Pension_Liability[a] = a = initialize_account(sprintf("%s.TAX-FREE", use_name))
+
+      # These are Pension Liability Accounts
+    } else if (is_suffix(a, "TAXABLE"))
+      taxable_account = a
+  }
+
+  # A SMSF member benefit or pension pament
+  if (is_class(b, "EXPENSE.NON-DEDUCTIBLE.BENEFIT") || is_class(b, "LIABILITY.MEMBER.PENSION")) {
+
     # But there is another complication - this needs to consider
     # unrealized gains too => so important assets are priced accurately
     #
@@ -892,7 +916,11 @@ function parse_transaction(now, a, b, units, amount,
     @Update_Profits_Function(now)
 
     # Expense must be account b
-    amount_taxed = amount * @Update_Member_Function(now, -amount, b)
+    if (is_class(b, "LIABILITY.MEMBER.PENSION")) {
+      amount_taxed = amount * @Update_Member_Function(now, -amount, Pension_Liability, b)
+    } else
+      amount_taxed = amount * @Update_Member_Function(now, -amount, Member_Liability, b)
+
     if (!is_suffix(b, "TAXABLE") && !is_suffix(b, "TAX-FREE")) {
       # Naming convention
       #
@@ -900,15 +928,23 @@ function parse_transaction(now, a, b, units, amount,
       #
       # Initialize accounts as needed
       use_name = sprintf("%s.%s:%s", substr(Parent_Name[b], 2), get_name_component(Leaf[b], 1), Leaf[b])
-      taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
 
       # Adjust costs for taxable account
       #
-      adjust_cost(a, -amount_taxed, now)
-      adjust_cost(taxable_account, amount_taxed, now)
+      if (taxable_account)
+        adjust_cost(taxable_account, -amount_taxed, now)
+      else
+        adjust_cost(a, -amount_taxed, now)
+
+      # Finished with the credit taxable account
+      b = initialize_account(sprintf("%s.TAXABLE", use_name))
+      adjust_cost(b, amount_taxed, now)
 
       # Record this sub-transaction
-      print_transaction(now, Comments, a, taxable_account, Write_Units, amount_taxed)
+      if (taxable_account)
+        print_transaction(now, Comments, taxable_account, b, Write_Units, amount_taxed)
+      else
+        print_transaction(now, Comments, a, b, Write_Units, amount_taxed)
 
       # Replace account b with tax-free account
       b = initialize_account(sprintf("%s.TAX-FREE", use_name))
@@ -917,6 +953,8 @@ function parse_transaction(now, a, b, units, amount,
       amount -= amount_taxed
     }
   }
+
+
 
   # Assets or Liabilities with a fixed term need a maturity date
   # Set the maturity date and account term
@@ -1036,7 +1074,7 @@ function parse_transaction(now, a, b, units, amount,
       @Update_Profits_Function(now)
 
       # Drop the INCOME prefix
-      @Update_Member_Function(now, amount, a)
+      @Update_Member_Function(now, amount, Member_Liability, a)
     }
   } else if (is_class(b, "EXPENSE.NON-DEDUCTIBLE.DIVIDEND")) {
     # A franking entity (eg company) can distribute franking credits
@@ -1441,7 +1479,7 @@ function update_profits(now) {
   return
 }
 
-function update_member_liability(now, delta_profits, a) {
+function update_member_liability(now, delta_profits, array, a) {
   # A no-op
   return
 }

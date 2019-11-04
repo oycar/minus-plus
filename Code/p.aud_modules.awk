@@ -30,6 +30,7 @@ BEGIN {
   make_array(Medicare_Levy)
   make_array(Member_Liability)
   make_array(Reserve_Rate)
+  Make_Liability[SUBSEP]; delete Member_Liability[SUBSEP]
 
   # The Epoch
   if ("" == Epoch)

@@ -46,9 +46,9 @@ END {
 # // Control Logging
 
 
-
-
 # // Control Export format
+
+
 
 
 # // Logic conventions
@@ -1842,54 +1842,46 @@ function print_transaction(now, comments, a, b, u, amount, fields, n_fields,    
 
 # Describe the transaction as a string
 
-# Export style
-function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,      i, string, swop) {
+
+# Normal style
+# Describe the transaction as a string
+function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,     i, string) {
   # Print statement
   # This could be a zero, single or double entry transaction
   #
-  # # floating point precision
-  # float_precision = ternary("" == float_precision, PRECISION, float_precision)
 
   # First the date
   string = sprintf("%11s", get_date(now))
-
-  # Export format always makes the matched account account b - the DEBIT account
-  if (match_account(a, Show_Account)) {
-    # Swop accounts
-    swop = b
-    b = a
-    a = swop
-
-    # Reverse amount
-    amount = -amount
-  }
 
   # Is it not zero entry?
   if ("" != a)
     # At least single entry
     string = string sprintf(", %13s, ", Leaf[a])
 
-  #
+  # Is it double entry?
   if ("" != b)
     string = string sprintf("%13s, ", Leaf[b])
 
-  # Cost element and cost entry
-  if ("" != u)
-    # This is the normal case
+  # Cost element and cost entry - if at least one entry
+  if (a || b) {
     string = string sprintf("%10s, %11.2f", u, amount)
-  else
-    # When export format is used and elements not provided
-    string = string sprintf("%11.2f", amount)
+
+    # Do we need to show the balance?
+    if (matched)
+      # From the start of the ledger
+      string = string sprintf(", %14s", print_cash(get_cost(matched, now)))
+    else
+      # Optional Fields
+      for (i = 1; i <= n_fields; i ++)
+        string = string ", " fields[i]
+  }
 
   # Finish off the line
-  for (i = 1; i <= n_fields; i ++)
-    string = string ", " fields[i]
   string = string ", " comments
 
   # All done
   return string
 } # End of printing a transaction
-
 
 
 function initialize_account(account_name,     class_name, array, p, n,
@@ -3151,7 +3143,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("TOB" ~ /[cC]|[aA]/ && "TOB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3489,7 +3481,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("TOB" ~ /[oO]|[aA]/ && "TOB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3629,7 +3621,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("TOB" ~ /[bB]|[aA]/ && "TOB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3762,7 +3754,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("TOB" ~ /[mM]|[aA]/ && "TOB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3835,7 +3827,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("TOB" ~ /[dD]|[aA]/ && "TOB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3970,7 +3962,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("TOB" ~ /[qQ]|[aA]/ && "TOB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4336,6 +4328,7 @@ BEGIN {
   ((SUBSEP in Medicare_Levy)?((1)):((0)))
   ((SUBSEP in Member_Liability)?((1)):((0)))
   ((SUBSEP in Reserve_Rate)?((1)):((0)))
+  Make_Liability[SUBSEP]; delete Member_Liability[SUBSEP]
 
   # The Epoch
   if ("" == Epoch)
@@ -4456,7 +4449,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("TOB" ~ /[tT]|[aA]/ && "TOB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5242,7 +5235,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("TOB" ~ /[iI]|[aA]/ && "TOB" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5361,7 +5354,7 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   # both redistribute liabilities and allocated profits
   delta_profits = get_cost(ALLOCATED, now) - initial_allocation - x
   if (!(((delta_profits) <= Epsilon) && ((delta_profits) >= -Epsilon)))
-    update_member_liability_smsf(now, delta_profits)
+    update_member_liability_smsf(now, delta_profits, Member_Liability)
 
   # Unallocated expenses/income
   adjust_cost(ALLOCATED, (get_cost("*INCOME.CONTRIBUTION",now) + get_cost("*EXPENSE.NON-DEDUCTIBLE.BENEFIT",now) - get_cost("*INCOME",now) - get_cost("*EXPENSE",now)) - get_cost(ALLOCATED, now), now)
@@ -5387,9 +5380,9 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
   balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 
-  # No default printing
-  show_balance = (0)
-  output_stream = "/dev/stderr"
+  # Verbose balance printing
+  show_balance = (1)
+  output_stream = "/dev/stdout"
 
 
   # Is there an error?
@@ -5415,7 +5408,7 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
       printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
       printf "\t**<Allocated=> %20.2f>\n", get_cost(ALLOCATED, now) > output_stream
     }
-    
+
     if ((((sum_future) > Epsilon) || ((sum_future) < -Epsilon)))
       printf "\tFuture      => %20.2f\n", sum_future > output_stream
     printf "\tBalance     => %20.2f\n", balance > output_stream
@@ -5434,7 +5427,7 @@ function update_profits_smsf(now,     delta_profits) {
     adjust_cost(ALLOCATED, delta_profits, now, (0))
 
     # Update the liabilities
-    update_member_liability_smsf(now, delta_profits)
+    update_member_liability_smsf(now, delta_profits, Member_Liability)
   }
 }
 
@@ -5445,7 +5438,8 @@ function update_profits_smsf(now,     delta_profits) {
 #          or (iv)  allocation to or from the reserve - no specification
 # This function keeps the member liability up to date for a SMSF
 #
-function update_member_liability_smsf(now, amount, a,
+function update_member_liability_smsf(now, amount, liability_array, a,
+
                                       share, taxable_share,
                                       member_id, member_account,
                                       target_account,
@@ -5468,10 +5462,11 @@ function update_member_liability_smsf(now, amount, a,
   # Note if a taxable share is driven negative the value should be transferred from the tax-free share
 
   # Get the appropriate member account
-  if ("" == a)
+  if ("" == a) {
     member_id = ""
-  else # This will be an account - but when not a CONTRIBUTION it will be a parent account
+  } else { # This will be an account - but when not a CONTRIBUTION it will be a parent account
     member_id = get_member_name(a, now, amount)
+  }
 
 
 
@@ -5482,7 +5477,7 @@ function update_member_liability_smsf(now, amount, a,
   taxable_share = sum_total = sum_share = 0
 
   # Normalize amounts
-  if (member_id in Member_Liability) { # Exact match - a contribution
+  if (member_id in liability_array) { # Exact match - a contribution
     # Adjust the liability
     adjust_cost(member_id, - amount, now)
     if (member_id ~ /TAXABLE/)
@@ -5493,7 +5488,7 @@ function update_member_liability_smsf(now, amount, a,
     # We still get the share from each account
     # Don't use the accumulated totals because (rarely) a negative account balance will break the proportioning
     # Also since  the order of transactions on a particular day is not defined use just_before() to compute proportions
-    for (member_account in Member_Liability)
+    for (member_account in liability_array)
       if (!member_id || is_ancestor(member_id, member_account)) {
         share[member_account] = x = get_cost(member_account, ((now) - 1))
         sum_total += x
@@ -5504,29 +5499,33 @@ function update_member_liability_smsf(now, amount, a,
       }
 
     # Normalize taxable share
+    assert((((sum_total) > Epsilon) || ((sum_total) < -Epsilon)), "update_member_liability: No liabilities to share")
     taxable_share /= sum_total
 
-    # There are two possibilities here -
-    #   No member id => profit/loss everything goes to/from TAXABLE accounts
-    #   A parent id  => proportioning rule applies
-    # Update the liabilities - but only the target accounts
-    for (member_account in share) {
-      x = share[member_account] / sum_total
 
-      # Target account
-      if (!member_id)
-        target_account = Member_Liability[member_account]
-      else
-        target_account = member_account
+    # Update the liabilities - but only if account a is not a liability already
+    if (!((a) ~ /^LIABILITY[.:]/)) {
+      # There are two possibilities here -
+      #   No member id => profit/loss everything goes to/from TAXABLE accounts
+      #   A parent id  => proportioning rule applies
+      for (member_account in share) {
+        x = share[member_account] / sum_total
 
-      # Adjust the liability
-      adjust_cost(target_account, - x * amount, now)
+        # Target account
+        if (!member_id)
+          target_account = liability_array[member_account]
+        else
+          target_account = member_account
 
-    } # End of exact share
+        # Adjust the liability
+        adjust_cost(target_account, - x * amount, now)
 
-    # Tidy up
-    delete share
+      } # End of exact share
+    }
   } # End of allocation
+
+  # Tidy up
+  delete share
 
 
 
@@ -5535,24 +5534,25 @@ function update_member_liability_smsf(now, amount, a,
 }
 
 # Obtain the member account
-function get_member_name(a, now, x,   member_name, member_account, target_account, subclass, contribution_tax) {
+function get_member_name(a, now, x,   member_name, member_account, target_account, account_type, contribution_tax) {
   # This obtains the liability account that needs to be modified
-  # In more detail INCOME.CONTRIBUTION.SUBCLASS:NAME.SUFFIX => LIABILITY.MEMBER.NAME:NAME.SUBCLASS
-  # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
-  # In fact        X.Y:NAME.SUFFIX => *LIABILITY.MEMBER.NAME
+  # In more detail INCOME.CONTRIBUTION.TYPE:NAME.X => LIABILITY.MEMBER.ACCUMULATION.NAME:NAME.TYPE
+  # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.TYPE => *LIABILITY.MEMBER.ACCUMULATION.NAME (pro-rated if TYPE not specified)
+  # And            LIABILITY.PENSION => LIABILITY.MEMBER.PENSION.NAME:PEN.NAME.TYPE (pro-rated if TYPE not specified)
+  # In fact        X.Y:NAME.TYPE => *LIABILITY.MEMBER.NAME
 
   # Get the member name
   member_name = get_name_component(Leaf[a], 1) # first component
 
   # A member liability account can only be created by a contribution
   if (((a) ~ ("^" ( "INCOME.CONTRIBUTION") "[.:]"))) {
-    # Identify the "subclass" - use Parent_Name because it is always available
-    subclass = get_name_component(Parent_Name[a], 0) # last component
+    # Identify the "account_type" (eg TAXABLE or TAX-FREE) - use Parent_Name because it is always available
+    account_type = get_name_component(Parent_Name[a], 0) # last component
 
     # If a link is made in a "MEMBER" array to each members liabilities
     # then there is no need to identify this as a member liability in the
     # account name
-    member_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.%s", member_name, member_name, subclass))
+    member_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.%s", member_name, member_name, account_type))
 
     # Ensure that this member is noted in the Member_Liability array
     if (!(member_account in Member_Liability)) {
@@ -5575,8 +5575,19 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
       adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)
       adjust_cost(target_account,  contribution_tax, now)
     }
+  } else if (((a) ~ ("^" ( "LIABILITY.MEMBER.PENSION") "[.:]"))) {
+    # If a link is made in a "MEMBER" array to each members liabilities
+    # then there is no need to identify this as a member liability in the
+    # account name
+    # Ensure that this member is noted in the Member_Liability array
+      # Need to ensure that the target TAXABLE account is created
+      # The target account can actually be the same as the member_account
+      #Pension_Liability[member_account] = member_account = initialize_account(sprintf("LIABILITY.MEMBER.PENSION.%s:%s.PENSION.TAXABLE", member_name, member_name))
+      #member_account = Parent_Name[member_account]
+      member_account = "*LIABILITY.MEMBER.PENSION." member_name
+
   } else {
-    # Return the parent account
+    # Return the ancestral account
     member_account = "*LIABILITY.MEMBER." member_name
     assert(member_account in Parent_Name, "<" $0 "> Unknown account <" member_account ">")
   }
@@ -5584,6 +5595,84 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
   # Return the account
   return member_account
 }
+
+# # Pay out Member benefits into pension or other accounts
+# function process_member_benefits(now, a, b, amount,
+#            taxable_account, use_name,
+#            unrealized_gains,
+#            amount_taxed,
+#             ) {
+#   # A complication for SMSF are transfers into a pension sub-account
+#   taxable_account = ""
+#   if (is_class(a, "LIABILITY.MEMBER.PENSION")) {
+#     if (!is_suffix(a, "TAXABLE") && !is_suffix(a, "TAX-FREE")) {
+#       # Naming convention
+#       #
+#       # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
+#       #
+#       # Initialize accounts as needed
+#       use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), get_name_component(Leaf[a], 1), Leaf[a])
+#       taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
+#
+#       # Replace account a with tax-free account
+#       a = initialize_account(sprintf("%s.TAX-FREE", use_name))
+#     } else if (is_suffix(a, "TAXABLE"))
+#       taxable_account = a
+#   }
+#
+#   # A SMSF member benefit
+#   if (is_class(b, "EXPENSE.NON-DEDUCTIBLE.BENEFIT")) {
+#     # But there is another complication - this needs to consider
+#     # unrealized gains too => so important assets are priced accurately
+#     #
+#     # Save unrealized gains; notice that the asset class must be updated too for balancing
+#     unrealized_gains = get_asset_gains("get_unrealized_gains", now)
+#
+#     # Get the change since previous transaction
+#     unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
+#
+#     # Adjust the market gains and the asset values
+#     adjust_cost("*ASSET", - unrealized_gains, now)
+#     adjust_cost(UNREALIZED, unrealized_gains, now)
+#
+#     # This will change proportions so update the profits first
+#     @Update_Profits_Function(now)
+#
+#     # Expense must be account b
+#     amount_taxed = amount * @Update_Member_Function(now, -amount, b)
+#     if (!is_suffix(b, "TAXABLE") && !is_suffix(b, "TAX-FREE")) {
+#       # Naming convention
+#       #
+#       # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
+#       #
+#       # Initialize accounts as needed
+#       use_name = sprintf("%s.%s:%s", substr(Parent_Name[b], 2), get_name_component(Leaf[b], 1), Leaf[b])
+#
+#       # Adjust costs for taxable account
+#       #
+#       if (taxable_account)
+#         adjust_cost(taxable_account, -amount_taxed, now)
+#       else
+#         adjust_cost(a, -amount_taxed, now)
+#
+#       # Finished with the credit taxable account
+#       b = initialize_account(sprintf("%s.TAXABLE", use_name))
+#       adjust_cost(b, amount_taxed, now)
+#
+#       # Record this sub-transaction
+#       if (taxable_account)
+#         print_transaction(now, Comments, taxable_account, b, Write_Units, amount_taxed)
+#       else
+#         print_transaction(now, Comments, a, b, Write_Units, amount_taxed)
+#
+#       # Replace account b with tax-free account
+#       b = initialize_account(sprintf("%s.TAX-FREE", use_name))
+#
+#       # Adjust the amount for later processing
+#       amount -= amount_taxed
+#     }
+#   }
+# }
 
 
 
@@ -5598,7 +5687,7 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
 # To Do =>
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
-#   Accumulated profits should not include unrealized losses/gains which are classified as capital 
+#   Accumulated profits should not include unrealized losses/gains which are classified as capital
 #   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
 #   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
 #
@@ -6415,8 +6504,32 @@ function parse_transaction(now, a, b, units, amount,
     print_transaction(now, "Increase Franking Balance", FRANKING_STAMPED, FRANKING, 0, amount)
   }
 
-  # A SMSF member benefit
-  if (((b) ~ ("^" ( "EXPENSE.NON-DEDUCTIBLE.BENEFIT") "[.:]"))) {
+  # For a SMSF process member benefits
+  #@Process_Member_Benefits(now, a, b , amount)
+
+  # A complication for SMSF are transfers into a pension sub-account
+  taxable_account = ""
+  if (((a) ~ ("^" ( "LIABILITY.MEMBER.PENSION") "[.:]"))) {
+    if (!((a) ~ ("[.:]" ( "TAXABLE") "(_|$)")) && !((a) ~ ("[.:]" ( "TAX-FREE") "(_|$)"))) {
+      # Naming convention
+      #
+      # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
+      #
+      # Initialize accounts as needed
+      use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), get_name_component(Leaf[a], 1), Leaf[a])
+      Pension_Liability[taxable_account] = taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
+
+      # Replace account a with tax-free account
+      Pension_Liability[a] = a = initialize_account(sprintf("%s.TAX-FREE", use_name))
+
+      # These are Pension Liability Accounts
+    } else if (((a) ~ ("[.:]" ( "TAXABLE") "(_|$)")))
+      taxable_account = a
+  }
+
+  # A SMSF member benefit or pension pament
+  if (((b) ~ ("^" ( "EXPENSE.NON-DEDUCTIBLE.BENEFIT") "[.:]")) || ((b) ~ ("^" ( "LIABILITY.MEMBER.PENSION") "[.:]"))) {
+
     # But there is another complication - this needs to consider
     # unrealized gains too => so important assets are priced accurately
     #
@@ -6434,7 +6547,11 @@ function parse_transaction(now, a, b, units, amount,
     @Update_Profits_Function(now)
 
     # Expense must be account b
-    amount_taxed = amount * @Update_Member_Function(now, -amount, b)
+    if (((b) ~ ("^" ( "LIABILITY.MEMBER.PENSION") "[.:]"))) {
+      amount_taxed = amount * @Update_Member_Function(now, -amount, Pension_Liability, b)
+    } else
+      amount_taxed = amount * @Update_Member_Function(now, -amount, Member_Liability, b)
+
     if (!((b) ~ ("[.:]" ( "TAXABLE") "(_|$)")) && !((b) ~ ("[.:]" ( "TAX-FREE") "(_|$)"))) {
       # Naming convention
       #
@@ -6442,15 +6559,23 @@ function parse_transaction(now, a, b, units, amount,
       #
       # Initialize accounts as needed
       use_name = sprintf("%s.%s:%s", substr(Parent_Name[b], 2), get_name_component(Leaf[b], 1), Leaf[b])
-      taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
 
       # Adjust costs for taxable account
       #
-      adjust_cost(a, -amount_taxed, now)
-      adjust_cost(taxable_account, amount_taxed, now)
+      if (taxable_account)
+        adjust_cost(taxable_account, -amount_taxed, now)
+      else
+        adjust_cost(a, -amount_taxed, now)
+
+      # Finished with the credit taxable account
+      b = initialize_account(sprintf("%s.TAXABLE", use_name))
+      adjust_cost(b, amount_taxed, now)
 
       # Record this sub-transaction
-      print_transaction(now, Comments, a, taxable_account, Write_Units, amount_taxed)
+      if (taxable_account)
+        print_transaction(now, Comments, taxable_account, b, Write_Units, amount_taxed)
+      else
+        print_transaction(now, Comments, a, b, Write_Units, amount_taxed)
 
       # Replace account b with tax-free account
       b = initialize_account(sprintf("%s.TAX-FREE", use_name))
@@ -6459,6 +6584,8 @@ function parse_transaction(now, a, b, units, amount,
       amount -= amount_taxed
     }
   }
+
+
 
   # Assets or Liabilities with a fixed term need a maturity date
   # Set the maturity date and account term
@@ -6578,7 +6705,7 @@ function parse_transaction(now, a, b, units, amount,
       @Update_Profits_Function(now)
 
       # Drop the INCOME prefix
-      @Update_Member_Function(now, amount, a)
+      @Update_Member_Function(now, amount, Member_Liability, a)
     }
   } else if (((b) ~ ("^" ( "EXPENSE.NON-DEDUCTIBLE.DIVIDEND") "[.:]"))) {
     # A franking entity (eg company) can distribute franking credits
@@ -6670,24 +6797,21 @@ function parse_transaction(now, a, b, units, amount,
     }
 
 
-    # Export format
-    # Needs fixed number of fields
-    # A, B, -U, x, b, b*g, (parcel_timestamp || parcel_name), SELL, comment
+    # Record the transaction
+    if (!(((current_brokerage) <= Epsilon) && ((current_brokerage) >= -Epsilon)))
+      fields[++ number_fields] = sprintf("%.*f", (2), current_brokerage - g) # Always use 1st field
 
-    # Record the GST on the brokerage
-    fields[1] = sprintf("%.*f", (2), current_brokerage) # Always use 1st field
-    fields[2] = sprintf("%.*f", (2), g)
     # Need to save the parcel_name, or alternatively parcel_timestamp, if present
     if ((-1) != Extra_Timestamp) # No timestamp
-      fields[3] = get_date(Extra_Timestamp)
-    else
-      # Otherwise save the parcel name
-      fields[3] = Parcel_Name
+      fields[++ number_fields] = get_date(Extra_Timestamp)
 
-    fields[3] = fields[1]
-    fields[4] = "SELL"
-    # Exclude brokerage here because the importing package usually expects to find the consideration alone
-    print_transaction(now, Comments, a, b, Write_Units, amount + g, fields, 4)
+    # Normally next field is  the parcel name
+    if ("" != Parcel_Name)
+      fields[++ number_fields] = Parcel_Name
+
+    # Normal format is much the same - but number of fields is not fixed
+    # A, B, -U, x + bg, (optional_fields), comment
+    print_transaction(now, Comments, a, b, Write_Units, amount + g, fields, number_fields)
 
 
   } else if (units > 0) {
@@ -6774,16 +6898,12 @@ function parse_transaction(now, a, b, units, amount,
 
     # Record the transaction
 
-    # Format is
-    # Needs fixed number of fields - we can ignore parcel name etc..
-    # A, B, U, x + b, b, b*g, <parcel-name>, BUY, Comments
-    # Record the GST on the brokerage
-    fields[3] = Parcel_Name
-    fields[1] = sprintf("%.*f", (2), current_brokerage) # Always use 2nd field
-    fields[2] = sprintf("%.*f", (2), g)
-    fields[4] = "BUY"
-
-    print_transaction(now, Comments, a, b, Write_Units, amount - g, fields, 4)
+    # Normal transactions
+    # A, B, U, x, b - b*g, <optional-fields>, Comments
+    # Record the adjustment due to brokerage and gst
+    if (!(((current_brokerage) <= Epsilon) && ((current_brokerage) >= -Epsilon)))
+      fields[++ number_fields] = sprintf("%.*f", (2), current_brokerage - g)
+    print_transaction(now, Comments, a, b, Write_Units, amount - g, fields, number_fields)
 
   } else if (Automatic_Depreciation) {
     # This is automatic depreciation
@@ -6947,7 +7067,7 @@ function update_profits(now) {
   return
 }
 
-function update_member_liability(now, delta_profits, a) {
+function update_member_liability(now, delta_profits, array, a) {
   # A no-op
   return
 }
@@ -7577,9 +7697,9 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
 
 
-  # No default printing
-  show_balance = (0)
-  output_stream = "/dev/stderr"
+  # Verbose balance printing
+  show_balance = (1)
+  output_stream = "/dev/stdout"
 
 
   # Is there an error?
