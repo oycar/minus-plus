@@ -104,6 +104,8 @@ END {
 
 
 
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -3153,7 +3155,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3491,7 +3493,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3631,7 +3633,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3764,7 +3766,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3837,7 +3839,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3972,7 +3974,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4461,7 +4463,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5247,7 +5249,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5500,7 +5502,7 @@ function update_member_liability_smsf(now, amount, liability_array, a,
 
 
     sum_share = 1.0
-    printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_id], sum_share, Leaf[member_id], print_cash(amount) > "/dev/stderr"
+    printf "\t%20s => %10.6f %20s => %14s\n", Leaf[member_id], sum_share, Leaf[member_id], print_cash(amount) > "/dev/stderr"
 
   } else { # Get totals
     # We still get the share from each account
@@ -5537,7 +5539,7 @@ function update_member_liability_smsf(now, amount, liability_array, a,
         adjust_cost(target_account, - x * amount, now)
 
         sum_share += x
-        printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_account], x, Leaf[target_account], print_cash(x * amount) > "/dev/stderr"
+        printf "\t%20s => %10.6f %20s => %14s\n", Leaf[member_account], x, Leaf[target_account], print_cash(x * amount) > "/dev/stderr"
 
       } # End of exact share
     }
@@ -5548,7 +5550,7 @@ function update_member_liability_smsf(now, amount, liability_array, a,
 
 
   # Just debugging
-  printf "\t%20s => %8.6f %16s => %14s\n", "Share", sum_share, "Total", print_cash(amount) > "/dev/stderr"
+  printf "\t%20s => %10.6f %20s => %14s\n", "Share", sum_share, "Total", print_cash(amount) > "/dev/stderr"
 
 
   # return proportion that was taxable
@@ -5627,6 +5629,7 @@ function process_member_contributions_smsf(now, x, liability_array, a) {
 function process_member_benefits_smsf(now, array, amount,
            a, b,
            taxable_account, use_name,
+           target_account, member_name,
            unrealized_gains,
            amount_taxed) {
 
@@ -5642,11 +5645,20 @@ function process_member_benefits_smsf(now, array, amount,
       # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
       #
       # Initialize accounts as needed
-      use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), get_name_component(Leaf[a], 1), Leaf[a])
-      Pension_Liability[taxable_account] = taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
+      member_name = get_name_component(Leaf[a], 1)
+      use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), member_name, Leaf[a])
+      taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
+      if (!(taxable_account in Pension_Liability)) {
+        # Need to ensure target account is recorded too
+        target_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.TAXABLE", member_name, member_name))
+        Member_Liability[taxable_account] = Pension_Liability[taxable_account] = target_account
+      } else
+        target_account = Member_Liability[taxable_account]
 
       # Replace account a with tax-free account
-      Pension_Liability[a] = a = initialize_account(sprintf("%s.TAX-FREE", use_name))
+      a = initialize_account(sprintf("%s.TAX-FREE", use_name))
+      if (!(a in Pension_Liability))
+        Member_Liability[a] = Pension_Liability[a] = target_account
 
       # These are Pension Liability Accounts
     } else if (((a) ~ ("[.:]" ( "TAXABLE") "(_|$)")))

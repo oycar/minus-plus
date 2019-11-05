@@ -218,7 +218,7 @@ function update_member_liability_smsf(now, amount, liability_array, a,
 
 @ifeq LOG update_member_liability
     sum_share = 1.0
-    printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_id], sum_share, Leaf[member_id], print_cash(amount) > STDERR
+    printf "\t%20s => %10.6f %20s => %14s\n", Leaf[member_id], sum_share, Leaf[member_id], print_cash(amount) > STDERR
 @endif # LOG
   } else { # Get totals
     # We still get the share from each account
@@ -255,7 +255,7 @@ function update_member_liability_smsf(now, amount, liability_array, a,
         adjust_cost(target_account, - x * amount, now)
 @ifeq LOG update_member_liability
         sum_share += x
-        printf "\t%20s => %8.6f %16s => %14s\n", Leaf[member_account], x, Leaf[target_account], print_cash(x * amount) > STDERR
+        printf "\t%20s => %10.6f %20s => %14s\n", Leaf[member_account], x, Leaf[target_account], print_cash(x * amount) > STDERR
 @endif # LOG
       } # End of exact share
     }
@@ -266,7 +266,7 @@ function update_member_liability_smsf(now, amount, liability_array, a,
 
 @ifeq LOG update_member_liability
   # Just debugging
-  printf "\t%20s => %8.6f %16s => %14s\n", "Share", sum_share, "Total", print_cash(amount) > STDERR
+  printf "\t%20s => %10.6f %20s => %14s\n", "Share", sum_share, "Total", print_cash(amount) > STDERR
 @endif # LOG
 
   # return proportion that was taxable
@@ -278,7 +278,7 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
   # This obtains the liability account that needs to be modified
   # In more detail INCOME.CONTRIBUTION.TYPE:NAME.X => LIABILITY.MEMBER.NAME:NAME.TYPE
   # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.TYPE => *LIABILITY.MEMBER.NAME (pro-rated if TYPE not specified)
-  # And            LIABILITY.MEMBER.(STREAM|PENSION) => LIABILITY.MEMBER.(STREAM|PENSION).NAME:SOME.NAME.TYPE (pro-rated if TYPE not specified)
+  # And            LIABILITY.MEMBER.(STREAM|PENSION) => *LIABILITY.MEMBER.(STREAM|PENSION).NAME:SOME.NAME.TYPE (pro-rated if TYPE not specified)
   # In fact        X.Y:NAME.TYPE => *LIABILITY.MEMBER.NAME
 
   # Get the member name
@@ -345,6 +345,7 @@ function process_member_contributions_smsf(now, x, liability_array, a) {
 function process_member_benefits_smsf(now, array, amount,
            a, b,
            taxable_account, use_name,
+           target_account, member_name,
            unrealized_gains,
            amount_taxed) {
 
@@ -360,11 +361,20 @@ function process_member_benefits_smsf(now, array, amount,
       # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
       #
       # Initialize accounts as needed
-      use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), get_name_component(Leaf[a], 1), Leaf[a])
-      Pension_Liability[taxable_account] = taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
+      member_name = get_name_component(Leaf[a], 1)
+      use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), member_name, Leaf[a])
+      taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
+      if (!(taxable_account in Pension_Liability)) {
+        # Need to ensure target account is recorded too
+        target_account = initialize_account(sprintf("LIABILITY.MEMBER.%s:%s.TAXABLE", member_name, member_name))
+        Member_Liability[taxable_account] = Pension_Liability[taxable_account] = target_account
+      } else
+        target_account = Member_Liability[taxable_account]
 
       # Replace account a with tax-free account
-      Pension_Liability[a] = a = initialize_account(sprintf("%s.TAX-FREE", use_name))
+      a = initialize_account(sprintf("%s.TAX-FREE", use_name))
+      if (!(a in Pension_Liability))
+        Member_Liability[a] = Pension_Liability[a] = target_account
 
       # These are Pension Liability Accounts
     } else if (is_suffix(a, "TAXABLE"))
