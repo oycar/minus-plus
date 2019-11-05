@@ -24,12 +24,6 @@
 # deferred profit/loss calculated in the annual tax return
 function balance_profits_smsf(now, past, initial_allocation,     delta_profits, x) {
   # Balance the books - including the reserve
-  # Note that this is only needed to be done once
-  # Reset the liabilities to just before now so that they are correct even if balance journal is re-run
-  # for (x in Member_Liability)
-  #   set_cost(x, get_cost(x, just_before(now)), now)
-  # set_cost(RESERVE, get_cost(RESERVE, just_before(now)), now)
-
   # Adjust member liability
   delta_profits = accumulated_profits(now) - initial_allocation
 
@@ -81,7 +75,6 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
   adjust_cost(ALLOCATED, accumulated_profits(now) - get_cost(ALLOCATED, now), now)
 @ifeq LOG balance_journal
   # Track reserve
-#  printf "\tPreviously Allocated       => %14s\n", print_cash(initial_allocation) > STDERR
   printf "\tApplied to Members         => %14s\n", print_cash(delta_profits) > STDERR
   printf "\tUnallocated Profits        => %14s\n", print_cash(accumulated_profits(now) - get_cost(ALLOCATED, now)) > STDERR
   printf "\tFinal Allocated            => %14s\n", print_cash(get_cost(ALLOCATED, now)) > STDERR
@@ -163,6 +156,13 @@ function update_profits_smsf(now,     delta_profits) {
 }
 
 # Update a member liability
+#
+# How does this interact with liabilities - surely the value of pension liabilities
+# should be taken into account when pro-rating; so need to revisit this
+#
+#  Stream/Pension Taxable/Tax-Free ratios are locked
+#  Contributions other benefits go to and from the accumulation accounts
+#
 # This can be (i)   a contribution - specified member, taxable or tax-free
 #          or (ii)  a benefit - specified member
 #          or (iii) allocation amongst members - no specificiation
@@ -190,14 +190,11 @@ function update_member_liability_smsf(now, amount, liability_array, a,
   # Case (iii) :   now, amount
   # Case (iv)  :   now, amount
 
-  # Note if a taxable share is driven negative the value should be transferred from the tax-free share
+  # Note if a taxable share is driven negative the value should be transferred
+  # from the tax-free share - where else
 
   # Get the appropriate member account
-  if ("" == a) {
-    member_id = ""
-  } else { # This will be an account - but when not a CONTRIBUTION it will be a parent account
-    member_id = get_member_name(a, now, amount)
-  }
+  member_id = ternary(a, get_member_name(a, now, amount), "")
 
 @ifeq LOG update_member_liability
   printf "Update Liabilities [%s]\n", get_date(now) > STDERR
@@ -226,10 +223,9 @@ function update_member_liability_smsf(now, amount, liability_array, a,
   } else { # Get totals
     # We still get the share from each account
     # Don't use the accumulated totals because (rarely) a negative account balance will break the proportioning
-    # Also since  the order of transactions on a particular day is not defined use just_before() to compute proportions
     for (member_account in liability_array)
       if (!member_id || is_ancestor(member_id, member_account)) {
-        share[member_account] = x = get_cost(member_account, just_before(now))
+        share[member_account] = x = get_cost(member_account, now)
         sum_total += x
 
         # Compute what fraction of the allocation was taxable
@@ -240,7 +236,6 @@ function update_member_liability_smsf(now, amount, liability_array, a,
     # Normalize taxable share
     assert(not_zero(sum_total), "update_member_liability: No liabilities to share")
     taxable_share /= sum_total
-
 
     # Update the liabilities - but only if account a is not a liability already
     if (!is_liability(a)) {
@@ -281,9 +276,9 @@ function update_member_liability_smsf(now, amount, liability_array, a,
 # Obtain the member account
 function get_member_name(a, now, x,   member_name, member_account, target_account, account_type, contribution_tax) {
   # This obtains the liability account that needs to be modified
-  # In more detail INCOME.CONTRIBUTION.TYPE:NAME.X => LIABILITY.MEMBER.ACCUMULATION.NAME:NAME.TYPE
-  # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.TYPE => *LIABILITY.MEMBER.ACCUMULATION.NAME (pro-rated if TYPE not specified)
-  # And            LIABILITY.PENSION => LIABILITY.MEMBER.PENSION.NAME:PEN.NAME.TYPE (pro-rated if TYPE not specified)
+  # In more detail INCOME.CONTRIBUTION.TYPE:NAME.X => LIABILITY.MEMBER.NAME:NAME.TYPE
+  # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.TYPE => *LIABILITY.MEMBER.NAME (pro-rated if TYPE not specified)
+  # And            LIABILITY.MEMBER.(STREAM|PENSION) => LIABILITY.MEMBER.(STREAM|PENSION).NAME:SOME.NAME.TYPE (pro-rated if TYPE not specified)
   # In fact        X.Y:NAME.TYPE => *LIABILITY.MEMBER.NAME
 
   # Get the member name
@@ -320,18 +315,11 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
       adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)
       adjust_cost(target_account,  contribution_tax, now)
     }
-  } else if (is_class(a, "LIABILITY.MEMBER.PENSION")) {
-    # If a link is made in a "MEMBER" array to each members liabilities
-    # then there is no need to identify this as a member liability in the
-    # account name
-    # Ensure that this member is noted in the Member_Liability array
-      # Need to ensure that the target TAXABLE account is created
-      # The target account can actually be the same as the member_account
-      #Pension_Liability[member_account] = member_account = initialize_account(sprintf("LIABILITY.MEMBER.PENSION.%s:%s.PENSION.TAXABLE", member_name, member_name))
-      #member_account = Parent_Name[member_account]
-      member_account = "*LIABILITY.MEMBER.PENSION." member_name
-
-  } else {
+  } else if (is_pension(a))
+    member_account = "*LIABILITY.MEMBER.PENSION." member_name
+  else if (is_stream(a))
+    member_account = "*LIABILITY.MEMBER.STREAM." member_name
+  else {
     # Return the ancestral account
     member_account = "*LIABILITY.MEMBER." member_name
     assert(member_account in Parent_Name, "<" $0 "> Unknown account <" member_account ">")
@@ -341,80 +329,106 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
   return member_account
 }
 
-# # Pay out Member benefits into pension or other accounts
-# function process_member_benefits(now, a, b, amount,
-#            taxable_account, use_name,
-#            unrealized_gains,
-#            amount_taxed,
-#             ) {
-#   # A complication for SMSF are transfers into a pension sub-account
-#   taxable_account = ""
-#   if (is_class(a, "LIABILITY.MEMBER.PENSION")) {
-#     if (!is_suffix(a, "TAXABLE") && !is_suffix(a, "TAX-FREE")) {
-#       # Naming convention
-#       #
-#       # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
-#       #
-#       # Initialize accounts as needed
-#       use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), get_name_component(Leaf[a], 1), Leaf[a])
-#       taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
-#
-#       # Replace account a with tax-free account
-#       a = initialize_account(sprintf("%s.TAX-FREE", use_name))
-#     } else if (is_suffix(a, "TAXABLE"))
-#       taxable_account = a
-#   }
-#
-#   # A SMSF member benefit
-#   if (is_class(b, "EXPENSE.NON-DEDUCTIBLE.BENEFIT")) {
-#     # But there is another complication - this needs to consider
-#     # unrealized gains too => so important assets are priced accurately
-#     #
-#     # Save unrealized gains; notice that the asset class must be updated too for balancing
-#     unrealized_gains = get_asset_gains("get_unrealized_gains", now)
-#
-#     # Get the change since previous transaction
-#     unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
-#
-#     # Adjust the market gains and the asset values
-#     adjust_cost("*ASSET", - unrealized_gains, now)
-#     adjust_cost(UNREALIZED, unrealized_gains, now)
-#
-#     # This will change proportions so update the profits first
-#     @Update_Profits_Function(now)
-#
-#     # Expense must be account b
-#     amount_taxed = amount * @Update_Member_Function(now, -amount, b)
-#     if (!is_suffix(b, "TAXABLE") && !is_suffix(b, "TAX-FREE")) {
-#       # Naming convention
-#       #
-#       # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
-#       #
-#       # Initialize accounts as needed
-#       use_name = sprintf("%s.%s:%s", substr(Parent_Name[b], 2), get_name_component(Leaf[b], 1), Leaf[b])
-#
-#       # Adjust costs for taxable account
-#       #
-#       if (taxable_account)
-#         adjust_cost(taxable_account, -amount_taxed, now)
-#       else
-#         adjust_cost(a, -amount_taxed, now)
-#
-#       # Finished with the credit taxable account
-#       b = initialize_account(sprintf("%s.TAXABLE", use_name))
-#       adjust_cost(b, amount_taxed, now)
-#
-#       # Record this sub-transaction
-#       if (taxable_account)
-#         print_transaction(now, Comments, taxable_account, b, Write_Units, amount_taxed)
-#       else
-#         print_transaction(now, Comments, a, b, Write_Units, amount_taxed)
-#
-#       # Replace account b with tax-free account
-#       b = initialize_account(sprintf("%s.TAX-FREE", use_name))
-#
-#       # Adjust the amount for later processing
-#       amount -= amount_taxed
-#     }
-#   }
-# }
+# Process member Benefits
+# Can use shortcut function names
+function process_member_contributions_smsf(now, x, liability_array, a) {
+  if (is_contribution(a)) {
+    # This will change proportions so update the profits first
+    update_profits_smsf(now)
+
+    # Fix up member liabilities
+    update_member_liability_smsf(now, x, Member_Liability, a)
+  }
+}
+
+# Pay out Member benefits into pension or other accounts
+function process_member_benefits_smsf(now, array, amount,
+           a, b,
+           taxable_account, use_name,
+           unrealized_gains,
+           amount_taxed) {
+
+  # Local accounts
+  a = array[1]; b = array[2]
+
+  # A complication for SMSF are transfers into a pension sub-account
+  taxable_account = ""
+  if (is_stream(a)) {
+    if (!is_suffix(a, "TAXABLE") && !is_suffix(a, "TAX-FREE")) {
+      # Naming convention
+      #
+      # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
+      #
+      # Initialize accounts as needed
+      use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), get_name_component(Leaf[a], 1), Leaf[a])
+      Pension_Liability[taxable_account] = taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
+
+      # Replace account a with tax-free account
+      Pension_Liability[a] = a = initialize_account(sprintf("%s.TAX-FREE", use_name))
+
+      # These are Pension Liability Accounts
+    } else if (is_suffix(a, "TAXABLE"))
+      taxable_account = a
+  }
+
+  # A SMSF member benefit or pension pament
+  if (is_benefit(b) || is_stream(b)) {
+
+    # But there is another complication - this needs to consider
+    # unrealized gains too => so important assets are priced accurately
+    #
+    # Save unrealized gains; notice that the asset class must be updated too for balancing
+    unrealized_gains = get_asset_gains("get_unrealized_gains", now)
+
+    # Get the change since previous transaction
+    unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
+
+    # Adjust the market gains and the asset values
+    adjust_cost("*ASSET", - unrealized_gains, now)
+    adjust_cost(UNREALIZED, unrealized_gains, now)
+
+    # This will change proportions so update the profits first
+    update_profits_smsf(now)
+
+    # Expense must be account b
+    if (is_stream(b))
+      amount_taxed = amount * @Update_Member_Function(now, -amount, Pension_Liability, b)
+    else
+      amount_taxed = amount * @Update_Member_Function(now, -amount, Member_Liability, b)
+
+    if (!is_suffix(b, "TAXABLE") && !is_suffix(b, "TAX-FREE")) {
+      # Naming convention
+      #
+      # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
+      #
+      # Initialize accounts as needed
+      use_name = sprintf("%s.%s:%s", substr(Parent_Name[b], 2), get_name_component(Leaf[b], 1), Leaf[b])
+
+      # Adjust costs for taxable account
+      #
+      if (taxable_account)
+        adjust_cost(taxable_account, -amount_taxed, now)
+      else
+        adjust_cost(a, -amount_taxed, now)
+
+      # Finished with the credit taxable account
+      b = initialize_account(sprintf("%s.TAXABLE", use_name))
+      adjust_cost(b, amount_taxed, now)
+
+      # Record this sub-transaction
+      if (taxable_account)
+        print_transaction(now, Comments, taxable_account, b, Write_Units, amount_taxed)
+      else
+        print_transaction(now, Comments, a, b, Write_Units, amount_taxed)
+
+      # Replace account b with tax-free account
+      b = initialize_account(sprintf("%s.TAX-FREE", use_name))
+
+      # Adjust the amount for later processing
+      amount -= amount_taxed
+    }
+  }
+
+  ordered_pair(array, a, b)
+  return amount
+}

@@ -422,10 +422,12 @@ function import_csv_data(array, symbol, name,
   Get_Taxable_Gains_Function   = "get_taxable_gains_" tolower(Journal_Currency)
 
   # These functions are not dependent on currency
-  Balance_Profits_Function  = "balance_journal"
-  Check_Balance_Function  = "check_balance"
-  Update_Profits_Function = "update_profits"
-  Update_Member_Function  = "update_member_liability"
+  Balance_Profits_Function     = "balance_journal"
+  Check_Balance_Function       = "check_balance"
+  Process_Member_Benefits      = "process_member_benefits"
+  Process_Member_Contributions = "process_member_contributions"
+  Update_Profits_Function      = "update_profits"
+  Update_Member_Function       = "update_member_liability"
 
   # Dividend Qualification Window - is recorded
   # with the help of the auxilliary variable
@@ -834,16 +836,11 @@ function parse_transaction(now, a, b, units, amount,
 
                            underlying_asset, credit_account,
                            swop, g,
-                           array, n,
+                           n, account_array,
                            bought_parcel,
-                           amount_taxed, use_name, taxable_account,
                            current_brokerage, gst,
-                           member_name,
                            correct_order, tax_credits,
-                           fields, number_fields,
-                           unrealized_gains) {
-  # No member name set
-  member_name = ""
+                           fields, number_fields) {
 
   # No swop
   swop = ""
@@ -874,87 +871,12 @@ function parse_transaction(now, a, b, units, amount,
   }
 
   # For a SMSF process member benefits
-  #@Process_Member_Benefits(now, a, b , amount)
-
-  # A complication for SMSF are transfers into a pension sub-account
-  taxable_account = ""
-  if (is_class(a, "LIABILITY.MEMBER.PENSION")) {
-    if (!is_suffix(a, "TAXABLE") && !is_suffix(a, "TAX-FREE")) {
-      # Naming convention
-      #
-      # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
-      #
-      # Initialize accounts as needed
-      use_name = sprintf("%s.%s:%s", substr(Parent_Name[a], 2), get_name_component(Leaf[a], 1), Leaf[a])
-      Pension_Liability[taxable_account] = taxable_account = initialize_account(sprintf("%s.TAXABLE", use_name))
-
-      # Replace account a with tax-free account
-      Pension_Liability[a] = a = initialize_account(sprintf("%s.TAX-FREE", use_name))
-
-      # These are Pension Liability Accounts
-    } else if (is_suffix(a, "TAXABLE"))
-      taxable_account = a
+  if (is_smsf) {
+    ordered_pair(account_array, a, b)
+    amount = @Process_Member_Benefits(now, account_array, amount)
+    a = account_array[1]; b = account_array[2]
+    delete account_array
   }
-
-  # A SMSF member benefit or pension pament
-  if (is_class(b, "EXPENSE.NON-DEDUCTIBLE.BENEFIT") || is_class(b, "LIABILITY.MEMBER.PENSION")) {
-
-    # But there is another complication - this needs to consider
-    # unrealized gains too => so important assets are priced accurately
-    #
-    # Save unrealized gains; notice that the asset class must be updated too for balancing
-    unrealized_gains = get_asset_gains("get_unrealized_gains", now)
-
-    # Get the change since previous transaction
-    unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
-
-    # Adjust the market gains and the asset values
-    adjust_cost("*ASSET", - unrealized_gains, now)
-    adjust_cost(UNREALIZED, unrealized_gains, now)
-
-    # This will change proportions so update the profits first
-    @Update_Profits_Function(now)
-
-    # Expense must be account b
-    if (is_class(b, "LIABILITY.MEMBER.PENSION")) {
-      amount_taxed = amount * @Update_Member_Function(now, -amount, Pension_Liability, b)
-    } else
-      amount_taxed = amount * @Update_Member_Function(now, -amount, Member_Liability, b)
-
-    if (!is_suffix(b, "TAXABLE") && !is_suffix(b, "TAX-FREE")) {
-      # Naming convention
-      #
-      # *:NAME.SUFFIX => *.NAME:NAME.SUFFIX.TAXABLE & *.NAME:NAME.SUFFIX.TAX-FREE
-      #
-      # Initialize accounts as needed
-      use_name = sprintf("%s.%s:%s", substr(Parent_Name[b], 2), get_name_component(Leaf[b], 1), Leaf[b])
-
-      # Adjust costs for taxable account
-      #
-      if (taxable_account)
-        adjust_cost(taxable_account, -amount_taxed, now)
-      else
-        adjust_cost(a, -amount_taxed, now)
-
-      # Finished with the credit taxable account
-      b = initialize_account(sprintf("%s.TAXABLE", use_name))
-      adjust_cost(b, amount_taxed, now)
-
-      # Record this sub-transaction
-      if (taxable_account)
-        print_transaction(now, Comments, taxable_account, b, Write_Units, amount_taxed)
-      else
-        print_transaction(now, Comments, a, b, Write_Units, amount_taxed)
-
-      # Replace account b with tax-free account
-      b = initialize_account(sprintf("%s.TAX-FREE", use_name))
-
-      # Adjust the amount for later processing
-      amount -= amount_taxed
-    }
-  }
-
-
 
   # Assets or Liabilities with a fixed term need a maturity date
   # Set the maturity date and account term
@@ -1069,13 +991,7 @@ function parse_transaction(now, a, b, units, amount,
     }
 
     # A SMSF member contribution
-    if (is_class(a, "INCOME.CONTRIBUTION")) {
-      # This will change proportions so update the profits first
-      @Update_Profits_Function(now)
-
-      # Drop the INCOME prefix
-      @Update_Member_Function(now, amount, Member_Liability, a)
-    }
+    @Process_Member_Contributions(now, amount, Member_Liability, a)
   } else if (is_class(b, "EXPENSE.NON-DEDUCTIBLE.DIVIDEND")) {
     # A franking entity (eg company) can distribute franking credits
     tax_credits = Real_Value[1]
@@ -1473,13 +1389,23 @@ function convert_term_account(a, now, maturity,       active_account, x, thresho
   return active_account
 }
 
-#
+# Some no-ops covering for SMSF related functions
 function update_profits(now) {
   # A No-op
   return
 }
 
 function update_member_liability(now, delta_profits, array, a) {
+  # A no-op
+  return
+}
+
+function process_member_benefits(t, array, x) {
+  # A no-op
+  return x
+}
+
+function process_member_contributions(t, x, array, a) {
   # A no-op
   return
 }

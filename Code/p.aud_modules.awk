@@ -29,8 +29,8 @@ BEGIN {
   make_array(Middle_Income_Offset)
   make_array(Medicare_Levy)
   make_array(Member_Liability)
+  make_array(Pension_Liability)
   make_array(Reserve_Rate)
-  Make_Liability[SUBSEP]; delete Member_Liability[SUBSEP]
 
   # The Epoch
   if ("" == Epoch)
@@ -99,6 +99,8 @@ function initialize_tax_aud() {
     # Special versions of functions for SMSFs
     Check_Balance_Function   = "check_balance_smsf"
     Balance_Profits_Function = "balance_profits_smsf"
+    Process_Member_Benefits      = "process_member_benefits_smsf"
+    Process_Member_Contributions = "process_member_contributions_smsf"
     Update_Member_Function   = "update_member_liability_smsf"
     Update_Profits_Function  = "update_profits_smsf"
 

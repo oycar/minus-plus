@@ -135,6 +135,16 @@
 @define is_term(a) ((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)
 @define is_current(a) ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/)
 @define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/)
+#
+#
+# // Contribution
+@define is_contribution(a) ((a) ~ /^INCOME\.CONTRIBUTION[.:]/)
+# // Benefit
+@define is_benefit(a) ((a) ~ /^EXPENSE\.NON\-DEDUCTIBLE\.BENEFIT[.:]/)
+#
+# // Pension or Income Stream
+@define is_stream(a) ((a) ~ /^LIABILITY\.MEMBER\.(PENSION|STREAM)[.:]/)
+@define is_pension(a) ((a) ~ /^LIABILITY\.MEMBER\.PENSION[.:]/)
 # //
 # // The last component of a name is the suffix
 @define is_suffix(a, b) ((a) ~ ("[.:]" (b) "(_|$)"))
