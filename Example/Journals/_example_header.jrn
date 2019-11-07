@@ -1,0 +1,136 @@
+## This contains a configurable set of headers for journal files
+##
+## Fund Name - just replace as required
+## <<, Journal_Title, Mr Wilkins Micawber,>>
+<<, Journal_Title, What The Dickens Super Fund,>>
+## <<, Journal_Title, Dickens & Micawber Pty Ltd,>>
+## <<, Journal_Title, The Micawber Trust,>>
+
+## Fund Type - uncomment which of the following you want - individual is set by
+## default - other options are private company (PTY), self managed super fund
+## (SMSF) and trust (TRUST)
+## <<, Journal_Type, PTY, >>
+## <<, Journal_Type, TRUST, >>
+## <<, Journal_Type, IND, >>
+<<, Journal_Type, SMSF, >>
+
+## The tax jurisdiction - this must be Australia at the moment but could be
+## extended  to other countries
+<<, Journal_Currency, AUD,>>
+
+## Supporting documents can be linked to the journal and relevant transactions
+## If so they can be accessed via the specified URI protocol and address
+## Local Files Example
+<<, Document_Protocol, file://,>>
+<<, Document_Root, /Users/wilkins/CloudStation/Projects/Accounts/WTDSF Documents/,>>
+## Remove Server Example
+## <<, Document_Protocol, https://,>>
+## <<, Document_Root, example.com/Documents/Example/,>>
+
+## The state record format "<<,constant_name,constant_value",>>
+## is for setting values which would not otherwise change - they are fixed
+## such as the Journal_Name or Journal_Type
+## This format can be used to set any value that Minus-Plus contains - if
+## you know what you are doing.
+## Some values need to vary over time; for example tax rates can change
+## from year to year; the SET, SET_ENTRY and SET_BANDS are useful here;
+## they set a variable at the current journal time and can be used to change
+## it again later.
+
+## The initial financial year can be set, (defined as the calendar year in
+## which the financial year ends)
+## For example
+SET_FINANCIAL_YEAR, 2018
+
+## Tax rates
+## These depend on the type of journal and the date
+## They are stored in the Tax_Bands array which can be set as follows
+## The date is determined by the location in the journal file; if it
+## is at the beginning it will apply to the first transaction;
+## if specified after earlier transactions it will use the most recent
+## transaction date
+##
+## For a Super Fund (SMSF)
+SET_BANDS, Tax_Bands, 0.15
+##
+## For a TRUST (which shouldn't incur any tax)
+## SET_BANDS, Tax_Bands, 0.47
+##
+## For a non base rate company (PTY)
+## SET_BANDS, Tax_Bands, 0.30
+##
+## For a base rate company
+## SET_BANDS, Tax_Bands, 0.275
+##
+## For an Individual is complicated; it depends on the financial year FY
+## Low income tax offset and Medicare bands can be set too
+## Pick which of these you need
+## They will need updating at the start of each new FY
+## The format is
+## SET_BANDS, Band_Name, Band-Rate-1, Threshold-1, Band-Rate-2, Threshold-2
+## If a threshold value is omitted defaults to zero so a single tax rate
+## can be specified with as above with a single value
+##
+## FY 2012
+## SET_BANDS, Tax_Bands, 0, 0, 0.15, 6000, 0.30, 37000, 0.370, 80000, 0.450, 180000
+## SET_BANDS, Medicare_Levy, 0, 0, 0.10, 19404, 0.015, 22828
+## SET_BANDS, Low_Income_Offset, 0, 0, 0.15, 6000, 0, 16000, -0.04, 30000, 0, 67500
+##
+## FY 2013
+## SET_BANDS, Tax_Bands, 0, 0, 0.19, 18200, 0.325, 37000, 0.370, 80000, 0.450, 180000
+## SET_BANDS, Medicare_Levy, 0, 0, 0.10, 20542, 0.015, 24167
+## SET_BANDS, Low_Income_Offset, 0, 0, 0.19, 18200, 0, 20542.1054, -0.015, 37000, 0, 66666.6667
+##
+## FY 2014
+## SET_BANDS, Tax_Bands, 0, 0, 0.19, 18200, 0.325, 37000, 0.370, 80000, 0.470, 180000
+## SET_BANDS, Medicare_Levy, 0, 0, 0.10, 20542, 0.015, 24167
+## SET_BANDS, Low_Income_Offset, 0, 0, 0.19, 18200, 0, 20542.1054, -0.015, 37000, 0, 66666.6667
+##
+## FY 2015
+## SET_BANDS, Tax_Bands, 0, 0, 0.19, 18200, 0.325, 37000, 0.370, 80000, 0.470, 180000
+## SET_BANDS, Medicare_Levy, 0, 0, 0.10, 20896, 0.02, 26120
+## SET_BANDS, Low_Income_Offset, 0, 0, 0.19, 18200, 0, 20542.1054, -0.015, 37000, 0, 66666.6667
+##
+## FY 2016
+## SET_BANDS, Tax_Bands, 0, 0, 0.19, 18200, 0.325, 37000, 0.370, 80000, 0.470, 180000
+## SET_BANDS, Medicare_Levy, 0, 0, 0.10, 21335, 0.02, 26668
+## SET_BANDS, Low_Income_Offset, 0, 0, 0.19, 18200, 0, 20542.1054, -0.015, 37000, 0, 66666.6667
+##
+## FY 2017
+## SET_BANDS, Medicare_Levy, 0, 0, 0.10, 21655, 0.02, 27068
+## SET_BANDS, Tax_Bands, 0, 0, 0.19, 18200, 0.325, 37000, 0.370, 80000, 0.450, 180000
+## SET_BANDS, Low_Income_Offset, 0, 0, 0.19, 18200, 0, 20542.1054, -0.015, 37000, 0, 66666.6667
+##
+## FY 2018
+## SET_BANDS, Tax_Bands, 0, 0, 0.19, 18200, 0.325, 37000, 0.370, 87000, 0.450, 180000
+## SET_BANDS, Medicare_Levy, 0, 0, 0.10, 21980, 0.02, 27475
+## SET_BANDS, Low_Income_Offset, 0, 0, 0.19, 18200, 0, 20542.1054, -0.015, 37000, 0, 66666.6667
+##
+## FY 2019
+## SET_BANDS, Tax_Bands, 0, 0, 0.19, 18200, 0.325, 37000, 0.370, 90000, 0.450, 180000
+## SET_BANDS, Medicare_Levy, 0, 0, 0.10, 22398, 0.02, 27997
+## SET_BANDS, Low_Income_Offset, 0, 0, 0.19, 18200, 0, 20542.1054, -0.015, 37000, 0, 66666.6667
+## SET_BANDS, Middle_Income_Offset, 0, 0, 0.19, 18200, 0, 19542.1053, 0.075, 37000, 0, 48000, -0.03, 90000, 0, 126000
+##
+## FY 2020 - TBD - Medicare_Levy is rebased every year
+## SET_BANDS, Medicare_Levy, 0, 0, 0.10, 22398, 0.02, 27997
+## SET_BANDS, Low_Income_Offset, 0, 0, 0.19, 18200, 0, 20542.1054, -0.015, 37000, 0, 66666.6667
+## SET_BANDS, Middle_Income_Offset, 0, 0, 0.19, 18200, 0, 19542.1053, 0.075, 37000, 0, 48000, -0.03, 90000, 0, 126000
+##
+##
+## Other Tax rates, if you are registered for GST you can set the rate
+## This just the default 10%
+SET_ENTRY, GST_Rate, 0.10
+
+## The ATO collects a supervisory levy; in FY 2019 it is $259
+SET_ENTRY, ATO_Levy, 259.00
+
+##
+## Foreign Tax Offsets Limit - by default $1000
+## SET_ENTRY, Foreign_Offset_Limit, 1000.00
+
+## Finally before actual transactions start we need to use START_JOURNAL
+START_JOURNAL
+
+## If the comments are not changed we have setup transactions for a SMSF
+## with tax rates set for 2019 in Australia

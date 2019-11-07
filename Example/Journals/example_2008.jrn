@@ -1,0 +1,101 @@
+##
+<<, Document_Protocol, file://,>>
+<<, Document_Root, /Users/zcha/CloudStation/Projects/Accounts/CWSF Documents/,>>
+<<, Journal_Title, Cole Whitehurst Superannuation Fund,>>
+<<, Journal_Currency, AUD,>>
+<<, Journal_Type, SMSF, >>
+##
+#
+#
+## There should be at least one START_JOURNAL
+START_JOURNAL
+           
+## Set Financial year
+SET_FINANCIAL_YEAR,                                   2008
+           
+# Before any arrays are defined need to establish the Epoch
+## The ATO Levy and other australian rates (all these can vary over time)
+  SET_ENTRY,                           Reserve_Rate,                                   0.15
+  SET_ENTRY,                               GST_Rate,                                   0.10
+  SET_ENTRY,                               ATO_Levy,                                 150.00
+  SET_ENTRY,                   Foreign_Offset_Limit,                                1000.00
+  SET_BANDS,                              Tax_Bands,                                   0.15
+##
+           
+# The journal entries
+2008 Jan 21,    INCOME.CONTRIBUTION.TAXABLE:ROB.CON,                ASSET.CURRENT.BANK:CASH,              0,          10.00,  # Contribution
+2008 Feb 08,                                   CASH,              EXPENSE.GENERAL:BANK.FEES,              0,          10.00,    # Bank Fees
+2008 Feb 20,                                ROB.CON,                 ASSET.CURRENT.BANK:ANZ,              0,          55.50,  # Contribution
+2008 Feb 20,  INCOME.CONTRIBUTION.TAX-FREE:KATY.NON,                                    ANZ,              0,       80320.44,  # Contribution
+2008 Feb 20,                                    ANZ,           ASSET.CAPITAL.SHARES:BHP.ASX,       2076.000,       80370.44,          50.00,            [B],            [H],  # BHP Shares Initial Investment
+2008 Feb 29,                                ROB.CON,                                   CASH,              0,         500.00,  # Contribution
+2008 Mar 03,                                   CASH,                  EXPENSE.GENERAL:ADMIN,              0,         374.00,  # Simple Fund Subscription
+2008 Mar 04,                                   CASH,              ASSET.CURRENT.BANK:ESAVER,              0,         125.00,  # Transfer to Savings
+2008 Mar 04,      LIABILITY.MEMBER.ROB:ROB.TAX-FREE,                                 ESAVER,              I,        1583.44,  # Rob's Rollin
+2008 Mar 04,       LIABILITY.MEMBER.ROB:ROB.TAXABLE,                                 ESAVER,              I,      146525.18,  # Rob's Rollin
+2008 Mar 05,                                    ANZ,                                   CASH,              0,           5.49,  # Transfer to Bank
+2008 Mar 06,                                   CASH,                                 ESAVER,              0,           6.48,  # Transfer to Savings
+2008 Mar 12,                                 ESAVER,          ASSET.TERM.DEPOSIT:TERM00.CUA,              0,       70000.00,              3,    2008 Jun 12,  # Term deposit 3 months
+2008 Mar 12,                                 ESAVER,                                    ANZ,              0,       50000.00,  # Transfer to ANZ Account
+2008 Mar 13,                                    ANZ,         ASSET.CAPITAL.TRUSTS:PXUPA.ASX,        150.000,       10982.95,          32.95,            [B],            [H],  # Initial Investment PXUPA
+2008 Mar 13,                                    ANZ,         ASSET.CAPITAL.SHARES:BENPA.ASX,        150.000,       13270.45,          32.95,            [B],            [H],  # Initial Investment BENPA
+2008 Mar 13,                                    ANZ,         ASSET.CAPITAL.SHARES:SGBPD.ASX,        110.000,       10537.95,          32.95,            [B],            [H],  # Initial Investment - SGBPD
+2008 Mar 13,                                    ANZ,         ASSET.CAPITAL.SHARES:IAGPB.ASX,        150.000,       14732.95,          32.95,            [B],            [H],  # Initial Investment IAGPB
+2008 Mar 13,                                    ANZ,                                 ESAVER,              0,         475.00,  # Transfer to ESAVER
+2008 Mar 18,                INCOME.INTEREST:ANZ.INT,                                    ANZ,              0,          50.29,  # Interest (ANZ)
+2008 Mar 18,            INCOME.DIVIDEND:DIV.BHP.ASX,                                   CASH,              0,         663.02,         284.15,            [D],  # BHP 356th Dividend
+2008 Mar 19,                                   CASH,                                 ESAVER,              0,         663.00,  # Transfer to ESAVER
+##
+2008 Mar 21,                       [CUA Statement:],                  # CUA Bank Statements
+      CHECK,                                   COST,                                   CASH,           0.03
+      CHECK,                                   COST,                                 ESAVER,       29378.10
+      CHECK,                                   COST,                             TERM00.CUA,       70000.00
+#
+2008 Mar 28,                                    ANZ,                                   CASH,              0,          50.00,  # Transfer to CUA
+2008 Mar 29,                                   CASH,                                 ESAVER,              0,          50.00,  # Transfer to ESAVER
+2008 Apr 01,                INCOME.INTEREST:ESA.INT,                                 ESAVER,              0,         337.05,  # eSaver Interest
+2008 Apr 04,  INCOME.CONTRIBUTION.TAXABLE:KATY.WORK,                                   CASH,              0,        7895.06,  # Employer Contribution
+2008 Apr 05,                                   CASH,                                 ESAVER,              0,        7895.01,  # Transfer to ESAVER
+2008 Apr 09,   INCOME.CONTRIBUTION.TAX-FREE:ROB.NON,                                    ANZ,              0,        8382.00,  # Contributions (Rob)
+2008 Apr 09,                                    ANZ,                                BHP.ASX,        200.000,        8432.00,          50.00,            [B],            [H],  # BHP in specie transfer (200 units)
+2008 Apr 09,                                 ESAVER,                                    ANZ,              0,          50.00,  # Transfer to ANZ Account
+2008 Apr 12,                                ROB.NON,                                 ESAVER,              0,       14000.00,  # Contribution
+2008 Apr 18,                                ANZ.INT,                                    ANZ,              0,           0.01,  # Interest (ANZ)
+2008 Apr 23,    INCOME.CONTRIBUTION.TAX-FREE:ROB.CC,                                 ESAVER,              0,        3000.00,  # Spouse contribution
+2008 May 01,                                ESA.INT,                                 ESAVER,              0,         268.98,  # Interest (ESaver)
+2008 May 01,                                 ESAVER,                                   CASH,              0,       48100.00,  # Transfer to Cash
+2008 May 01,          INCOME.DIVIDEND:DIV.BENPA.ASX,                                   CASH,              0,         460.74,         197.46,    2008 Apr 14,            [D],  # BENPA Interim Dividend
+2008 May 05,                                   CASH,       ASSET.CAPITAL.PROPERTY:AMEYS.990,          1.000,       48500.00,  # Down payment on 950 Amey's Track
+2008 May 09,                              KATY.WORK,                                   CASH,              0,       14183.06,  # Employer Contribution
+2008 May 10,                                   CASH,                                 ESAVER,              0,       14200.00,  # Transfer to ESAVER
+2008 May 12,                                ROB.NON,                                 ESAVER,              0,       37500.00,  # Contribution
+2008 May 12,                                ROB.CON,                                 ESAVER,              0,       12500.00,  # Contribution
+2008 May 12,                                   CASH,                                 ESAVER,              0,          23.88,  # Transfer to ESAVER
+2008 May 12,                                   CASH,                                 ESAVER,              0,      318539.01,  # Transfer to ESAVER
+2008 May 12,    LIABILITY.MEMBER.KATY:KATY.TAX-FREE,                                   CASH,              0,        5000.00,  # Katy's Rollin
+2008 May 12,     LIABILITY.MEMBER.KATY:KATY.TAXABLE,                                   CASH,              0,      313539.01,  # Katy's Rollin
+2008 May 20,          INCOME.DIVIDEND:DIV.SGBPD.ASX,                                   CASH,              0,         171.06,          73.31,    2008 May 04,            [D],  # Dividends (SGBPD)
+2008 May 21,                                   CASH,                                 ESAVER,              0,         190.00,  # Transfer to ESAVER
+2008 May 31,                                ESA.INT,                                 ESAVER,              0,        1557.40,  # Interest (ESaver)
+2008 Jun 06,                              KATY.WORK,                                   CASH,              0,       14022.36,  # Employer Contribution
+2008 Jun 07,                                   CASH,                                 ESAVER,              0,       14023.00,  # Transfer to ESAVER
+2008 Jun 12,             INCOME.INTEREST:TERM00.INT,                                 ESAVER,              0,        1314.47,  # Interest (CUA Term Deposit)
+2008 Jun 12,                             TERM00.CUA,                                 ESAVER,              0,       70000.00,  # Disposal of 1 units in asset[724052] => TERM00.CUA
+2008 Jun 16,          INCOME.DIVIDEND:DIV.IAGPB.ASX,                                   CASH,              0,         339.18,         145.36,    2008 May 28,            [D],  # IAGPB Dividend
+2008 Jun 16,                              IAGPB.ASX,                                   CASH,       -150.000,       15000.00,            [S],            [H],  # Disposal of 150 units in asset[776092] => IAGPB.ASX
+           
+2008 Jun 16,                                   CASH,                                 ESAVER,              0,       15339.00,  # Transfer to ESAVER
+2008 Jun 26,                                 ESAVER,                                   CASH,              0,      436550.00,  # Transfer from ESAVER
+2008 Jun 26,                                   CASH,                              AMEYS.990,              I,      436401.85,    2008 May 05,  # Ameys Track Final Installment
+2008 Jun 26,                                   CASH,                              AMEYS.990,              I,           5.00,    2008 May 05,  # Bank Charges for Bank Cheque
+2008 Jun 27,                                 ESAVER,                                   CASH,              0,         600.00,  # Transfer from ESAVER
+2008 Jun 29,                                 ESAVER,                                   CASH,              0,       26100.00,  # Transfer to Cash
+2008 Jun 30,           INCOME.FOREIGN:FOR.PXUPA.ASX,                                   CASH,              0,         726.63,  [PXUPA Distribution:],  # PXUPA distribution
+2008 Jun 30,               INCOME.INTEREST:CASH.INT,                                   CASH,              0,           3.44,  # Cash A/C Interest
+2008 Jun 30,                              KATY.WORK,                                   CASH,              0,       12576.00,  # Employer Contribution
+2008 Jun 30,                              KATY.WORK,                                   CASH,              0,        1607.06,  # Employer Contribution
+2008 Jun 30,                                ESA.INT,                                 ESAVER,              0,        2252.98,  # Interest (ESaver)
+##
+## Missing Price
+        SET,                                  PRICE,                              BENPA.ASX,          88.00
+        SET,                                  VALUE,                              AMEYS.990,              0,  #  Value At Cost 484906.8500

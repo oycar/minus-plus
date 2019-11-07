@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Control Export format
 
 
@@ -330,7 +332,6 @@ END {
 
 
 # // Carry Forward & Write Back Limits in Years
-# // @defeval CARRY_FORWARD_LIMIT  (0)
 
 
 
@@ -5481,11 +5482,6 @@ function update_member_liability_smsf(now, amount, liability_array, a,
   member_id = ((a)?( get_member_name(a, now, amount)):( ""))
 
 
-  printf "Update Liabilities [%s]\n", get_date(now) > "/dev/stderr"
-  if (member_id)
-    printf "\t%20s => %s\n", "Member id", member_id > "/dev/stderr"
-  printf "\tMember Shares\n" > "/dev/stderr"
-
 
   # Allocation to the liability accounts
   # Either no id is given - distribute amongst all accounts
@@ -5500,9 +5496,6 @@ function update_member_liability_smsf(now, amount, liability_array, a,
     if (member_id ~ /TAXABLE/)
       taxable_share = 1.0
 
-
-    sum_share = 1.0
-    printf "\t%20s => %10.6f %20s => %14s\n", Leaf[member_id], sum_share, Leaf[member_id], print_cash(amount) > "/dev/stderr"
 
   } else { # Get totals
     # We still get the share from each account
@@ -5538,9 +5531,6 @@ function update_member_liability_smsf(now, amount, liability_array, a,
         # Adjust the liability
         adjust_cost(target_account, - x * amount, now)
 
-        sum_share += x
-        printf "\t%20s => %10.6f %20s => %14s\n", Leaf[member_account], x, Leaf[target_account], print_cash(x * amount) > "/dev/stderr"
-
       } # End of exact share
     }
   } # End of allocation
@@ -5548,9 +5538,6 @@ function update_member_liability_smsf(now, amount, liability_array, a,
   # Tidy up
   delete share
 
-
-  # Just debugging
-  printf "\t%20s => %10.6f %20s => %14s\n", "Share", sum_share, "Total", print_cash(amount) > "/dev/stderr"
 
 
   # return proportion that was taxable
@@ -5562,7 +5549,7 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
   # This obtains the liability account that needs to be modified
   # In more detail INCOME.CONTRIBUTION.TYPE:NAME.X => LIABILITY.MEMBER.NAME:NAME.TYPE
   # And            EXPENSE.NON-DEDUCTIBLE.BENEFIT:NAME.TYPE => *LIABILITY.MEMBER.NAME (pro-rated if TYPE not specified)
-  # And            LIABILITY.MEMBER.(STREAM|PENSION) => LIABILITY.MEMBER.(STREAM|PENSION).NAME:SOME.NAME.TYPE (pro-rated if TYPE not specified)
+  # And            LIABILITY.MEMBER.(STREAM|PENSION) => *LIABILITY.MEMBER.(STREAM|PENSION).NAME:SOME.NAME.TYPE (pro-rated if TYPE not specified)
   # In fact        X.Y:NAME.TYPE => *LIABILITY.MEMBER.NAME
 
   # Get the member name

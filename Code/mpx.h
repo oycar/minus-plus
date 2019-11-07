@@ -62,7 +62,7 @@
 @define SHORT_FORMAT ("%Y %b")    # // 2010 Jun
 
 # // Default Reports
-@define ALL_REPORTS ("a:b:c:d:f:m:o:q:t:z")
+@define ALL_REPORTS ("a:b:c:d:m:o:q:t:z")
 
 # // Default Reports
 @ifndef SHOW_REPORTS
