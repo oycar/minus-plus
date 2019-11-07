@@ -38,7 +38,8 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     # The value cannot be later than the current time "now"
     if (value > now) {
       Read_Date_Error = "Payment date is later than current date"
-      return DATE_ERROR
+      return ternary(Enforce_Qualification, DATE_ERROR, FALSE)
+
     } else if (near_zero(discrepancy))
       return found_key
 
@@ -66,7 +67,7 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     # Best match was key
     if (discrepancy > ONE_WEEK) {
       Read_Date_Error = "Failed to find a payment date within one week of current date"
-      return DATE_ERROR
+      return ternary(Enforce_Qualification, DATE_ERROR, FALSE)
     }
 
     # Return it
@@ -74,8 +75,9 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
   }
 
   # Failed to find a qualification date
+  # Is enforcement strict?
   Read_Date_Error = "Failed to find any payment date"
-  return DATE_ERROR
+  return ternary(Enforce_Qualification, DATE_ERROR, FALSE)
 }
 
 # read csv records

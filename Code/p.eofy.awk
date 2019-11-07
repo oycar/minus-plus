@@ -1476,32 +1476,43 @@ function print_dividend_qualification(now, past, is_detailed,
         payment = - get_delta_cost(a, key)
 
         # The qualifying date is one day before the ex-dividend date
-        qualifying_date = just_after(yesterday(get_exdividend_date(underlying_asset, key), HOUR))
+        if (qualifying_date = get_exdividend_date(underlying_asset, key))
+          qualifying_date = just_after(yesterday(qualifying_date, HOUR))
 
         # If this date is valid now compute the proportion of the dividend is qualified
         assert(qualifying_date > DATE_ERROR, sprintf("%s: %s <%s>",  Leaf[a], Read_Date_Error, get_date(key)))
 
-        # These are the units that were qualified on the qualifying date
-        qualified_units = get_qualified_units(underlying_asset, qualifying_date)
+        # Catch  the case that no qualification date was recorded
+        if (qualifying_date) {
+          # These are the units that were qualified on the qualifying date
+          qualified_units = get_qualified_units(underlying_asset, qualifying_date)
 
-        # Now get the total units
-        total_units = get_units(underlying_asset, qualifying_date)
+          # Now get the total units
+          total_units = get_units(underlying_asset, qualifying_date)
 
-        # If not all units are qualified need to check the second half of the Qualification Window
-        if (!near_zero(total_units - qualified_units)) {
-          q = maximum_entry(Qualified_Units[underlying_asset], qualifying_date, qualifying_date + 0.5 * Qualification_Window)
-          qualified_units = max_value(q, qualified_units)
-          qualified_fraction = qualified_units / total_units
+          # If not all units are qualified need to check the second half of the Qualification Window
+          if (!near_zero(total_units - qualified_units)) {
+            q = maximum_entry(Qualified_Units[underlying_asset], qualifying_date, qualifying_date + 0.5 * Qualification_Window)
+            qualified_units = max_value(q, qualified_units)
+            qualified_fraction = qualified_units / total_units
 
-          # Should never be greater than unity
-          assert(!above_zero(qualified_fraction - 1.0), sprintf("Qualified Units[%s] => %.3f > Units held on qualification date <%s>",
-            underlying_asset, qualified_units, total_units))
-        } else
+            # Should never be greater than unity
+            assert(!above_zero(qualified_fraction - 1.0), sprintf("Qualified Units[%s] => %.3f > Units held on qualification date <%s>",
+              underlying_asset, qualified_units, total_units))
+          } else
+            qualified_fraction = 1.0
+
+          # The output - show ex-dividend date not qualifying date
+          printf "%13s %12s %12.3f %16s %14.3f %12.2f %16s\n", Leaf[underlying_asset], get_date(tomorrow(qualifying_date)), total_units,
+                  get_date(key), qualified_units, 100.0 * qualified_fraction, print_cash(payment) > reports_stream
+        } else {
+          # No qualification date
+          qualified_units    = total_units = get_units(underlying_asset, now)
           qualified_fraction = 1.0
 
-        # The output - show ex-dividend date not qualifying date
-        printf "%13s %12s %12.3f %16s %14.3f %12.2f %16s\n", Leaf[underlying_asset], get_date(tomorrow(qualifying_date)), total_units,
-                get_date(key), qualified_units, 100.0 * qualified_fraction, print_cash(payment) > reports_stream
+          printf "%13s %12s %12.3f %16s %14.3f %12.2f %16s\n", Leaf[underlying_asset], "No Date", total_units,
+                  get_date(key), total_units, 100.0, print_cash(payment) > reports_stream
+        }
 
         # Sum qualified payment
         qualified_payment += qualified_fraction * payment

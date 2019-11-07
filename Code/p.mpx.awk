@@ -492,7 +492,7 @@ function set_financial_year(now,   new_fy) {
 #  SET
 #  CHECK
 #
-$1 ~ /^(CHECK|SET)/ { #|SET_BANDS|SET_ENTRY)/ {
+$1 ~  /^([[:space:]])*(CHECK|SET)/  {
  # Use a function so we can control scope of variables
  read_control_record()
  next
@@ -969,9 +969,13 @@ function parse_transaction(now, a, b, units, amount,
       } else if (Qualification_Window && (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION.CLOSE"))) {
         Extra_Timestamp = get_exdividend_date(underlying_asset, now)
 
-        # This must exist
-        assert(DATE_ERROR != Extra_Timestamp, "Cannot find the ex-dividend date for <" Leaf[a] "> relating to the payment date <" get_date(now) ">")
-        fields[number_fields = 1] = get_date(Extra_Timestamp)
+        # A date error is an error
+        assert(DATE_ERROR != Extra_Timestamp, "<" Leaf[a] "> Cannot find ex-dividend date for payment date <" get_date(now) ">. Use option -q to override.")
+
+        if (!Extra_Timestamp)
+          printf "Warning: No exdividend information for %s\n", Leaf[a] > STDERR
+        else
+          fields[number_fields = 1] = get_date(Extra_Timestamp)
       }
 
       # Clear the timestamp
@@ -1495,7 +1499,7 @@ END {
   # This loop will happen at least once
   if (Last_Record > Stop_Time)
     eofy_actions(Stop_Time)
-  else if (Stop_Time < Future) {
+  else { # if (Stop_Time < Future) {
     # We need to produce statements
     do {
 

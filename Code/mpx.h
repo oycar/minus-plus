@@ -32,7 +32,7 @@
  Threshold_Dates Total_Units Underlying_Asset Units_Held "
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
- Document_Root EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency\
+ Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency\
  Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED\
  Dividend_Qualification_Function Get_Taxable_Gains_Function\
  Gross_Up_Gains_Function Imputation_Report_Function\
