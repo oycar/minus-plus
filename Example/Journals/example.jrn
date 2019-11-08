@@ -72,8 +72,8 @@
 ## as contributions but they would distort the financial statements so directly applying them to the
 ## member liability accounts is a better option
 
-2008 Mar 04, LIABILITY.MEMBER.WILKINS:WILKINS.TAX-FREE,                             ESAVER,              0,        1583.44,  # Rob's Rollin
-2008 Mar 04, LIABILITY.MEMBER.WILKINS:WILKINS.TAXABLE,                              ESAVER,              0,      146525.18,  # Rob's Rollin
+2008 Mar 04, LIABILITY.MEMBER.WILKINS:WILKINS.TAX-FREE,                             ESAVER,              0,        1583.44,  # WILKINS.s Rollin
+2008 Mar 04, LIABILITY.MEMBER.WILKINS:WILKINS.TAXABLE,                              ESAVER,              0,      146525.18,  # WILKINS.s Rollin
 2008 Mar 05,                                    ANZ,                                  CASH,              0,           5.49,  # Transfer to Bank
 2008 Mar 06,                                   CASH,                                ESAVER,              0,           6.48,  # Transfer to Savings
 
@@ -120,7 +120,7 @@
 2008 Apr 01,                INCOME.INTEREST:ESA.INT,                                 ESAVER,              0,         337.05,  # eSaver Interest
 2008 Apr 04,  INCOME.CONTRIBUTION.TAXABLE:EMMA.WORK,                                   CASH,              0,        7895.06,  # Employer Contribution
 2008 Apr 05,                                   CASH,                                 ESAVER,              0,        7895.01,  # Transfer to ESAVER
-2008 Apr 09,INCOME.CONTRIBUTION.TAX-FREE:WILKINS.NON,                                   ANZ,              0,        8382.00,  # Contributions (Rob)
+2008 Apr 09,INCOME.CONTRIBUTION.TAX-FREE:WILKINS.NON,                                   ANZ,              0,        8382.00,  # Contributions (WILKINS.
 2008 Apr 09,                                    ANZ,                                BHP.ASX,        200.000,        8432.00,          50.00,            [B],            [H],  # BHP in specie transfer (200 units)
 2008 Apr 09,                                 ESAVER,                                    ANZ,              0,          50.00,  # Transfer to ANZ Account
 2008 Apr 12,                            WILKINS.NON,                                 ESAVER,              0,       14000.00,  # Contribution

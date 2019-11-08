@@ -105,7 +105,7 @@ function initialize_tax_aud() {
     Update_Profits_Function  = "update_profits_smsf"
 
     # Special accounts for SMSFs
-    RESERVE   = initialize_account("LIABILITY.RESERVE:INVESTMENT.RESERVE")
+    #RESERVE   = initialize_account("LIABILITY.RESERVE:INVESTMENT.RESERVE")
     ALLOCATED = initialize_account("SPECIAL.ACCOUNT:ALLOCATED")
 
     # Reserve rate is variable over time

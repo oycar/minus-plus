@@ -177,29 +177,32 @@
 @define set_entry(array, x, t) (array[t] = (x))
 
 # // Rounding etc
-@define near_zero(x) (((x) <= Epsilon) && ((x) >= -Epsilon))
+# // @define near_zero(x) (((x) <= Epsilon) && ((x) >= -Epsilon))
+@define near_zero(x) (less_than_or_equal(x, Epsilon) && greater_than_or_equal(x, -Epsilon))
 
 # // Not zero
-@define not_zero(x) (((x) > Epsilon) || ((x) < -Epsilon))
+# // @define not_zero(x) (((x) > Epsilon) || ((x) < -Epsilon))
+@define not_zero(x) (greater_than(x, Epsilon) || less_than(x, -Epsilon))
 
 # // Positive?
-@define above_zero(x) ((x) >  Epsilon)
+@define above_zero(x) greater_than(x, Epsilon)
+
 # // Yield x if x is positive, otherwise z
-@define yield_positive(x, z) ternary((x) >   Epsilon, (x), z)
+@define yield_positive(x, z) ternary(above_zero(x), (x), z)
 
 # // Negative?
-@define below_zero(x) ((x) < -Epsilon)
+@define below_zero(x) less_than(x, -Epsilon)
 # // Yield x if x is negative, otherwise z
-@define yield_negative(x, z) ternary((x) < - Epsilon, (x), z)
+@define yield_negative(x, z) ternary(below_zero(x), (x), z)
 
 # // Round to zero
 @define round_zero(x) ternary(near_zero(x), 0, x)
 
 # // Numerical comparisons
-@define greater_than(x, y) ((x - y) > 0)
-@define less_than(x, y)    ((x - y) < 0)
-@define greater_than_or_equal(x, y) ((x - y) >= 0)
-@define less_than_or_equal(x, y)    ((x - y) <= 0)
+@define greater_than(x, y) (((x) - (y)) > 0)
+@define less_than(x, y)    (((x) - (y)) < 0)
+@define greater_than_or_equal(x, y) (((x) - (y)) >= 0)
+@define less_than_or_equal(x, y)    (((x) - (y)) <= 0)
 
 @define is_closed(a, now) (!is_open((a), (now)))
 @define is_new(a) ("" == first_key(Cost_Basis[a]))

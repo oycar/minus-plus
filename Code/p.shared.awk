@@ -1090,7 +1090,7 @@ function one_year(now, sense,     year, day, sum) {
 function is_open(a, now,     p) {
   # An asset is open if there are unsold parcels at time 'now'
   for (p = 0; p < Number_Parcels[a]; p ++) {
-    if (Held_From[a][p] > now)
+    if (greater_than(Held_From[a][p], now))
       break
     if (is_unsold(a, p, now))
       return TRUE
@@ -1213,7 +1213,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
     # Either divide adjustment between all open parcels OR
     # concentrate with a parcel with the same timestamp
     for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
+      if (greater_than(Held_From[a][i], now)) # All further transactions occured after (now)
         break # All done
       if (Held_From[a][i] == now) {
         # The adjustment is pooled explicitly with this parcel
@@ -1225,7 +1225,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 @endif # LOG
         # Also record the parents cost
         # If this is a tax adjustment then only negative costs are significant
-        if (!tax_adjustment || x < 0)
+        if (!tax_adjustment || below_zero(x))
           update_cost(a, x, now)
 
         return # Only one parcel is adjusted - it must be unsold if only just purchased
@@ -1263,9 +1263,9 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 @endif # LOG
 
     # Balance costs
-    if (!tax_adjustment || x < 0)
+    if (!tax_adjustment || below_zero(x))
       update_cost(a, x, now)
-  } else if (!tax_adjustment || x > 0) { # This is the corresponding account - only significant if not a tax adjustment or if it is positive
+  } else if (!tax_adjustment || above_zero(x)) { # This is the corresponding account - only significant if not a tax adjustment or if it is positive
     sum_entry(Cost_Basis[a], x, now)
 
     # Also record the parents cost
@@ -1319,7 +1319,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
     #   The reduced cost is decreased and the adjusted cost is unchanged
     # The other is to adjust for tax not yet paid and parcel adjustment > 0
     #   here the tax adjustment is still negative but the accounting adjustment is zero
-    if (parcel_adjustment > 0)
+    if (above_zero(parcel_adjustment))
       # A tax adjustment for an undeductible but legitimate expense
       sum_entry(Tax_Adjustments[a][p], - parcel_adjustment, now)
     else { # A tax adjustment for deferred tax or depreciation &c
@@ -1360,7 +1360,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
       update_cost(a, -parcel_cost, now)
 
       # Update tax adjustment too
-      if (parcel_adjustment < parcel_cost)
+      if (less_than(parcel_adjustment, parcel_cost))
         sum_entry(Tax_Adjustments[a][p], parcel_cost, now)
       else {
         parcel_cost -= parcel_adjustment
@@ -1372,7 +1372,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 @endif # LOG
         # Need to record taxable gains/losses too
         held_time = get_held_time(now, Held_From[a][p])
-        if (held_time >= CGT_PERIOD) {
+        if (greater_than_or_equal(held_time, CGT_PERIOD)) {
           if (!(a in Long_Gains))
             Long_Gains[a] = initialize_account(LONG_GAINS ":LG." Leaf[a])
           adjust_cost(Long_Gains[a], parcel_cost, now)
@@ -1406,7 +1406,7 @@ function get_cost(a, now,     i, sum_cost) {
     sum_cost = 0
 
     for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
+      if (greater_than(Held_From[a][i], now)) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
         sum_cost += sum_cost_elements(Accounting_Cost[a][i], now) # cost elements
@@ -1434,7 +1434,7 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
   # Do not apply to equities
   if (is_asset(a)) {
     for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
+      if (greater_than(Held_From[a][i], now)) # All further transactions occured after (now)
         break # All done
       if (is_unsold(a, i, now)) # This is an unsold parcel at time (now)
         sum_adjustments += find_entry(Tax_Adjustments[a][i], now)
@@ -1492,7 +1492,7 @@ function get_realized_gains(a, now,
   # Must be a capital asset
   if (is_capital(a)) {
     for (i = 0; i < Number_Parcels[a]; i ++) {
-      if (Held_From[a][i] > now) # All further transactions occured after (now)
+      if (greater_than(Held_From[a][i], now)) # All further transactions occured after (now)
         break # All done
       if (is_sold(a, i, now)) # This is a sold parcel at time (now)
         gains += get_parcel_proceeds(a, i) + sum_cost_elements(Accounting_Cost[a][i], now) # All cost elements
@@ -1519,7 +1519,7 @@ function sum_cost_elements(array, now,     sum_elements, e) {
 function get_cash_in(a, i, now) {
 
   # Is the account open?
-  if (now >= Held_From[a][i])
+  if (greater_than_or_equal(now, Held_From[a][i]))
     # Yes - always element I
     return get_element_cost(a, i, I, Held_From[a][i]) # The Held_From time ensures  that later element I costs do not impact the result
 
@@ -1550,7 +1550,7 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 # Print out transactions
 # Generalize for the case of a single entry transaction
 function print_transaction(now, comments, a, b, u, amount, fields, n_fields,     matched) {
-  if (now > Stop_Time)
+  if (greater_than(now, Stop_Time))
     return
 
   # Are we matching particular accounts?
@@ -1971,7 +1971,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
   sum_delta = 0
   for (p = 0; p < Number_Parcels[a]; p ++) {
     # Is this parcel purchased yet?
-    if (Held_From[a][p] > now)
+    if (greater_than(Held_From[a][p], now))
       break # All done
     if (is_unsold(a, p, now)) {
       # First see if depreciation already was computed for time (now)
@@ -1986,7 +1986,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
 
       # Now we need the opening value for this parcel - always cost element I
       open_key = find_key(Accounting_Cost[a][p][I], just_before(now))
-      assert(open_key - Epoch >= 0, sprintf("%s: No earlier depreciation record than %s", get_short_name(a), get_date(now)))
+      assert(greater_than_or_equal(open_key, Epoch), sprintf("%s: No earlier depreciation record than %s", get_short_name(a), get_date(now)))
 
       # The opening value - cost element I
       open_value = Accounting_Cost[a][p][I][open_key]
@@ -2068,7 +2068,7 @@ function get_tax(now, bands, total_income,
     band_width = last_threshold - threshold # negative thresholds stored
 
     # Is this threshold below the total income?
-    if (total_income < -threshold)
+    if (less_than(total_income, -threshold))
       break
 
     # Update the last threshold
@@ -2115,7 +2115,7 @@ function get_taxable_income(now, tax_left,
     band_tax = band_width * Tax_Bands[current_key][last_threshold]
 
     # Is the tax_payable above the amount paid?
-    if (band_tax >= tax_left) {
+    if (greater_than_or_equal(band_tax, tax_left)) {
       # The tax actually accruing from this band is tax_left
       # so the income lying in this band is simply x
       total_income += tax_left * band_width / band_tax
@@ -2132,7 +2132,7 @@ function get_taxable_income(now, tax_left,
   }
 
   # We can still have have tax unaccounted for here
-  if (tax_left > Epsilon)
+  if (greater_than(tax_left, Epsilon))
     total_income += tax_left / Tax_Bands[current_key][last_threshold]
 
   # The minimum total income that would generate this much tax

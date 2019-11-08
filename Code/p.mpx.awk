@@ -1306,6 +1306,8 @@ function parse_transaction(now, a, b, units, amount,
 }
 
 # Set an account term for term limited assets and liabilities
+#
+# Fixme - This fails for state arrays because Leaf is overwritten
 function set_account_term(a, now) {
   # It is possible for a current account to have no term set
 
@@ -1499,8 +1501,12 @@ END {
   # This loop will happen at least once
   if (Last_Record > Stop_Time)
     eofy_actions(Stop_Time)
-  else { # if (Stop_Time < Future) {
+  else if (!Write_State) {
     # We need to produce statements
+    # The reason for not producing a final statement
+    # when a state file is being written is that
+    # it would lead to duplication of data processing
+    # if the last record is not already beyond the Stop_Time
     do {
 
       # Get each EOFY in turn
@@ -1539,8 +1545,6 @@ END {
   # Log data about selected variables
   if (Write_Variables)
     filter_data(Last_Record, Write_Variables, TRUE)
-
-  # Check
 } #// END
 #
 

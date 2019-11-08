@@ -51,10 +51,11 @@ function balance_profits_smsf(now, past, initial_allocation,     delta_profits, 
 @endif
 
   # Apply actual profits to the reserve
+  x *= find_entry(Reserve_Rate, now)
   if (above_zero(x)) {
-    # Only distribute actual delta_profits to the reserve
-    # Compute the net allocated profits in the current period
-    x *= find_entry(Reserve_Rate, now)
+    # Initialize reserve if needed
+    if (!RESERVE)
+      RESERVE   = initialize_account("LIABILITY.RESERVE:INVESTMENT.RESERVE")
 
     # The only reserve set in eofy actions so use now
     adjust_cost(RESERVE, -x, now)
