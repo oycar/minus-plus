@@ -145,6 +145,12 @@
 # // Pension or Income Stream
 @define is_stream(a) ((a) ~ /^LIABILITY\.MEMBER\.(PENSION|STREAM)[.:]/)
 @define is_pension(a) ((a) ~ /^LIABILITY\.MEMBER\.PENSION[.:]/)
+
+#
+# // Match buy or sell transactions (pairs of accounts)
+@define is_sale(t, a, b)  ((is_asset(a) && is_open(a, t)) || (is_equity(b) && is_open(b, t)))
+@define is_purchase(a, b)  (is_asset(b) || is_equity(a))
+
 # //
 # // The last component of a name is the suffix
 @define is_suffix(a, b) ((a) ~ ("[.:]" (b) "(_|$)"))

@@ -543,96 +543,6 @@ function initialize_state(    x) {
   }
 }
 
-# Initialize special accounts
-function set_special_accounts() {
-  # Built in accounts are required for EOFY statements
-  #
-  # Check & Set use special accounts to trigger actions
-  #
-  initialize_account("SPECIAL.CONTROL:COST")
-  initialize_account("SPECIAL.CONTROL:UNITS")
-  initialize_account("SPECIAL.CONTROL:VALUE")
-  initialize_account("SPECIAL.CONTROL:PRICE")
-
-  # A NULL account
-  NULL = initialize_account("SPECIAL.ACCOUNT:NULL")
-
-  # The DEPRECIATION account
-  DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
-
-  # When a depreciating asset is sold any profit or loss is booked as income/expense to these accounts
-  SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
-  SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
-
-  # Balancing - to simplify processing of transactions at EOFY
-  # These are income/expense items not needed in the operating statement
-  ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
-  FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
-
-  # Keeping a record of taxable income, gains, losses
-  TAXABLE_INCOME   = initialize_account("SPECIAL.TAX:TAXABLE.INCOME")
-  INCOME_TAX       = initialize_account("SPECIAL.TAX:INCOME.TAX")
-
-  # Built in TAX accounts - debtor like
-  WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
-  PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
-
-  # Built in TAX accounts - creditor like
-  DEFERRED     = initialize_account("LIABILITY.TAX:DEFERRED.TAX")
-  TAX          = initialize_account("LIABILITY.TAX:TAX")
-  RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
-  GST          = initialize_account("LIABILITY.TAX:TAX.GST")
-
-  # Offsets
-  NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
-  CARRY_OFFSETS      = initialize_account("SPECIAL.OFFSET.CARRY:CARRY.OFFSETS")
-  REFUNDABLE_OFFSETS = initialize_account("SPECIAL.OFFSET.REFUNDABLE:REFUNDABLE.OFFSETS")
-
-  # Franking Credits - strictly speaking should be AUD accounts
-  ##FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
-  ##FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
-
-  ## Franking Credits
-  #
-  FRANKING          = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
-  FRANKING_PAID     = initialize_account("SPECIAL.FRANKING:FRANKING.PAID") # Disbursed
-  FRANKING_STAMPED  = initialize_account("SPECIAL.FRANKING:FRANKING.STAMPED") # Received through net tax paid
-
-  # Franking deficit offset
-  # Other offsets stored in unique accounts with same branch name
-  #FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
-  FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
-
-  # Franking tax account - a creditor like account
-  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
-
-  # Other tax credits, offsets & deductions
-  LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
-
-  # Accounting capital gains accounts
-  REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
-  REALIZED_LOSSES = initialize_account("EXPENSE.LOSSES.REALIZED:LOSSES")
-  UNREALIZED  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
-
-  # Extra capital gains accounts which can be manipulated independently of asset revaluations
-  INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")
-  INCOME_SHORT       = initialize_account("INCOME.GAINS.SHORT:INCOME.SHORT")
-  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES.LONG:EXPENSE.LONG")
-  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
-
-  # Taxable capital gains are in special accounts
-  # Make sure the parent accounts exist
-  initialize_account(LONG_GAINS  ":LONG.GAINS")
-  initialize_account(LONG_LOSSES ":LONG.LOSSES")
-  initialize_account(SHORT_GAINS ":SHORT.GAINS")
-  WRITTEN_BACK   =   initialize_account(SHORT_LOSSES ":SHORT.LOSSES")
-
-  #
-  # Deferred Gains & Losses too (all long...)
-  DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
-  DEFERRED_LOSSES = initialize_account("SPECIAL.DEFERRED:DEFERRED.LOSSES")
-}
-
 #
 function read_control_record(       now, i, x, p, is_check){
   # Clear initial values
@@ -651,7 +561,7 @@ function read_control_record(       now, i, x, p, is_check){
       # Syntax for check and set is
       # CHECKSET, ACCOUNT, WHAT, X, # Comment
       # We need to rebuild the line into something more standard
-      # DATE, ACCOUNT, WHAT, 0, X, # Comment
+      # DATE, ACCOUNT, WHAT, X, 0, # Comment
       #
       # Some special accounts are needed
 
@@ -659,19 +569,19 @@ function read_control_record(       now, i, x, p, is_check){
       $1 = get_date(now)
 
       # Shuffle up fields
-      for (i = NF; i > 3; i --)
+      for (i = NF; i > 5; i --)
         $(i+1) = $i
 
       # Set cost element field
-      $4 = 0
+      #$5 = 0
 
       # Add one field
-      NF ++
+      #NF ++
 
       # Check amount is set
-      if (NF < 5) {
-        $5 = 0
-        NF = 5
+      if (NF < 4) {
+        $4 = 0
+        NF = 4
       }
 
       # We can parse this line now
@@ -1016,20 +926,21 @@ function parse_transaction(now, a, b, units, amount,
   if (units < 0) {
     # The asset being sold must be "a" but if equity must be "b"
     #
-    correct_order = is_asset(a) && is_open(a, now)
-    if (!correct_order) {
-      correct_order = is_equity(b) && is_open(b, now)
-      if (correct_order) {
-        swop = a; a = b; b = swop
-        amount = - amount
-      }
-    }
+    # correct_order = is_asset(a) && is_open(a, now)
+    # if (!correct_order) {
+    #   correct_order = is_equity(b) && is_open(b, now)
+    #   if (correct_order) {
+    #     swop = a; a = b; b = swop
+    #     amount = - amount
+    #   }
+    # }
+    correct_order = is_sale(now, a, b)
     assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, get_short_name(a), get_short_name(b)))
 
-    # Get the number of units to be sold in the special case of sell all
-    if ("SELL" == Write_Units) {
-      units = - get_units(a, now)
-      Write_Units = sprintf("%10.3f", units)
+    # If this is not an asset sale swop the accounts
+    if (!is_asset(a) || is_closed(a, now)) {
+      swop = a; a = b; b = swop
+      amount = - amount
     }
 
     # Get brokerage (if any)
@@ -1123,16 +1034,24 @@ function parse_transaction(now, a, b, units, amount,
 @endif
 
   } else if (units > 0) {
-    # For a purchase the asset must be account "b"
-    correct_order = is_asset(b)
-    if (!correct_order) {
-      correct_order = is_equity(a)
-      if (correct_order) {
-        swop = a; a = b; b = swop
-        amount = - amount
-      }
-    }
+    # # For a purchase the asset must be account "b"
+    # correct_order = is_asset(b)
+    # if (!correct_order) {
+    #   correct_order = is_equity(a)
+    #   if (correct_order) {
+    #     swop = a; a = b; b = swop
+    #     amount = - amount
+    #   }
+    # }
+    # This must be a purchase
+    correct_order = is_purchase(a, b)
     assert(correct_order, sprintf("%s => can't buy asset %s\n", $0, get_short_name(b)))
+
+    # If this is not an asset purchase swop the accounts
+    if (!is_asset(b)) {
+      swop = a; a = b; b = swop
+      amount = - amount
+    }
 
     # Normally fields[1] is  the parcel name
     if ("" != Parcel_Name)

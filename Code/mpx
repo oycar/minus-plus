@@ -167,6 +167,8 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
     else
       app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" -D SHOW_REPORTS=\"${Show_Reports}\" p.mpx.awk > ${MPXDIR}/mpx.awk
     fi
+    app p.echo.awk > ${MPXDIR}/echo.awk
+
   else
     echo >&2 "mpx warning: No preprocessor gpp found - using prebuilt mpx script."
   fi

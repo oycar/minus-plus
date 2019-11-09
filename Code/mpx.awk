@@ -106,8 +106,6 @@ END {
 
 
 
-
-
 # // Default Asset Prefix for Price Lists
 
 
@@ -172,6 +170,12 @@ END {
 
 #
 # // Pension or Income Stream
+
+
+
+#
+# // Match buy or sell transactions (pairs of accounts)
+
 
 
 # //
@@ -864,55 +868,98 @@ function parse_line(now,    i, j, x, number_accounts) {
   # i == 1 => Zero Entry
   i = number_accounts + 1
 
-  # Interpret units
   #
-  # If number accounts > 0 this MUST be a legal units field
-  # Units indicate whether an item is bought or sold; or the cost element or whether adjusting
-  # the cost base or the reduced cost base
-  #
-  #  A non zero numerical value
-  #   units > 0 => BUY  cost element I
-  #   units < 0 => SELL cost element I
-  #
-  #  A blank or zero
-  #    units == 0 => Cost Base element II (the default)
-  #
-  #  A string  (roman numbers I to V are meaningful but could be anything without brackets)
-  #    units == I   => Cost Base element I
-  #    units == II  => Cost Base element II etc
-  #
-  #  A bracketed string
-  #    units == (I) => Tax Adjustment to Cost Base element I etc
-  #
-  # Finally the special value (D) or (d) means depreciate automatically
-
+  # The amount
+  # Must exist if number accounts > 0
   if (number_accounts) {
+    i ++
+
+    # Must ba number
+    assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
+    amount = strtonum($i)
+
+    # Interpret units
+    #
+    # If number accounts > 0 this MUST be a legal units field
+    # Units indicate whether an item is bought or sold; or the cost element or whether adjusting
+    # the cost base or the reduced cost base
+    #
+    #  A non zero numerical value
+    #   units > 0 => BUY  cost element I
+    #   units < 0 => SELL cost element I
+    #
+    #  A blank or zero
+    #    units == 0 => Cost Base element II (the default)
+    #
+    #  A string  (roman numbers I to V are meaningful but could be anything without brackets)
+    #    units == I   => Cost Base element I
+    #    units == II  => Cost Base element II etc
+    #
+    #  A bracketed string
+    #    units == (I) => Tax Adjustment to Cost Base element I etc
+    #
+    # Finally the special value (D) or (d) means depreciate automatically
+
     # Is units a numerical value?
+    #i ++
+    #units = parse_units($i)
+
+
+
+
+
+    # Move on to the next field
     i ++
-    units = parse_units($i)
+    #j = units
 
-    # The amount - this should be checked
-    # Must be a number or "COST" if a sale transaction
-    i ++
-    if ("COST" == $i) {
-      # In this case this must be a sale of all the units
-      assert("SELL" == Write_Units, "<" $0 "> Is not a sale transaction")
+    # This field can be units or a cost element
+    x = parse_optional_value($i)
 
-      # Get the amount
-      amount = get_cost(Account[1], now)
+    # Is this a non zero value?
+    units = 0
+    if (x) {
+      units = x
 
-      # If this is a single entry transaction must negate the amount
-      if (1 == number_accounts)
-        amount = - amount
-    } else {
-      # Must ba number
-      assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
-      amount = strtonum($i)
+      # This might be the number of units; is this a buy or sell transaction?
+      if ((((x) - ( Epsilon)) > 0) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((Account[1]) ~ /^EQUITY[.:]/)))
+        # Interpret these as units
+        Write_Units  = sprintf("%10.3f", x)
+      else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now))))
+        Write_Units  = sprintf("%10.3f", x)
+      else { # Not units
+        Write_Units = units = 0
+        i --
+      }
+    } else if ("" != x) { # Ignore the case of this being a time-stamp
+      units = parse_cost_element(x)
+
+      # The output syntax
+      if (Tax_Adjustment)
+        Write_Units =  "(" Cost_Element ")"
+      else if (COST_ELEMENT == Cost_Element) {
+        Write_Units = 0 # Simpler to read and most common case
+        i --
+      } else
+        Write_Units = Cost_Element
     }
+
   }
 
   # From now on the fields are context dependent
   # Possibilities are:
+  # * **Field 5**
+  #   * **Units** in a buy or sell transaction
+  #   * **Cost Element** in many transactions
+  #   * **A Parcel Date** in a buy or sell transaction
+  #   * **An Ex-Dividend Date** in an income transaction
+  #   * **Brokerage** in a buy or sell transaction
+  #   * **Tax Credits** in an income transaction
+  #   * **Effective Life** in a depreciating asset purchase
+  #   * **A Parcel Name** in a buy or sell transaction
+  #   * **A GST Tag** in an income, expense, buy or sell transaction. If brokerage is present the GST is applied only on the brokerage.
+  #   * **A document name** in any transaction
+  #   * **A comment** in any transaction
+  # * **Field 7**
   # * **Field 6**
   #   * **A Parcel Date** in a buy or sell transaction
   #   * **An Ex-Dividend Date** in an income transaction
@@ -946,12 +993,15 @@ function parse_line(now,    i, j, x, number_accounts) {
   #   * **A document name** in any transaction
   #   * **A comment** in any transaction
 
-  # Move on to the next field
+  # At the moment
+  # always advance i
   i ++
 
-  # The next two fields can contain real numbers, time-stamps or strings
+
+
+
+  # The next three fields can contain real numbers, time-stamps or strings
   # Check first for real numbers or time-stamps
-  # Next two fields are compatible
   for (j = 1; i <= NF; j++) {
     # Set x
     if (j <= 3)
@@ -1181,8 +1231,7 @@ function parse_optional_value(field,     value) {
   }
 
   # Next - is it a numerical value?
-  # FIXME can do better than this
-  value = (((strtonum(field)) < 0)?( -(strtonum(field))):(strtonum(field)))
+  value = strtonum(field)
 
   # This is a value
   if (((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
@@ -1248,7 +1297,51 @@ function parse_optional_string(field, save_document,    string, x) {
   return ""
 }
 
+# Is this a cost element?
+function parse_cost_element(u,       units, len) {
+  # Need to examine the original string more closely
+  len = length(u)
 
+  # Brackets?
+  if (u ~ /^()/ && u ~ /)$/) {
+    # This is probably a tax adjustment
+    Tax_Adjustment = (1)
+
+    # bracketed
+    if (len > 2)
+      units = trim(toupper(substr(u, 2, len - 2)))
+    else
+      # Empty String defaults to cost element II
+      units = COST_ELEMENT
+  } else
+    units = u
+
+  # The units might still be I, II, III, IV, V, D or 0
+  switch (units) {
+    case "0" : Cost_Element = COST_ELEMENT
+      # A string (0) is not a tax adjustment
+      Tax_Adjustment = (0)
+      break
+    case "D" : # Depreciation
+      Cost_Element = I # First cost element
+      Tax_Adjustment = Automatic_Depreciation = (1)
+      break
+    case "I" :
+    case "II" :
+    case "III" :
+    case "IV" :
+    case "V" : # Cost elements
+      Cost_Element = units # As specified
+      break
+
+    default: #
+      # A string such as (12) is not a tax adjustment
+      Tax_Adjustment = (0)
+      units = 0
+   }
+
+  return units
+}
 
 # Is units a numerical value?
 function parse_units(u, units,      len) {
@@ -1289,11 +1382,6 @@ function parse_units(u, units,      len) {
         Cost_Element = units # As specified
         break
 
-      # Special case of "SELL"
-      case "SELL" :
-         Write_Units = units # To signify a sale
-         Cost_Element = I # First cost element
-         break
       default: #
         # A string such as (12) is not a tax adjustment
         Tax_Adjustment = (0)
@@ -1311,17 +1399,14 @@ function parse_units(u, units,      len) {
   }
 
   # The output syntax
-  if (Write_Units != "SELL") {
-    if (0 != units)
-      Write_Units  = sprintf("%10.3f", units)
-    else if (Tax_Adjustment)
-      Write_Units =  "(" Cost_Element ")"
-    else if (COST_ELEMENT == Cost_Element)
-      Write_Units = 0 # Simpler to read and most common case
-    else
-      Write_Units = Cost_Element
-  } else
-    units = -1 # This is a simple place holder
+  if (0 != units)
+    Write_Units  = sprintf("%10.3f", units)
+  else if (Tax_Adjustment)
+    Write_Units =  "(" Cost_Element ")"
+  else if (COST_ELEMENT == Cost_Element)
+    Write_Units = 0 # Simpler to read and most common case
+  else
+    Write_Units = Cost_Element
 
   return units
 }
@@ -1360,6 +1445,96 @@ function add_optional_field(optional_fields, field_value, field_rank,
 
   # Save the number of fields of this rank
   optional_fields[field_rank]["length"] = number_fields
+}
+
+# Initialize special accounts
+function set_special_accounts() {
+  # Built in accounts are required for EOFY statements
+  #
+  # Check & Set use special accounts to trigger actions
+  #
+  initialize_account("SPECIAL.CONTROL:COST")
+  initialize_account("SPECIAL.CONTROL:UNITS")
+  initialize_account("SPECIAL.CONTROL:VALUE")
+  initialize_account("SPECIAL.CONTROL:PRICE")
+
+  # A NULL account
+  NULL = initialize_account("SPECIAL.ACCOUNT:NULL")
+
+  # The DEPRECIATION account
+  DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
+
+  # When a depreciating asset is sold any profit or loss is booked as income/expense to these accounts
+  SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
+  SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
+
+  # Balancing - to simplify processing of transactions at EOFY
+  # These are income/expense items not needed in the operating statement
+  ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
+  FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
+
+  # Keeping a record of taxable income, gains, losses
+  TAXABLE_INCOME   = initialize_account("SPECIAL.TAX:TAXABLE.INCOME")
+  INCOME_TAX       = initialize_account("SPECIAL.TAX:INCOME.TAX")
+
+  # Built in TAX accounts - debtor like
+  WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
+  PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
+
+  # Built in TAX accounts - creditor like
+  DEFERRED     = initialize_account("LIABILITY.TAX:DEFERRED.TAX")
+  TAX          = initialize_account("LIABILITY.TAX:TAX")
+  RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
+  GST          = initialize_account("LIABILITY.TAX:TAX.GST")
+
+  # Offsets
+  NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
+  CARRY_OFFSETS      = initialize_account("SPECIAL.OFFSET.CARRY:CARRY.OFFSETS")
+  REFUNDABLE_OFFSETS = initialize_account("SPECIAL.OFFSET.REFUNDABLE:REFUNDABLE.OFFSETS")
+
+  # Franking Credits - strictly speaking should be AUD accounts
+  ##FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
+  ##FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
+
+  ## Franking Credits
+  #
+  FRANKING          = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
+  FRANKING_PAID     = initialize_account("SPECIAL.FRANKING:FRANKING.PAID") # Disbursed
+  FRANKING_STAMPED  = initialize_account("SPECIAL.FRANKING:FRANKING.STAMPED") # Received through net tax paid
+
+  # Franking deficit offset
+  # Other offsets stored in unique accounts with same branch name
+  #FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
+  FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
+
+  # Franking tax account - a creditor like account
+  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
+
+  # Other tax credits, offsets & deductions
+  LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
+
+  # Accounting capital gains accounts
+  REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
+  REALIZED_LOSSES = initialize_account("EXPENSE.LOSSES.REALIZED:LOSSES")
+  UNREALIZED  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
+
+  # Extra capital gains accounts which can be manipulated independently of asset revaluations
+  INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")
+  INCOME_SHORT       = initialize_account("INCOME.GAINS.SHORT:INCOME.SHORT")
+  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES.LONG:EXPENSE.LONG")
+  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
+
+  # Taxable capital gains are in special accounts
+  # Make sure the parent accounts exist
+  initialize_account(("SPECIAL.TAXABLE.GAINS.LONG")  ":LONG.GAINS")
+  initialize_account(("SPECIAL.TAXABLE.LOSSES.LONG") ":LONG.LOSSES")
+  initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SHORT.GAINS")
+  WRITTEN_BACK   =   initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SHORT.LOSSES")
+
+  #
+  # Deferred Gains & Losses too (all long...)
+  DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
+  DEFERRED_LOSSES = initialize_account("SPECIAL.DEFERRED:DEFERRED.LOSSES")
 }
 
 # Get date
@@ -3161,7 +3336,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3499,7 +3674,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3639,7 +3814,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3772,7 +3947,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3845,7 +4020,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3980,7 +4155,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4480,7 +4655,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5266,7 +5441,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6239,96 +6414,6 @@ function initialize_state(    x) {
   }
 }
 
-# Initialize special accounts
-function set_special_accounts() {
-  # Built in accounts are required for EOFY statements
-  #
-  # Check & Set use special accounts to trigger actions
-  #
-  initialize_account("SPECIAL.CONTROL:COST")
-  initialize_account("SPECIAL.CONTROL:UNITS")
-  initialize_account("SPECIAL.CONTROL:VALUE")
-  initialize_account("SPECIAL.CONTROL:PRICE")
-
-  # A NULL account
-  NULL = initialize_account("SPECIAL.ACCOUNT:NULL")
-
-  # The DEPRECIATION account
-  DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
-
-  # When a depreciating asset is sold any profit or loss is booked as income/expense to these accounts
-  SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
-  SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
-
-  # Balancing - to simplify processing of transactions at EOFY
-  # These are income/expense items not needed in the operating statement
-  ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
-  FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
-
-  # Keeping a record of taxable income, gains, losses
-  TAXABLE_INCOME   = initialize_account("SPECIAL.TAX:TAXABLE.INCOME")
-  INCOME_TAX       = initialize_account("SPECIAL.TAX:INCOME.TAX")
-
-  # Built in TAX accounts - debtor like
-  WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
-  PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
-
-  # Built in TAX accounts - creditor like
-  DEFERRED     = initialize_account("LIABILITY.TAX:DEFERRED.TAX")
-  TAX          = initialize_account("LIABILITY.TAX:TAX")
-  RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
-  GST          = initialize_account("LIABILITY.TAX:TAX.GST")
-
-  # Offsets
-  NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
-  CARRY_OFFSETS      = initialize_account("SPECIAL.OFFSET.CARRY:CARRY.OFFSETS")
-  REFUNDABLE_OFFSETS = initialize_account("SPECIAL.OFFSET.REFUNDABLE:REFUNDABLE.OFFSETS")
-
-  # Franking Credits - strictly speaking should be AUD accounts
-  ##FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
-  ##FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
-
-  ## Franking Credits
-  #
-  FRANKING          = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
-  FRANKING_PAID     = initialize_account("SPECIAL.FRANKING:FRANKING.PAID") # Disbursed
-  FRANKING_STAMPED  = initialize_account("SPECIAL.FRANKING:FRANKING.STAMPED") # Received through net tax paid
-
-  # Franking deficit offset
-  # Other offsets stored in unique accounts with same branch name
-  #FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
-  FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
-
-  # Franking tax account - a creditor like account
-  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
-
-  # Other tax credits, offsets & deductions
-  LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
-
-  # Accounting capital gains accounts
-  REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
-  REALIZED_LOSSES = initialize_account("EXPENSE.LOSSES.REALIZED:LOSSES")
-  UNREALIZED  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
-
-  # Extra capital gains accounts which can be manipulated independently of asset revaluations
-  INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")
-  INCOME_SHORT       = initialize_account("INCOME.GAINS.SHORT:INCOME.SHORT")
-  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES.LONG:EXPENSE.LONG")
-  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
-
-  # Taxable capital gains are in special accounts
-  # Make sure the parent accounts exist
-  initialize_account(("SPECIAL.TAXABLE.GAINS.LONG")  ":LONG.GAINS")
-  initialize_account(("SPECIAL.TAXABLE.LOSSES.LONG") ":LONG.LOSSES")
-  initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SHORT.GAINS")
-  WRITTEN_BACK   =   initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SHORT.LOSSES")
-
-  #
-  # Deferred Gains & Losses too (all long...)
-  DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
-  DEFERRED_LOSSES = initialize_account("SPECIAL.DEFERRED:DEFERRED.LOSSES")
-}
-
 #
 function read_control_record(       now, i, x, p, is_check){
   # Clear initial values
@@ -6347,7 +6432,7 @@ function read_control_record(       now, i, x, p, is_check){
       # Syntax for check and set is
       # CHECKSET, ACCOUNT, WHAT, X, # Comment
       # We need to rebuild the line into something more standard
-      # DATE, ACCOUNT, WHAT, 0, X, # Comment
+      # DATE, ACCOUNT, WHAT, X, 0, # Comment
       #
       # Some special accounts are needed
 
@@ -6355,19 +6440,19 @@ function read_control_record(       now, i, x, p, is_check){
       $1 = get_date(now)
 
       # Shuffle up fields
-      for (i = NF; i > 3; i --)
+      for (i = NF; i > 5; i --)
         $(i+1) = $i
 
       # Set cost element field
-      $4 = 0
+      #$5 = 0
 
       # Add one field
-      NF ++
+      #NF ++
 
       # Check amount is set
-      if (NF < 5) {
-        $5 = 0
-        NF = 5
+      if (NF < 4) {
+        $4 = 0
+        NF = 4
       }
 
       # We can parse this line now
@@ -6704,20 +6789,21 @@ function parse_transaction(now, a, b, units, amount,
   if (units < 0) {
     # The asset being sold must be "a" but if equity must be "b"
     #
-    correct_order = ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open(a, now)
-    if (!correct_order) {
-      correct_order = ((b) ~ /^EQUITY[.:]/) && is_open(b, now)
-      if (correct_order) {
-        swop = a; a = b; b = swop
-        amount = - amount
-      }
-    }
+    # correct_order = is_asset(a) && is_open(a, now)
+    # if (!correct_order) {
+    #   correct_order = is_equity(b) && is_open(b, now)
+    #   if (correct_order) {
+    #     swop = a; a = b; b = swop
+    #     amount = - amount
+    #   }
+    # }
+    correct_order = (((( a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( a, now)) || ((( b) ~ /^EQUITY[.:]/) && is_open( b, now)))
     assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, (Leaf[a]), (Leaf[b])))
 
-    # Get the number of units to be sold in the special case of sell all
-    if ("SELL" == Write_Units) {
-      units = - ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
-      Write_Units = sprintf("%10.3f", units)
+    # If this is not an asset sale swop the accounts
+    if (!((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || (!is_open((a), ( now)))) {
+      swop = a; a = b; b = swop
+      amount = - amount
     }
 
     # Get brokerage (if any)
@@ -6792,16 +6878,24 @@ function parse_transaction(now, a, b, units, amount,
 
 
   } else if (units > 0) {
-    # For a purchase the asset must be account "b"
-    correct_order = ((b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/)
-    if (!correct_order) {
-      correct_order = ((a) ~ /^EQUITY[.:]/)
-      if (correct_order) {
-        swop = a; a = b; b = swop
-        amount = - amount
-      }
-    }
+    # # For a purchase the asset must be account "b"
+    # correct_order = is_asset(b)
+    # if (!correct_order) {
+    #   correct_order = is_equity(a)
+    #   if (correct_order) {
+    #     swop = a; a = b; b = swop
+    #     amount = - amount
+    #   }
+    # }
+    # This must be a purchase
+    correct_order = ((( b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((a) ~ /^EQUITY[.:]/))
     assert(correct_order, sprintf("%s => can't buy asset %s\n", $0, (Leaf[b])))
+
+    # If this is not an asset purchase swop the accounts
+    if (!((b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/)) {
+      swop = a; a = b; b = swop
+      amount = - amount
+    }
 
     # Normally fields[1] is  the parcel name
     if ("" != Parcel_Name)
@@ -6964,6 +7058,8 @@ function parse_transaction(now, a, b, units, amount,
 }
 
 # Set an account term for term limited assets and liabilities
+#
+# Fixme - This fails for state arrays because Leaf is overwritten
 function set_account_term(a, now) {
   # It is possible for a current account to have no term set
 
