@@ -11,7 +11,7 @@ BEGIN {
   set_months()
 
   # Required column widths
-  required = "11 38 38 14 14"
+  required = "11 36 36 14"
   split(required, Width, " ")
 }
 
@@ -271,7 +271,7 @@ function switch_units(    t, n, i) {
   if (i in Width)
     printf "%*s\n", Width[i], $i
   else
-    printf "%14s\n", $i
+    printf "%s\n", $i
 }
 
 # Is units a numerical value?
