@@ -143,6 +143,7 @@ function parse_old_line(now,    i, j, x, number_accounts) {
       assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
       amount = strtonum($i)
     }
+    $4 = Write_Units
   }
 
   # From now on the fields are context dependent
@@ -250,7 +251,7 @@ function switch_units(    t, n, i) {
     # Units are column 4
     # If they are zero just elide them
     i = $4
-    if (not_zero(i)) {
+    if (0 != i) {
       # Swop
       $4 = $5
       $5 = i
@@ -271,4 +272,72 @@ function switch_units(    t, n, i) {
     printf "%*s\n", Width[i], $i
   else
     printf "%14s\n", $i
+}
+
+# Is units a numerical value?
+function parse_units(u, units,      len) {
+  units = strtonum(u)
+  if (0 == units) {
+    # Need to examine the original string more closely
+    len = length(u)
+
+    # Brackets?
+    if (u ~ /^()/ && u ~ /)$/) {
+      # This is probably a tax adjustment
+      Tax_Adjustment = TRUE
+
+      # bracketed
+      if (len > 2)
+        units = trim(toupper(substr(u, 2, len - 2)))
+      else
+        # Empty String defaults to cost element II
+        units = COST_ELEMENT
+    } else
+      units = u
+
+    # The units might still be I, II, III, IV, V, D or 0
+    switch (units) {
+      case "0" : Cost_Element = COST_ELEMENT
+        # A string (0) is not a tax adjustment
+        Tax_Adjustment = FALSE
+        break
+      case "D" : # Depreciation
+        Cost_Element = I # First cost element
+        Tax_Adjustment = Automatic_Depreciation = TRUE
+        break
+      case "I" :
+      case "II" :
+      case "III" :
+      case "IV" :
+      case "V" : # Cost elements
+        Cost_Element = units # As specified
+        break
+
+      default: #
+        # A string such as (12) is not a tax adjustment
+        Tax_Adjustment = FALSE
+    }
+
+    # Ensure units are still zero
+    units = 0
+  } else { # BUY or SELL transaction
+    # Units should be numerical
+    if (units !~ /^[0-9\.\-]+$/)
+      # If we get here this assertion will fail
+      assert(FALSE, "<" $0 "> Unexpected cost element field syntax <" units ">")
+
+    Cost_Element = I # First cost element
+  }
+
+  # The output syntax
+  if (0 != units)
+    Write_Units  = sprintf("%10.3f", units)
+  else if (Tax_Adjustment)
+    Write_Units =  "(" Cost_Element ")"
+  else if (COST_ELEMENT == Cost_Element)
+    Write_Units = 0 # Simpler to read and most common case
+  else
+    Write_Units = Cost_Element
+
+  return units
 }

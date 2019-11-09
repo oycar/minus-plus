@@ -879,17 +879,8 @@ function parse_line(now,    i, j, x, number_accounts) {
     #
     # Finally the special value (D) or (d) means depreciate automatically
 
-    # Is units a numerical value?
-    #i ++
-    #units = parse_units($i)
-
-
-
-
-
     # Move on to the next field
     i ++
-    #j = units
 
     # This field can be units or a cost element
     x = parse_optional_value($i)
@@ -905,40 +896,33 @@ function parse_line(now,    i, j, x, number_accounts) {
         Write_Units  = sprintf("%10.3f", x)
       else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now))))
         Write_Units  = sprintf("%10.3f", x)
-      else { # Not units
+      else { # No units - rescan field
         Write_Units = units = 0
         i --
       }
     } else if ("" != x) { # Ignore the case of this being a time-stamp
-      units = parse_cost_element(x)
+      Write_Units = parse_cost_element($i)
 
       # The output syntax
       if (Tax_Adjustment)
-        Write_Units =  "(" Cost_Element ")"
+        # Bracket it
+        Write_Units =  "(" Write_Units ")"
       else if (COST_ELEMENT == Cost_Element) {
+        # Default case
         Write_Units = 0 # Simpler to read and most common case
         i --
-      } else
-        Write_Units = Cost_Element
-    }
+      } else if ("" == Write_Units) {
+        Write_Units = 0
+        Cost_Element = COST_ELEMENT
+        i --
+      }
 
+
+    }
   }
 
   # From now on the fields are context dependent
   # Possibilities are:
-  # * **Field 5**
-  #   * **Units** in a buy or sell transaction
-  #   * **Cost Element** in many transactions
-  #   * **A Parcel Date** in a buy or sell transaction
-  #   * **An Ex-Dividend Date** in an income transaction
-  #   * **Brokerage** in a buy or sell transaction
-  #   * **Tax Credits** in an income transaction
-  #   * **Effective Life** in a depreciating asset purchase
-  #   * **A Parcel Name** in a buy or sell transaction
-  #   * **A GST Tag** in an income, expense, buy or sell transaction. If brokerage is present the GST is applied only on the brokerage.
-  #   * **A document name** in any transaction
-  #   * **A comment** in any transaction
-  # * **Field 7**
   # * **Field 6**
   #   * **A Parcel Date** in a buy or sell transaction
   #   * **An Ex-Dividend Date** in an income transaction
@@ -972,12 +956,8 @@ function parse_line(now,    i, j, x, number_accounts) {
   #   * **A document name** in any transaction
   #   * **A comment** in any transaction
 
-  # At the moment
   # always advance i
   i ++
-
-
-
 
   # The next three fields can contain real numbers, time-stamps or strings
   # Check first for real numbers or time-stamps
@@ -1277,7 +1257,7 @@ function parse_optional_string(field, save_document,    string, x) {
 }
 
 # Is this a cost element?
-function parse_cost_element(u,       units, len) {
+function parse_cost_element(u,       len) {
   # Need to examine the original string more closely
   len = length(u)
 
@@ -1288,17 +1268,17 @@ function parse_cost_element(u,       units, len) {
 
     # bracketed
     if (len > 2)
-      units = trim(toupper(substr(u, 2, len - 2)))
+      u = trim(toupper(substr(u, 2, len - 2)))
     else
       # Empty String defaults to cost element II
-      units = COST_ELEMENT
-  } else
-    units = u
+      u = COST_ELEMENT
+  }
 
   # The units might still be I, II, III, IV, V, D or 0
-  switch (units) {
+  switch (u) {
     case "0" : Cost_Element = COST_ELEMENT
-      # A string (0) is not a tax adjustment
+      # Zero defaults to cost element II
+      # Also a string (0) is not a tax adjustment
       Tax_Adjustment = (0)
       break
     case "D" : # Depreciation
@@ -1310,84 +1290,18 @@ function parse_cost_element(u,       units, len) {
     case "III" :
     case "IV" :
     case "V" : # Cost elements
-      Cost_Element = units # As specified
+      Cost_Element = u
       break
 
     default: #
       # A string such as (12) is not a tax adjustment
       Tax_Adjustment = (0)
-      units = 0
+
+      # And this is not a legitimate cost element
+      u = ""
    }
 
-  return units
-}
-
-# Is units a numerical value?
-function parse_units(u, units,      len) {
-  units = strtonum(u)
-  if (0 == units) {
-    # Need to examine the original string more closely
-    len = length(u)
-
-    # Brackets?
-    if (u ~ /^()/ && u ~ /)$/) {
-      # This is probably a tax adjustment
-      Tax_Adjustment = (1)
-
-      # bracketed
-      if (len > 2)
-        units = trim(toupper(substr(u, 2, len - 2)))
-      else
-        # Empty String defaults to cost element II
-        units = COST_ELEMENT
-    } else
-      units = u
-
-    # The units might still be I, II, III, IV, V, D or 0
-    switch (units) {
-      case "0" : Cost_Element = COST_ELEMENT
-        # A string (0) is not a tax adjustment
-        Tax_Adjustment = (0)
-        break
-      case "D" : # Depreciation
-        Cost_Element = I # First cost element
-        Tax_Adjustment = Automatic_Depreciation = (1)
-        break
-      case "I" :
-      case "II" :
-      case "III" :
-      case "IV" :
-      case "V" : # Cost elements
-        Cost_Element = units # As specified
-        break
-
-      default: #
-        # A string such as (12) is not a tax adjustment
-        Tax_Adjustment = (0)
-    }
-
-    # Ensure units are still zero
-    units = 0
-  } else { # BUY or SELL transaction
-    # Units should be numerical
-    if (units !~ /^[0-9\.\-]+$/)
-      # If we get here this assertion will fail
-      assert((0), "<" $0 "> Unexpected cost element field syntax <" units ">")
-
-    Cost_Element = I # First cost element
-  }
-
-  # The output syntax
-  if (0 != units)
-    Write_Units  = sprintf("%10.3f", units)
-  else if (Tax_Adjustment)
-    Write_Units =  "(" Cost_Element ")"
-  else if (COST_ELEMENT == Cost_Element)
-    Write_Units = 0 # Simpler to read and most common case
-  else
-    Write_Units = Cost_Element
-
-  return units
+  return u
 }
 
 # optional fields
@@ -2862,6 +2776,7 @@ function parse_old_line(now,    i, j, x, number_accounts) {
       assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
       amount = strtonum($i)
     }
+    $4 = Write_Units
   }
 
   # From now on the fields are context dependent
@@ -2969,7 +2884,7 @@ function switch_units(    t, n, i) {
     # Units are column 4
     # If they are zero just elide them
     i = $4
-    if (((((i) - ( Epsilon)) > 0) || (((i) - ( -Epsilon)) < 0))) {
+    if (0 != i) {
       # Swop
       $4 = $5
       $5 = i
@@ -2990,4 +2905,72 @@ function switch_units(    t, n, i) {
     printf "%*s\n", Width[i], $i
   else
     printf "%14s\n", $i
+}
+
+# Is units a numerical value?
+function parse_units(u, units,      len) {
+  units = strtonum(u)
+  if (0 == units) {
+    # Need to examine the original string more closely
+    len = length(u)
+
+    # Brackets?
+    if (u ~ /^()/ && u ~ /)$/) {
+      # This is probably a tax adjustment
+      Tax_Adjustment = (1)
+
+      # bracketed
+      if (len > 2)
+        units = trim(toupper(substr(u, 2, len - 2)))
+      else
+        # Empty String defaults to cost element II
+        units = COST_ELEMENT
+    } else
+      units = u
+
+    # The units might still be I, II, III, IV, V, D or 0
+    switch (units) {
+      case "0" : Cost_Element = COST_ELEMENT
+        # A string (0) is not a tax adjustment
+        Tax_Adjustment = (0)
+        break
+      case "D" : # Depreciation
+        Cost_Element = I # First cost element
+        Tax_Adjustment = Automatic_Depreciation = (1)
+        break
+      case "I" :
+      case "II" :
+      case "III" :
+      case "IV" :
+      case "V" : # Cost elements
+        Cost_Element = units # As specified
+        break
+
+      default: #
+        # A string such as (12) is not a tax adjustment
+        Tax_Adjustment = (0)
+    }
+
+    # Ensure units are still zero
+    units = 0
+  } else { # BUY or SELL transaction
+    # Units should be numerical
+    if (units !~ /^[0-9\.\-]+$/)
+      # If we get here this assertion will fail
+      assert((0), "<" $0 "> Unexpected cost element field syntax <" units ">")
+
+    Cost_Element = I # First cost element
+  }
+
+  # The output syntax
+  if (0 != units)
+    Write_Units  = sprintf("%10.3f", units)
+  else if (Tax_Adjustment)
+    Write_Units =  "(" Cost_Element ")"
+  else if (COST_ELEMENT == Cost_Element)
+    Write_Units = 0 # Simpler to read and most common case
+  else
+    Write_Units = Cost_Element
+
+  return units
 }
