@@ -9,12 +9,12 @@
 ##
 ## We can start the transactions now! The generous spacing is not necessary, it is here for clarity.
 ##
-## DATE                  CREDIT ACCOUNT                                  DEBIT ACCOUNT                  UNITS        AMOUNT      COMMENTS
+## DATE                  CREDIT ACCOUNT                                  DEBIT ACCOUNT            AMOUNT      COMMENTS
 ##__________________________________________________________________________________________________________________________________________
 2008 Jan 21, INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON,              ASSET.CURRENT.BANK:CASH,          10.00, # Contribution
-2008 Feb 08,                                 CASH,            EXPENSE.GENERAL:BANK.FEES,          10.00, # Bank Fees
-2008 Feb 20,                          WILKINS.CON,               ASSET.CURRENT.BANK:ANZ,          55.50, # Contribution
-2008 Feb 20, INCOME.CONTRIBUTION.TAX-FREE:EMMA.NON,                                  ANZ,       80320.44, # Contribution
+2008 Feb 08,                                    CASH,            EXPENSE.GENERAL:BANK.FEES,          10.00, # Bank Fees
+2008 Feb 20,                             WILKINS.CON,               ASSET.CURRENT.BANK:ANZ,          55.50, # Contribution
+2008 Feb 20, INCOME.CONTRIBUTION.TAX-FREE:EMMA.NON,                                    ANZ,       80320.44, # Contribution
 ##
 ## The date syntax is somewhat flexible - there are other legal formats;; including 2008-02-20, 20/02/2008 or 20-02-2008 or Feb 20 2008;
 ## but not 20-02-08 (2020 Feb 08) or 02-20-2008 (Illegal Date!)
@@ -50,9 +50,9 @@
 ## The name portion ASSET.CAPITAL is required; the SHARES is just a convention which will give tidier financial statements;
 ## The leaf name BHP.ASX is arbitrary; it could be BHP or AX.BHP or any unique name
 ##
-## DATE                  CREDIT ACCOUNT                DEBIT ACCOUNT               UNITS         AMOUNT          BROKERAGE      CONTRACT     HOLDING STATEMENT           COMMENTS
+## DATE                  CREDIT ACCOUNT                DEBIT ACCOUNT           AMOUNT          UNITS           BROKERAGE      CONTRACT     HOLDING STATEMENT           COMMENTS
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 Feb 20,                                  ANZ,         ASSET.CAPITAL.SHARES:BHP.ASX,       80370.44,       2076.000,          50.00,            [B],            [H], # BHP Shares Initial Investment
+2008 Feb 20,                 ANZ,         ASSET.CAPITAL.SHARES:BHP.ASX,       80370.44,       2076.000,          50.00,            [B],            [H], # BHP Shares Initial Investment
 ## These extra fields are optional but are useful to simplify data record documents attached to a transaction; these will be linked to specifically named files
 ## located in the Document_Root folder. The shorthand [B] is equivalent to [BHP Buy 2008 Feb], [H] to [BHP Holding Statement 2008 Feb].
 ## Notice the amount paid is the actual total cash paid for the shares including the brokerage
