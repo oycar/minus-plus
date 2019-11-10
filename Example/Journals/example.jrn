@@ -12,24 +12,28 @@
 
 
 ## We can start the transactions now! The generous spacing is not necessary, it is here for clarity.
+## Each transaction transfers the amount in the fourth column from the credit account to the debit account;
 ##
-## DATE                  CREDIT ACCOUNT                                  DEBIT ACCOUNT                  UNITS        AMOUNT      COMMENTS
+## DATE                  CREDIT ACCOUNT                                  DEBIT ACCOUNT                  AMOUNT      COMMENTS
 ##__________________________________________________________________________________________________________________________________________
-2008 Jan 21,INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON,                ASSET.CURRENT.BANK:CASH,              0,          10.00,  # Contribution
-2008 Feb 08,                                   CASH,              EXPENSE.GENERAL:BANK.FEES,              0,          10.00,  # Bank Fees
-2008 Feb 20,                            WILKINS.CON,                 ASSET.CURRENT.BANK:ANZ,              0,          55.50,  # Contribution
-2008 Feb 20,  INCOME.CONTRIBUTION.TAX-FREE:EMMA.NON,                                    ANZ,              0,       80320.44,  # Contribution
+2008 Jan 21,INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON,                ASSET.CURRENT.BANK:CASH,             10.00,  # Contribution
+2008 Feb 08,                                   CASH,              EXPENSE.GENERAL:BANK.FEES,             10.00,  # Bank Fees
+2008 Feb 20,                            WILKINS.CON,                 ASSET.CURRENT.BANK:ANZ,             55.50,  # Contribution
+2008 Feb 20,  INCOME.CONTRIBUTION.TAX-FREE:EMMA.NON,                                    ANZ,          80320.44,  # Contribution
 ##
 ## The date syntax is somewhat flexible - there are other legal formats;; including 2008-02-20, 20/02/2008 or 20-02-2008 or Feb 20 2008;
-## but not 20-02-08 (2020 Feb 08) or 02-20-2008 (Illegal Date!)
+## but not 20-02-08 (2020 Feb 08) or 02-20-2008 (not a legal date at all)
 ##
 
-## This is followed by two account names; which on first encounter must be given as fully qualified names
-## For example INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON which is of the general form
-## CLASS.NAME:LEAF.NAME
-## The short leaf name can be used on all subsequent entries, it must be unique
+## This is followed by two account names; which must be given in full on their first use
+## For example INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON which is composed of two parts
+## The class name INCOME.CONTRIBUTION.TAXABLE
+## The leaf name  WILKINS.CON
+##
+## The short leaf name can be used in isolation, it must be unique
 ## (and so consequentially the whole name will be unique)
-## All names will be of one of the following five classes
+## All names will be of one of the following five top level classes
+##
 ## 1 ASSET
 ## 2 LIABILITY
 ## 3 EQUITY
@@ -37,8 +41,6 @@
 ## 5 EXPENSE
 ##
 ##
-## Each transaction transfers amounts from the left hand account to the right hand account
-## The two numerical fields are the units (or cost element) and the amount
 ## Several class names are significant to more than one dotted component;
 ## For example
 ## ASSET.CAPITAL - Assets subject to capital gains
@@ -50,19 +52,25 @@
 ##
 ## Other than respecting  these rules the accounts can be named at will. So
 ## EXPENSE.GARDEN:GARDENING.BILL is a legitimate tax deductible expense
-## wheres
 
-## Extra fields can be used in several transactions to simplify data entry: for example a share purchase
-## The name portion ASSET.CAPITAL is required; the SHARES is just a convention which will give tidier financial statements;
-## The leaf name BHP.ASX is arbitrary; it could be BHP or AX.BHP or any unique name
+## In many transactions extra fields are required or are useful to convey extra information. An asset purchase
+## (here of shares in BHP) is a good example of this
+
 ##
-## DATE                  CREDIT ACCOUNT                DEBIT ACCOUNT               UNITS         AMOUNT          BROKERAGE      CONTRACT     HOLDING STATEMENT           COMMENTS
+## DATE                  CREDIT ACCOUNT                DEBIT ACCOUNT              AMOUNT          UNITS         BROKERAGE      CONTRACT     HOLDING STATEMENT           COMMENTS
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 Feb 20,                  ANZ,           ASSET.CAPITAL.SHARES:BHP.ASX,       2076.000,       80370.44,          50.00,         [B],           [H],            # BHP Shares Initial Investment
+2008 Feb 20,                  ANZ,           ASSET.CAPITAL.SHARES:BHP.ASX,       80370.44,      2076.000,         50.00,         [B],           [H],            # BHP Shares Initial Investment
 
-## These extra fields are optional but are useful to simplify data record documents attached to a transaction; these will be linked to specifically named files
-## located in the Document_Root folder. The shorthand [B] is equivalent to [BHP Buy 2008 Feb], [H] to [BHP Holding Statement 2008 Feb].
-## Notice the amount paid is the actual total cash paid for the shares including the brokerage
+
+## The first extra field, the numebr of units, is absolutely required here; since without it we would not know how many shares were purchased. The second extra
+## field records the brokerage; (if any). Then two fields record supporting documentation in shorthand, [B] for a buy contract, [H] for a holding statement.
+## These are stored by default as pdf files in the folder specified by the 'Document_Root' variable in the journal header; they will be listed
+## with a full name "BHP Buy 2008 Feb.pdf" and "BHP Holding Statement 2008 Feb.pdf" with the URI protocol specified in the header. (For example file:// or https://.)
+## Notice that since the specified amount was paid from the bank account the brokerage here is included in that amount already; i.e. $80370.44 was the
+## gross cash paid for the shares.
+
+
+
 ##
 2008 Feb 29,                            WILKINS.CON,                                   CASH,              0,         500.00,  # Contribution
 2008 Mar 03,                                   CASH,                  EXPENSE.GENERAL:ADMIN,              0,         374.00,  # Simple Fund Subscription
