@@ -2,38 +2,41 @@
 ##
 ## Lines commenced with '#' are just comments - as can be seen the journal can be
 ## very verbose if desired.
-
 ## You can leave lines blank
-
 ## Before we start we need to include a header file;
 ## the example header "_example_header.jrn" can be included
 ## Either cut and paste it in here or simply prepend it to the list of journal files passed to mpx
 ##
-
-
 ## We can start the transactions now! The generous spacing is not necessary, it is here for clarity.
-## Each transaction transfers the amount in the fourth column from the credit account to the debit account;
 ##
-## DATE                  CREDIT ACCOUNT                                  DEBIT ACCOUNT                  AMOUNT      COMMENTS
+
+
+##
+## A SMSF can receive concessional (taxable) or non-concessional (tax-free) contributions
+## which need to be assigned to a specific member. So  INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON
+## is a taxable contribution to Wilkins; INCOME.CONTRIBUTION.TAX-FREE:EMMA.NON is a
+## tax-free contribution to Emma.
+
+
+##
+## DATE                  CREDIT ACCOUNT                                  DEBIT ACCOUNT            AMOUNT      COMMENTS
 ##__________________________________________________________________________________________________________________________________________
-2008 Jan 21,INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON,                ASSET.CURRENT.BANK:CASH,             10.00,  # Contribution
-2008 Feb 08,                                   CASH,              EXPENSE.GENERAL:BANK.FEES,             10.00,  # Bank Fees
-2008 Feb 20,                            WILKINS.CON,                 ASSET.CURRENT.BANK:ANZ,             55.50,  # Contribution
-2008 Feb 20,  INCOME.CONTRIBUTION.TAX-FREE:EMMA.NON,                                    ANZ,          80320.44,  # Contribution
+2008 Jan 21, INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON,              ASSET.CURRENT.BANK:CASH,          10.00, # Contribution
+2008 Feb 08,                                    CASH,            EXPENSE.GENERAL:BANK.FEES,          10.00, # Bank Fees
+2008 Feb 20,                             WILKINS.CON,               ASSET.CURRENT.BANK:ANZ,          55.50, # Contribution
+2008 Feb 20, INCOME.CONTRIBUTION.TAX-FREE:EMMA.NON,                                    ANZ,       80320.44, # Contribution
+
+
 ##
 ## The date syntax is somewhat flexible - there are other legal formats;; including 2008-02-20, 20/02/2008 or 20-02-2008 or Feb 20 2008;
-## but not 20-02-08 (2020 Feb 08) or 02-20-2008 (not a legal date at all)
+## but not 20-02-08 (2020 Feb 08) or 02-20-2008 (Illegal Date!)
 ##
-
-## This is followed by two account names; which must be given in full on their first use
-## For example INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON which is composed of two parts
-## The class name INCOME.CONTRIBUTION.TAXABLE
-## The leaf name  WILKINS.CON
-##
-## The short leaf name can be used in isolation, it must be unique
+## This is followed by two account names; which on first encounter must be given as fully qualified names
+## For example INCOME.CONTRIBUTION.TAXABLE:WILKINS.CON which is of the general form
+## CLASS.NAME:LEAF.NAME
+## The short leaf name can be used on all subsequent entries, it must be unique
 ## (and so consequentially the whole name will be unique)
-## All names will be of one of the following five top level classes
-##
+## All names will be of one of the following five classes
 ## 1 ASSET
 ## 2 LIABILITY
 ## 3 EQUITY
@@ -41,6 +44,8 @@
 ## 5 EXPENSE
 ##
 ##
+## Each transaction transfers amounts from the left hand account to the right hand account
+## The two numerical fields are the units (or cost element) and the amount
 ## Several class names are significant to more than one dotted component;
 ## For example
 ## ASSET.CAPITAL - Assets subject to capital gains
@@ -51,10 +56,11 @@
 ## The wiki lists these in more detail
 ##
 ## Other than respecting  these rules the accounts can be named at will. So
-## EXPENSE.GARDEN:GARDENING.BILL is a legitimate tax deductible expense
+## EXPENSE.GARDEN:GARDENING.BILL is a legitimate account name.
 
 ## In many transactions extra fields are required or are useful to convey extra information. An asset purchase
 ## (here of shares in BHP) is a good example of this
+##
 
 ##
 ## DATE                  CREDIT ACCOUNT                DEBIT ACCOUNT              AMOUNT          UNITS         BROKERAGE      CONTRACT     HOLDING STATEMENT           COMMENTS
@@ -62,7 +68,7 @@
 2008 Feb 20,                  ANZ,           ASSET.CAPITAL.SHARES:BHP.ASX,       80370.44,      2076.000,         50.00,         [B],           [H],            # BHP Shares Initial Investment
 
 
-## The first extra field, the numebr of units, is absolutely required here; since without it we would not know how many shares were purchased. The second extra
+## The first extra field, the number of units, is absolutely required here; since without it we would not know how many shares were purchased. The second extra
 ## field records the brokerage; (if any). Then two fields record supporting documentation in shorthand, [B] for a buy contract, [H] for a holding statement.
 ## These are stored by default as pdf files in the folder specified by the 'Document_Root' variable in the journal header; they will be listed
 ## with a full name "BHP Buy 2008 Feb.pdf" and "BHP Holding Statement 2008 Feb.pdf" with the URI protocol specified in the header. (For example file:// or https://.)
@@ -70,82 +76,91 @@
 ## gross cash paid for the shares.
 
 
-
 ##
-2008 Feb 29,                            WILKINS.CON,                                   CASH,              0,         500.00,  # Contribution
-2008 Mar 03,                                   CASH,                  EXPENSE.GENERAL:ADMIN,              0,         374.00,  # Simple Fund Subscription
-2008 Mar 04,                                   CASH,              ASSET.CURRENT.BANK:ESAVER,              0,         125.00,  # Transfer to Savings
+2008 Feb 29,                          WILKINS.CON,                                 CASH,         500.00, # Contribution
+2008 Mar 03,                                 CASH,                EXPENSE.GENERAL:ADMIN,         374.00, # Simple Fund Subscription
+2008 Mar 04,                                 CASH,            ASSET.CURRENT.BANK:ESAVER,         125.00, # Transfer to Savings
 
 ## Member interests in super funds are through liabilities. Contributions and earnings will be assigned directly; roll-ins could be treated
 ## as contributions but they would distort the financial statements so directly applying them to the
 ## member liability accounts is a better option
 
-2008 Mar 04, LIABILITY.MEMBER.WILKINS:WILKINS.TAX-FREE,                             ESAVER,              0,        1583.44,  # WILKINS.s Rollin
-2008 Mar 04, LIABILITY.MEMBER.WILKINS:WILKINS.TAXABLE,                              ESAVER,              0,      146525.18,  # WILKINS.s Rollin
-2008 Mar 05,                                    ANZ,                                  CASH,              0,           5.49,  # Transfer to Bank
-2008 Mar 06,                                   CASH,                                ESAVER,              0,           6.48,  # Transfer to Savings
+2008 Mar 04, LIABILITY.MEMBER.WILKINS:WILKINS.TAX-FREE,                   ESAVER,        1583.44, # WILKINS Roll in
+2008 Mar 04, LIABILITY.MEMBER.WILKINS:WILKINS.TAXABLE,                    ESAVER,      146525.18, # WILKINS Roll in
+2008 Mar 05,                                      ANZ,                      CASH,           5.49, # Transfer to Bank
+2008 Mar 06,                                     CASH,                    ESAVER,           6.48, # Transfer to Savings
 
-## Another example of an optional field is the term of a term period; this allows minus-plus to determine if this asset is actually a current asset - despite being declared in ASSET.TERM
-
-## DATE                                    CREDIT ACCOUNT                DEBIT ACCOUNT               UNITS         AMOUNT          TERM IN MONTHS      COMMENTS
+## Another example of an optional field is the length of any term period in months; this allows minus-plus to determine if this asset is actually a current asset - despite being declared in ASSET.TERM
+## DATE                                 CREDIT ACCOUNT                DEBIT ACCOUNT          AMOUNT     TERM IN MONTHS      COMMENTS
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 Mar 12,                                 ESAVER,          ASSET.TERM.DEPOSIT:TERM00.CUA,              0,       70000.00,              3,    # Term deposit 3 months
+2008 Mar 12,                               ESAVER,        ASSET.TERM.DEPOSIT:TERM00.CUA,       70000.00,         3,         # Term deposit 3 months
+
 
 ##
 ## More transactions
 ##
-2008 Mar 12,                                 ESAVER,                                    ANZ,              0,       50000.00,  # Transfer to ANZ Account
-2008 Mar 13,                                    ANZ,         ASSET.CAPITAL.TRUSTS:PXUPA.ASX,        150.000,       10982.95,          32.95,            [B],            [H],  # Initial Investment PXUPA
-2008 Mar 13,                                    ANZ,         ASSET.CAPITAL.SHARES:BENPA.ASX,        150.000,       13270.45,          32.95,            [B],            [H],  # Initial Investment BENPA
-2008 Mar 13,                                    ANZ,         ASSET.CAPITAL.SHARES:SGBPD.ASX,        110.000,       10537.95,          32.95,            [B],            [H],  # Initial Investment SGBPD
-2008 Mar 13,                                    ANZ,         ASSET.CAPITAL.SHARES:IAGPB.ASX,        150.000,       14732.95,          32.95,            [B],            [H],  # Initial Investment IAGPB
-2008 Mar 13,                                    ANZ,                                 ESAVER,              0,         475.00,  # Transfer to ESAVER
-2008 Mar 18,                INCOME.INTEREST:ANZ.INT,                                    ANZ,              0,          50.29,  # Interest (ANZ)
+##
+2008 Mar 12,                               ESAVER,                                  ANZ,       50000.00, # Transfer to ANZ Account
 
+## DATE                CREDIT ACCOUNT                DEBIT ACCOUNT                  AMOUNT          UNITS        BROKERAGE      CONTRACT   HOLDING STATEMENT           COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2008 Mar 13,                         ANZ,   ASSET.CAPITAL.TRUSTS:PXUPA.ASX,       10982.95,        150.000,        32.95,         [B],            [H],          # Initial Investment PXUPA
+2008 Mar 13,                         ANZ,   ASSET.CAPITAL.SHARES:BENPA.ASX,       13270.45,        150.000,        32.95,         [B],            [H],          # Initial Investment BENPA
+2008 Mar 13,                         ANZ,   ASSET.CAPITAL.SHARES:SGBPD.ASX,       10537.95,        110.000,        32.95,         [B],            [H],          # Initial Investment SGBPD
+2008 Mar 13,                         ANZ,   ASSET.CAPITAL.SHARES:IAGPB.ASX,       14732.95,        150.000,        32.95,         [B],            [H],          # Initial Investment IAGPB
+
+
+2008 Mar 13,                         ANZ,                           ESAVER,         475.00, # Transfer to ESAVER
+2008 Mar 18,     INCOME.INTEREST:ANZ.INT,                              ANZ,          50.29, # Interest (ANZ)
 ##
 ## Another new optional field, determining the imputation credits available in the Australian system of franked dividends
-
-## DATE                             CREDIT ACCOUNT                     DEBIT ACCOUNT          UNITS         AMOUNT        FRANKING CREDIT   STATEMENT   COMMENTS
-##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 Mar 18,            INCOME.DIVIDEND:DIV.BHP.ASX,                          CASH,              0,         663.02,         284.15,            [D],  # BHP 356th Dividend
-
+## Their is no need to specify that the field represents franking credits; the context of the transaction (a dividend or distribution) plus
+## the fact that no units are being acquired (since the debit account is not capital asset) means  that the field must represent a franking credit.
+## Another optional field which may follow the franking credits is the ex-dividend date.
+## For dividends Australian franking credits are only qualified if the underlying assets were
+## held long enough (more than 45 days) either before or after the ex-dividend date; so to
+## determine this the ex-dividend date is needed. It can also be provided via a data file (along with
+## security prices for example). If not present at all financial statements can still be processed by
+## either resetting the Qualification_Window in the header file to zero; (using the state record)
+## (the default value is 91 days) <<,Qualification_Window,0,>>
 ##
-2008 Mar 19,                                   CASH,                        ESAVER,              0,         663.00,  # Transfer to ESAVER
+## or at run time allow dividend qualification checking to be overridden using the '-q' option for mpx
+## In either of the above cases the accuracy of the financial statements may be reduced.
 
+
+## DATE                             CREDIT ACCOUNT               DEBIT ACCOUNT      AMOUNT        FRANKING CREDIT EX-DIVIDEND DATE   STATEMENT   COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2008 Mar 18,          INCOME.DIVIDEND:DIV.BHP.ASX,                    CASH,         663.02,         284.15,          2008 Feb 25,       [D],     # BHP 356th Dividend
+##
+
+2008 Mar 19,                                 CASH,                               ESAVER,         663.00, # Transfer to ESAVER
 ##
 ## The journal file can also record documents not directly connected with any transaction
 ## As above document names are surrounded by square brackets
 ## Then balance checks can be carried out - for example this verifies that the account CASH
 ## indeed has a balance of $29,378.10 and so on
-2008 Mar 21,                       [CUA Statement:],                  # CUA Bank Statements
-      CHECK,                                   COST,                                   CASH,           0.03
-      CHECK,                                   COST,                                 ESAVER,       29378.10
-      CHECK,                                   COST,                             TERM00.CUA,       70000.00
-
+2008 Mar 21,                     [CUA Statement:],                # CUA Bank Statements
+      CHECK,                                   COST,                               CASH,           0.03
+      CHECK,                                   COST,                             ESAVER,       29378.10
+      CHECK,                                   COST,                         TERM00.CUA,       70000.00
 ##
-2008 Mar 28,                                    ANZ,                                   CASH,              0,          50.00,  # Transfer to CUA
-2008 Mar 29,                                   CASH,                                 ESAVER,              0,          50.00,  # Transfer to ESAVER
-2008 Apr 01,                INCOME.INTEREST:ESA.INT,                                 ESAVER,              0,         337.05,  # eSaver Interest
-2008 Apr 04,  INCOME.CONTRIBUTION.TAXABLE:EMMA.WORK,                                   CASH,              0,        7895.06,  # Employer Contribution
-2008 Apr 05,                                   CASH,                                 ESAVER,              0,        7895.01,  # Transfer to ESAVER
-2008 Apr 09,INCOME.CONTRIBUTION.TAX-FREE:WILKINS.NON,                                   ANZ,              0,        8382.00,  # Contributions (WILKINS.
-2008 Apr 09,                                    ANZ,                                BHP.ASX,        200.000,        8432.00,          50.00,            [B],            [H],  # BHP in specie transfer (200 units)
-2008 Apr 09,                                 ESAVER,                                    ANZ,              0,          50.00,  # Transfer to ANZ Account
-2008 Apr 12,                            WILKINS.NON,                                 ESAVER,              0,       14000.00,  # Contribution
-2008 Apr 18,                                ANZ.INT,                                    ANZ,              0,           0.01,  # Interest (ANZ)
-2008 Apr 23,INCOME.CONTRIBUTION.TAX-FREE:WILKINS.SPC,                                ESAVER,              0,        3000.00,  # Spouse contribution
-2008 May 01,                                ESA.INT,                                 ESAVER,              0,         268.98,  # Interest (ESaver)
-2008 May 01,                                 ESAVER,                                   CASH,              0,       48100.00,  # Transfer to Cash
-
-
+2008 Mar 28,                                  ANZ,                                 CASH,          50.00, # Transfer to CUA
+2008 Mar 29,                                 CASH,                               ESAVER,          50.00, # Transfer to ESAVER
+2008 Apr 01,              INCOME.INTEREST:ESA.INT,                               ESAVER,         337.05, # eSaver Interest
+2008 Apr 04, INCOME.CONTRIBUTION.TAXABLE:EMMA.WORK,                                CASH,        7895.06, # Employer Contribution
+2008 Apr 05,                                 CASH,                               ESAVER,        7895.01, # Transfer to ESAVER
+2008 Apr 09, INCOME.CONTRIBUTION.TAX-FREE:WILKINS.NON,                              ANZ,        8382.00, # Contributions (WILKINS.
+2008 Apr 09,                                  ANZ,                              BHP.ASX,        8432.00,        200.000,          50.00,            [B],            [H], # BHP in specie transfer (200 units)
+2008 Apr 09,                               ESAVER,                                  ANZ,          50.00, # Transfer to ANZ Account
+2008 Apr 12,                          WILKINS.NON,                               ESAVER,       14000.00, # Contribution
+2008 Apr 18,                              ANZ.INT,                                  ANZ,           0.01, # Interest (ANZ)
+2008 Apr 23, INCOME.CONTRIBUTION.TAX-FREE:WILKINS.SPC,                           ESAVER,        3000.00, # Spouse contribution
+2008 May 01,                              ESA.INT,                               ESAVER,         268.98, # Interest (ESaver)
+2008 May 01,                               ESAVER,                                 CASH,       48100.00, # Transfer to Cash
 ##
-## For dividends franking credits are only qualified if the underlying assets were
-## held long enough (more than 45 days) around the ex-dividend date; so to
-## determine whether or not the ex-dividend date is needed, and therefore
-## it can be provided by the input record. Otherwise the dates can be provided
-## via an imported data file; or, if any are missing, the accounts can be
-## still generated with the -q flag; which will cause errors if in fact any
-## dividends were not in fact fully qualified.
+
+
+
 ## Also (be aware) in the processing of foreign tax offsets, franking credits and so on to work out
 ## all details the income account is linked to the underlying asset; to do this
 ## the leaf names for the corresponding income accounts are restricted: if the underlying asset
@@ -155,68 +170,85 @@
 ##
 ## In the above the gains are net gains distributed from a managed fund; no special
 ## account needs to be defined for ordinary realized or taxable capital gains and losses
-
-## DATE                             CREDIT ACCOUNT                DEBIT ACCOUNT        UNITS        AMOUNT     FRANKING CREDIT   EX-DIVIDEND DATE     STATEMENT      COMMENTS
+## DATE                             CREDIT ACCOUNT                DEBIT ACCOUNT     AMOUNT     FRANKING CREDIT   EX-DIVIDEND DATE     STATEMENT      COMMENTS
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 May 01,          INCOME.DIVIDEND:DIV.BENPA.ASX,                  CASH,              0,         460.74,        197.46,          2008 Apr 14,         [D],     # BENPA Interim Dividend
+2008 May 01,        INCOME.DIVIDEND:DIV.BENPA.ASX,                    CASH,         460.74,         197.46,         2008 Apr 14,        [D],   # BENPA Interim Dividend
+
 
 ##
 ## The accounts can record real property too - again the name component PROPERTY is not required, it could be ASSET.CAPITAL.REAL_ESTATE or even just ASSET.CAPITAL
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 May 05,                                   CASH,        ASSET.CAPITAL.PROPERTY:FARM.990,          1.000,       48500.00,  # Down payment on Farm
+2008 May 05,                                 CASH,      ASSET.CAPITAL.PROPERTY:FARM.990,       48500.00,          1.000, # Down payment on Farm
 
-2008 May 09,                              EMMA.WORK,                                   CASH,              0,       14183.06,  # Employer Contribution
-2008 May 10,                                   CASH,                                 ESAVER,              0,       14200.00,  # Transfer to ESAVER
-2008 May 12,                            WILKINS.NON,                                 ESAVER,              0,       37500.00,  # Contribution
-2008 May 12,                            WILKINS.CON,                                 ESAVER,              0,       12500.00,  # Contribution
-2008 May 12,                                   CASH,                                 ESAVER,              0,          23.88,  # Transfer to ESAVER
-2008 May 12,                                   CASH,                                 ESAVER,              0,      318539.01,  # Transfer to ESAVER
-2008 May 12,    LIABILITY.MEMBER.EMMA:EMMA.TAX-FREE,                                   CASH,              0,        5000.00,  # Emma's Rollin
-2008 May 12,     LIABILITY.MEMBER.EMMA:EMMA.TAXABLE,                                   CASH,              0,      313539.01,  # Emma's Rollin
-2008 May 20,          INCOME.DIVIDEND:DIV.SGBPD.ASX,                                   CASH,              0,         171.06,          73.31,    2008 May 04,            [D],  # Dividends (SGBPD)
-2008 May 21,                                   CASH,                                 ESAVER,              0,         190.00,  # Transfer to ESAVER
-2008 May 31,                                ESA.INT,                                 ESAVER,              0,        1557.40,  # Interest (ESaver)
-2008 Jun 06,                              EMMA.WORK,                                   CASH,              0,       14022.36,  # Employer Contribution
-2008 Jun 07,                                   CASH,                                 ESAVER,              0,       14023.00,  # Transfer to ESAVER
-2008 Jun 12,             INCOME.INTEREST:TERM00.INT,                                 ESAVER,              0,        1314.47,  # Interest (CUA Term Deposit)
-2008 Jun 12,                             TERM00.CUA,                                 ESAVER,              0,       70000.00,  # Close term deposit
-2008 Jun 16,          INCOME.DIVIDEND:DIV.IAGPB.ASX,                                   CASH,              0,         339.18,         145.36,    2008 May 28,            [D],  # IAGPB Dividend
 
-## An asset sale!
+2008 May 09,                            EMMA.WORK,                                 CASH,       14183.06, # Employer Contribution
+2008 May 10,                                 CASH,                               ESAVER,       14200.00, # Transfer to ESAVER
+2008 May 12,                          WILKINS.NON,                               ESAVER,       37500.00, # Contribution
+2008 May 12,                          WILKINS.CON,                               ESAVER,       12500.00, # Contribution
+2008 May 12,                                 CASH,                               ESAVER,          23.88, # Transfer to ESAVER
+2008 May 12,                                 CASH,                               ESAVER,      318539.01, # Transfer to ESAVER
+2008 May 12,  LIABILITY.MEMBER.EMMA:EMMA.TAX-FREE,                                 CASH,        5000.00, # Emma's Rollin
+2008 May 12,   LIABILITY.MEMBER.EMMA:EMMA.TAXABLE,                                 CASH,      313539.01, # Emma's Rollin
+2008 May 20,        INCOME.DIVIDEND:DIV.SGBPD.ASX,                                 CASH,         171.06,          73.31,    2008 May 04,            [D], # Dividends (SGBPD)
+2008 May 21,                                 CASH,                               ESAVER,         190.00, # Transfer to ESAVER
+2008 May 31,                              ESA.INT,                               ESAVER,        1557.40, # Interest (ESaver)
+2008 Jun 06,                            EMMA.WORK,                                 CASH,       14022.36, # Employer Contribution
+2008 Jun 07,                                 CASH,                               ESAVER,       14023.00, # Transfer to ESAVER
+2008 Jun 12,           INCOME.INTEREST:TERM00.INT,                               ESAVER,        1314.47, # Interest (CUA Term Deposit)
+2008 Jun 12,                           TERM00.CUA,                               ESAVER,       70000.00, # Close term deposit
+2008 Jun 16,        INCOME.DIVIDEND:DIV.IAGPB.ASX,                                 CASH,         339.18,         145.36,    2008 May 28,            [D], # IAGPB Dividend
+
+
+## The next transaction is an example of an asset sale
 ## Basically the same as a purchase - but now the asset is the credit account
-## And proceeds flow to a bank account - the debit account
 ## And - since this is a sale - the number of units is negative
 ## In this case all units are sold; but in general default sales are First-In-First-Out (FIFO)
-## DATE                  CREDIT ACCOUNT                DEBIT ACCOUNT       UNITS         AMOUNT       CONTRACT     HOLDING STATEMENT           COMMENTS
+## DATE                  CREDIT ACCOUNT                DEBIT ACCOUNT      AMOUNT         UNITS             CONTRACT     HOLDING STATEMENT           COMMENTS
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 Jun 16,                IAGPB.ASX,                       CASH,       -150.000,      15000.00,        [S],            [H],          # Disposal of 150 units in IAGPB.ASX - No Brokerage
-
+2008 Jun 16,                IAGPB.ASX,                      CASH,       15000.00,       -150.000,            [S],            [H],           # Disposal of 150 units in IAGPB.ASX - No Brokerage
 ##
 ##
-2008 Jun 16,                                   CASH,                                 ESAVER,              0,       15339.00,  # Transfer to ESAVER
-2008 Jun 26,                                 ESAVER,                                   CASH,              0,      436550.00,  # Transfer from ESAVER
+
+2008 Jun 16,                                 CASH,                               ESAVER,       15339.00, # Transfer to ESAVER
+2008 Jun 26,                               ESAVER,                                 CASH,      436550.00, # Transfer from ESAVER
 
 ##
-## Here we have a purchase that sets the effective date to when the commitment was made
-## (So an installment sale)
-## To do this the Units field becomes the Cost Element field - and the initial purchase cost
-## element is element I (a Roman Numeral)
-## Furthermore the date of the earlier purchase is required
-
-## DATE                     CREDIT ACCOUNT                                  DEBIT ACCOUNT           COST ELEMENT    AMOUNT    EFFECTIVE DATE    COMMENTS
+## Here we have a purchase that sets the effective date to when the commitment was made, (effectively an installment purchase)
+## A new optional field; no extra units are being purchased but instead an earlier purchase is
+## being modified. It would be possible to record this transaction as
+## DATE                     CREDIT ACCOUNT                DEBIT ACCOUNT       AMOUNT    COMMENTS
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 Jun 26,                                   CASH,                              FARM.990,              I,      436401.85,    2008 May 05,  # Farm Final Installment
-2008 Jun 26,                                   CASH,                              FARM.990,              I,           5.00,    2008 May 05,  # Bank Charges for Bank Cheque
+## 2008 Jun 26,                     CASH,                      FARM.990,      436401.85,   # Farm Final Installment
+## 2008 Jun 26,                     CASH,                      FARM.990,           5.00,   # Bank Charges for Bank Cheque
+##
+## But this would  impact the accounts differently. Here no extra parcels are being purchased; but instead the cost basis of the asset is adjusted
+## - if there were multiple parcels all existing parcels would have their cost adjusted proportionally to  their value; and the cost adjustment
+## would be in the second cost element, (II), which would not change the record of the initial cost of the asset. So instead two extra fields
+## are used; the first specifies that the adjustment should be made to cost element I, the purchase cost, and  that all the adjustments should
+## be concentrated in a single parcel, identified by the purchase date (2008 May 05). (If the adjustment is made on the same day
+## as the original transaction then this date label is not required.) Now future references to this asset will act as if the total sum
+## of 48500.00 + 436401.85 + 5.00 occurred on the initial purchase date of 2008 May 05. Cost elements are discussed further in the wiki.
+
+
+## DATE                     CREDIT ACCOUNT                DEBIT ACCOUNT      AMOUNT    COST ELEMENT      EFFECTIVE DATE    COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2008 Jun 26,                     CASH,                      FARM.990,      436401.85,       I,            2008 May 05,     # Farm Final Installment
+2008 Jun 26,                     CASH,                      FARM.990,           5.00,       I,            2008 May 05,     # Bank Charges for Bank Cheque
+
+
+
 
 ##
 ##
-2008 Jun 27,                                 ESAVER,                                   CASH,              0,         600.00,  # Transfer from ESAVER
-2008 Jun 29,                                 ESAVER,                                   CASH,              0,       26100.00,  # Transfer to Cash
+2008 Jun 27,                               ESAVER,                                 CASH,         600.00, # Transfer from ESAVER
+2008 Jun 29,                               ESAVER,                                 CASH,       26100.00, # Transfer to Cash
+
 
 ## Foreign income (and offsets) are of interest to the tax office; therefore segregate it into account INCOME.FOREIGN; also foreign tax credits can
 ## be recorded in an optional field in the same way as franking credits are in INCOME.DIVIDEND or INCOME.DISTRIBUTION payments
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 Jun 30,           INCOME.FOREIGN:FOR.PXUPA.ASX,                                   CASH,              0,         726.63,  [PXUPA Distribution:],  # PXUPA distribution
+2008 Jun 30,         INCOME.FOREIGN:FOR.PXUPA.ASX,                                 CASH,         726.63, [PXUPA Distribution:], # PXUPA distribution
+
 
 ## If a document is linked to a transaction it will be default file type ".pdf"
 ## Also in addition to the shorthands
@@ -231,21 +263,17 @@
 ## whilst [E+ Extra Text] is [Expense 2008 Extra Text]
 ##
 ##
-2008 Jun 30,               INCOME.INTEREST:CASH.INT,                                   CASH,              0,           3.44,  # Cash A/C Interest
-2008 Jun 30,                              EMMA.WORK,                                   CASH,              0,       12576.00,  # Employer Contribution
-2008 Jun 30,                              EMMA.WORK,                                   CASH,              0,        1607.06,  # Employer Contribution
-2008 Jun 30,                                ESA.INT,                                 ESAVER,              0,        2252.98,  # Interest (ESaver)
-
+2008 Jun 30,             INCOME.INTEREST:CASH.INT,                                 CASH,           3.44, # Cash A/C Interest
+2008 Jun 30,                            EMMA.WORK,                                 CASH,       12576.00, # Employer Contribution
+2008 Jun 30,                            EMMA.WORK,                                 CASH,        1607.06, # Employer Contribution
+2008 Jun 30,                              ESA.INT,                               ESAVER,        2252.98, # Interest (ESaver)
 ##
 ## Missing Prices
 ## Two different (but verbose) ways of setting security prices
         SET,                                  PRICE,                              BENPA.ASX,         88.00
         SET,                                  VALUE,                              FARM.990,              0,  #  Giving zero here sets the value to cost, here 484906.85
-
 ##
 ## (If you really want to set zero value in this way instead use PRICE instead)
 ##     SET,                                  PRICE,                               FARM.990,              0,  #  This really does give zero value!
 ##
-
 ## This is the End Of The Financial Year
-## Nothing special to do; mpx will figure it out

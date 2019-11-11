@@ -104,8 +104,6 @@ END {
 
 
 
-
-
 # // Default Asset Prefix for Price Lists
 
 
@@ -937,11 +935,6 @@ function parse_line(now,    i, j, x, number_accounts) {
         Cost_Element = COST_ELEMENT
         i --
       }
-
-
-    if (Write_Units)
-      printf "%s %s %s %s Units => %s Write => %s\n", get_date(now), x, Leaf[Account[1]], Leaf[Account[2]], units, Write_Units > "/dev/stderr"
-
     }
   }
 
@@ -1256,9 +1249,8 @@ function parse_optional_string(field, save_document,    string, x) {
   # The string can be a document name enclosed in square brackets
   string = ctrim(field, "[", "]")
   if (string == field) {
-    # Parcel names are enclosed by double quotes
-    string = ctrim(field, "\"", "\"")
-    if (string != field) {
+    # Parcel names are enclosed by single quotes
+    if (field ~ /^"([[:print:]])+"$/) {
       # A Parcel name
       Parcel_Name = field # With quotes
       return ""
@@ -2977,6 +2969,13 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             # Print out the parcel information
             if (is_detailed && key) {
               # If printing out in detail
+              if ((( a in Parcel_Tag) && ( p in Parcel_Tag[ a]))) {
+                if (label) # Deal with label first
+                  printf "%*s\n", asset_width + 1, label > reports_stream
+                label = Parcel_Tag[a][p]
+              }
+
+              # Print line
               printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                    asset_width + 1, label,
                    7, p,
@@ -3253,7 +3252,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3591,7 +3590,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3731,7 +3730,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3864,7 +3863,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3937,7 +3936,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4072,7 +4071,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4572,7 +4571,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5358,7 +5357,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5831,7 +5830,7 @@ function process_member_benefits_smsf(now, array, amount,
 #    Original style
 #   2008 Apr 09, 604000, 776003,    200.000,    8382.00, BHP in specie transfer (200 units)
 #   became over time
-#   2008 Apr 09, CASH, BHP.ASX, 200, 8382.00, # (in specie transfer in fact)
+#   2008 Apr 09, CASH, BHP.ASX, 8382.00, 200, # (in specie transfer in fact)
 #
 # To Do =>
 #
@@ -6705,15 +6704,6 @@ function parse_transaction(now, a, b, units, amount,
   # A sale transaction
   if (units < 0) {
     # The asset being sold must be "a" but if equity must be "b"
-    #
-    # correct_order = is_asset(a) && is_open(a, now)
-    # if (!correct_order) {
-    #   correct_order = is_equity(b) && is_open(b, now)
-    #   if (correct_order) {
-    #     swop = a; a = b; b = swop
-    #     amount = - amount
-    #   }
-    # }
     correct_order = (((( a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( a, now)) || ((( b) ~ /^EQUITY[.:]/) && is_open( b, now)))
     assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, (Leaf[a]), (Leaf[b])))
 
@@ -6796,14 +6786,6 @@ function parse_transaction(now, a, b, units, amount,
 
   } else if (units > 0) {
     # # For a purchase the asset must be account "b"
-    # correct_order = is_asset(b)
-    # if (!correct_order) {
-    #   correct_order = is_equity(a)
-    #   if (correct_order) {
-    #     swop = a; a = b; b = swop
-    #     amount = - amount
-    #   }
-    # }
     # This must be a purchase
     correct_order = ((( b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((a) ~ /^EQUITY[.:]/))
     assert(correct_order, sprintf("%s => can't buy asset %s\n", $0, (Leaf[b])))
@@ -7276,6 +7258,14 @@ function get_held_time(now, from,     held_time) {
 function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
                                              last_parcel, p) {
 
+  printf "%s: %s units => %.3f amount => %11.2f\n", "buy_units", (Leaf[a]), u, x > "/dev/stderr"
+  printf "\tU => %.3f Cost => %.2f\n", ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))), get_cost(a, now) > "/dev/stderr"
+  printf "\tTime => %s\n", get_date(now, LONG_FORMAT) > "/dev/stderr"
+  if (parcel_tag)
+    printf "\tParcel Name => %s\n", parcel_tag > "/dev/stderr"
+  if (parcel_timestamp >= Epoch)
+    printf "\tSet purchase date   => %s\n", get_date(parcel_timestamp) > "/dev/stderr"
+
 
   # Some units are bought
   assert(!((((u) - ( Epsilon)) <= 0) && (((u) - ( -Epsilon)) >= 0)), sprintf("buy_units[%s] : can't buy zero units", $0))
@@ -7298,6 +7288,9 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 
   # Debugging
 
+  printf "\t%s\n\t\tUnits => %.3f Cost => %.2f\n", (Leaf[a]), ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))), get_cost(a, now) > "/dev/stderr"
+  printf "\t\tParcel => %05d\n", last_parcel > "/dev/stderr"
+
 
   # Buy u units for x
   u = Units_Held[a][last_parcel]
@@ -7305,6 +7298,12 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 
   # Passive revaluation
   p = x / u
+
+  printf "\tPrice       => %11.2f\n", p > "/dev/stderr"
+  printf "\tParcel      => %05d\n", last_parcel > "/dev/stderr"
+  printf "\tCost        => %11.2f\n", x > "/dev/stderr"
+  if ((( a in Parcel_Tag) && ( last_parcel in Parcel_Tag[ a])))
+    printf "\tParcel Name => %s\n", Parcel_Tag[a][last_parcel] > "/dev/stderr"
 
 
   # Set the new price
@@ -7612,7 +7611,9 @@ function copy_parcel(ac, p, q,     e, key) {
   Held_From[ac][q] = Held_From[ac][p]
   Held_Until[ac][q] = Held_Until[ac][p]
   Parcel_Proceeds[ac][q] = Parcel_Proceeds[ac][p]
-
+  if ((( ac in Parcel_Tag) && ( p in Parcel_Tag[ ac])))
+    Parcel_Tag[ac][q] = Parcel_Tag[ac][p]
+    
   # Copy all entries
   # Note keys will not match so need to delete old entries from parcel q
   delete Accounting_Cost[ac][q] # Delete old entries
@@ -7641,6 +7642,10 @@ function split_parcel(ac, p, du,   fraction_kept, e, key) {
 
   # Parcel Proceeds
   Parcel_Proceeds[ac][p + 1] = 0
+
+  # Parcel tag
+  if ((( ac in Parcel_Tag) && ( p in Parcel_Tag[ ac])))
+    Parcel_Tag[ac][p + 1] = Parcel_Tag[ac][p]
 
   # The New Adjustments
   # Need to delete old arrays because

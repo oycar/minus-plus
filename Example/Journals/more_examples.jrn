@@ -1,0 +1,238 @@
+## More Examples Journal File
+##
+## The example.jrn file was a self contained (but simple) set of accounts
+## This is rather less a coherent set of books than a set of examples
+## showing how different transactions can be accounted for using mpx.
+##
+##
+
+## Handling rent and property expenses
+## This is simple - just create appropriate INCOME and EXPENSE accounts
+## These can be as fine grained as required; e.g. a single EXPENSE account
+## could be used or they could be broken up into agency expenses, repairs, rates etc.
+## In either case financial statements will be produced using the final component
+## of the class name as a sub-header; so so if multiple properties were held
+## then these could be collected up in one heading with accounts like INCOME.FIRST.PROPERTY:FIRST.RENT
+## INCOME.SECOND.PROPERTY:SECOND.RENT, and so on; alternatively account names like
+## INCOME.PROPERTY.FIRST_PROPERTY:FIRST.RENT would create different sub-headings for each property.
+##
+2008 Aug 08,                       CASH, EXPENSE.PROPERTY:AGENT.EXPENSE,    52.58, # Rent - Agent's Expenses
+2008 Aug 08,  INCOME.PROPERTY:FARM.RENT,                           CASH,   640.00, #
+
+## Processing GST. If the accounts need to look after GST (or for that matter VAT)
+## a GST field can be appended to the earlier fields. In the case of a share or managed fund
+## transaction GST is only applied to the brokerage and so a purchase of 52 units
+## in the listed unit trust Commonwealth Property Office might look like
+##
+2008 Aug 14,  LIABILITY.CURRENT:CREDITOR,  ASSET.CAPITAL.TRUSTS:CBAPB.ASX,   9884.70,   52.000,  32.95,  GST,  [B], [H], # CBAPB - Perls IV -  52
+
+## which would apply GST at the rate specified by the variable GST_Rate, which is 10% by default.
+## Often for super funds a reduced rate of GST applies, which is signified by the PART_GST field
+##
+2008 Sep 25,                     CSR.ASX,                             ANZ,   1207.05, -500.000,  32.95,  PART_GST,  [S], [H], # Disposal of 500 units in CSR.ASX
+
+## A GST refund would look like this, with TAX.GST being a predefined account LIABILITY.TAX:TAX.GST
+##
+2008 Oct 17,   TAX.GST,    CASH,         167.00, # ATO GST Refund
+
+## An example of GST being collected (and being levied on the whole amount) is:
+##
+2008 Dec 22,   INCOME.PROPERTY:LAND.RENT,   CASH,   693.50, GST, # Quarterly Rental for Farmland
+
+## Paying income tax involves other predefined accounts LIABILITY.TAX:TAX, LIABILITY.TAX:TAX.PAYG and the
+## administrative levy EXPENSE.LEVY:ATO.LEVY
+##
+2009 Jan 06,     ESAVER,         TAX,       10152.50,  [Tax Return:], # Income Tax 2008 due
+2009 Jan 06,        TAX,    ATO.LEVY,         150.00,                 # Supervisory Levy
+2009 Jan 06,     ESAVER,    TAX.PAYG,        2700.00,        [PAYG:], # Income Tax Instalment (2008-2009)
+2009 Jan 06,     ESAVER,     TAX.GST,          69.00,                 # GST Paid
+
+## Distributions from managed funds are taxed on an accrual rather than a cash basis. To deal with this
+## record distibutions as being paid from a current ASSET account ASSET.CURRENT.ACCRUED (or in fact you
+## could use some other distinctive final class name component, eg ASSET.CURRENT.DUE)
+
+2009 Jan 07,    ASSET.CURRENT.ACCRUED:UBS_AUS.DUE,     CASH,         707.55,   [D], # UBS Australian Bonds Distribution
+2009 Jan 14,        ASSET.CURRENT.ACCRUED:AYT.DUE,     CASH,         825.00,   [D], # Asset Backed Yield Trust (AYT) Distribution
+
+## The at the end of the financial year the distributions paid can be recorded once the annual tax statements
+## are received; the distribution may include franking credits too.
+
+2009 Jun 30,     INCOME.DISTRIBUTION:AYF.NPPI,                        AYF.DUE,   934.59,            [T], # NPPI
+2009 Jun 30, INCOME.DISTRIBUTION:DIST.AYF.ASX,                        AYF.DUE,   500.46,   214.48,  [T], # AYF Annual Distribution
+
+## Allowed fund expenses can be attributed to an expense account
+2009 Jun 30,                          AYF.DUE,   EXPENSE.DISTRIBUTION:EXP.AYF,   185.06, # AYF Annual Tax Statement
+
+## Deferred income (which decreases the cost basis)
+## can be paid as capital return from the asset capital account itself;
+2009 Jun 30,                          AYF.ASX,                        AYF.DUE,   580.51,            [T], # AYF Annual Distribution capital return
+2009 Jun 30, INCOME.DISTRIBUTION:DIST.AYT.ASX,                        AYT.DUE,  1815.93,            [T], # Annual Dist
+
+## Other possible transactions related to end of financial year statements include net
+## capital gains recorded in an annual tax statement from account ASSET.CAPITAL.TRUSTS:LEAF.NAME
+## are recorded to INCOME.GAINS.NET:GAINS.LEAF.NAME
+## The GAINS.LEAF.NAME is a linked account; and sums processed here will be handled
+## to produce the appropriate taxable gains in the end of financial year statement; the gains reported
+## should be the actual net gains recorded as being paid; not the grossed up gains. The accounts
+## will take care of any discounting or offsetting against available capital losses automatically.
+2009 Jun 30,       INCOME.GAINS.NET:GAINS.CPA.ASX,                              CPA.DUE,          28.97,            [T], # CPA Net capital gain paid out in cash
+##
+
+## Sometimes the reported taxable distribution is greater than the cash paid; here the distribution
+## is recorded as being paid to the capital asset, increasing the cost basis
+2009 Jun 30,                         DIST.HHY.ASX,                              HHY.ASX,         594.00,            [T], # HHY Annual Statement
+
+## Foreign sourced income can be handled with special class INCOME.FOREIGN. An optional field here after
+## the amount would indicate foreign tax offsets rather than franking credits
+2009 Jun 30,         INCOME.FOREIGN:FOR.UBS_SHARE,                        UBS_SHARE.DUE,         204.56,          48.33,            [T], # Annual Statement
+
+## Yet another possibility is for exempt income which is not subject to taxes at all;
+## this can be classified as being paid to an account in class INCOME.EXEMPT,
+## the leaf name is not linked (so any unique leaf name could be used)
+2009 Jun 30,         INCOME.EXEMPT:EXEMPT.LLC.ASX,                        LLC.DUE,          53.97,            [T], # LLC Non-Assesable, no impact on cost base
+
+##
+## Dividend reinvestment is easily handled by including the UNITS after the amount but before
+## any franking credits etc
+##
+# DATE        CREDIT ACCOUNT  DEBIT ACCOUNT   AMOUNT   UNITS   FRANKING CREDIT EX-DIVIDEND DATE   DOCUMENTS   COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2010 May 31,   DIV.WHF.ASX,     WHF.ASX,      59.50,  20.000,       25.50,                        [D], [H], # WHF DRP 20
+
+
+## For individuals and super funds listed investment companies can distribute a Listed Investment Company
+## tax deduction ("LIC Deduction"). These can be recorded as yet another optional field
+## after the franking credit. In this case should there be no franking credit be a zero
+## value should be given for the franking credit rather simple omitting it, (otherwise mpx will
+## mistake the LIC deduction for a franking credit) - this is getting about as complex as it gets
+##
+# DATE       CREDIT ACCOUNT DEBIT ACCOUNT AMOUNT   UNITS  FRANKING CREDIT LIC DEDUCTION EX-DIVIDEND DATE DOCUMENTS  COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2010 May 31,  DIV.WHF.ASX,    WHF.ASX,    59.50,  20.000,       25.50,                                   [D], [H], # WHF DRP 20
+
+## Another major issue is depreciation. This can be processed by using assets of class ASSET.FIXED
+## which are (like capital assets) unitised but (unlike capital gains) not subject to capital
+## gains and losses. Instead they can be depreciated.
+##
+##
+#   DATE    CREDIT ACCOUNT      DEBIT ACCOUNT         AMOUNT   UNITS  LIFETIME METHOD COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2012 Dec 19,    ESAVER,    ASSET.FIXED:FARM.FENCES,   1132.56,    1,    30,     DV,     # Farm fencing
+
+
+
+## GST cannot be applied directly to this transaction because it will assume that it should only be applied to
+## any brokerage (which is irrelevant here) so instead an adjustment can immediately be described
+## (No parcel date needs to be specified if the adjustment is made on the same day as the original transaction.)
+##
+2012 Dec 19,    FARM.FENCES,       TAX.GST,            102.96,    I, # GST adjustment to Cost Element I
+
+## The above asset will be depreciated using the diminishing value (DV) method with an effective life of
+## thirty years; the cost includes GST which will be allowed for in the process. Depreciation is
+## automitcally carried at the end of the financial year.
+## Extra expenditure on the asset will be applied to the second element cost, the lifetime and
+## method will stay the same.
+##
+#   DATE    CREDIT ACCOUNT      DEBIT ACCOUNT   AMOUNT   GST-FLAG      COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2013 Apr 15,      CASH,          FARM.FENCES,   7115.44,   GST,         # Farm Fencing (Replacement of old fences)
+
+## If the depreciating
+
+## Prime cost, PC, (or straight line) depreciation can also be used
+##
+#   DATE    CREDIT ACCOUNT      DEBIT ACCOUNT              AMOUNT   UNITS  LIFETIME METHOD GST-FLAG      COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2013 Oct 15,      CASH,    ASSET.FIXED:AMEYS.ENERGIZER,  1316.12,     1,     2.5,     PC,    GST,        # Portable solar powered fence energizer
+
+## In Australia depreciating items can be pooled if they are low value; in this case each member of the
+## pool is a separate parcel (so each is at least one unit). The method name is POOL and the effective
+## lifetime is always 5.3333 years.
+##
+## To allow the components of the pool to be identified in the financial statements it is convenient
+## to label each parcel with a label, which would always be the last optional field before
+## documents and comments, and is signified by being surrounded by double quotes
+##
+#   DATE    CREDIT ACCOUNT    DEBIT ACCOUNT     AMOUNT   UNITS  LIFETIME METHOD  LABEL            DOCUMENTS         COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2017 Jul 01,  PURCHASES, ASSET.FIXED:KSH.POOL,   127.20,  1,   5.3333,    POOL, "Iron",                            # Iron for West Row
+2017 Jul 01,  PURCHASES,             KSH.POOL,   493.40,  1,                    "Coffee Table",  [Furniture],      # Coffee Table
+2017 Jul 01,  PURCHASES,             KSH.POOL,   470.25,  1,                    "Easy Chair",    [Bed plus Chair], # Dixie Chair
+2018 Jan 24,  PURCHASES,             KSH.POOL,   160.00,  4,                    "Outdoor Chairs",                  # West Row Outdoor Chairs
+
+
+## Depreciation can be inserted manually into the accounts (if computed using an external application)
+## The amount is paid to the predefined debit account EXPENSE.DEPRECIATION:DEPRECIATION
+##
+#   DATE      CREDIT ACCOUNT   DEBIT ACCOUNT     AMOUNT   COST ELEMENT    COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2013 Jun 30,  FARM.FENCES,    DEPRECIATION,     143.12,      (I),        # Manual Farm fences depreciation for FY2013
+
+##
+## Depreciation is not a standard expense it that it is a tax adjustment;
+## tax is already saved on the depreciation even while the asset is being held.
+## So if a (capital) asset is purchased for $1000 and it has $500 of
+## the capital returned before being sold for $600 then (overall) $100
+## of gains were made (reduced cost = 500, tax adjustments = 0, adjusted cost = 500
+## sale cost = 600, overall profits sale cost - adjusted cost = 100)
+##
+
+## Now consider a depreciating asset costing $1000 with $500 of depreciation incurred.
+## The reduced cost    =  500
+## The tax adjustments = (500)  (since tax has been deducted on $500)
+## The adjusted cost   =  500 - (500) = 1000
+## Sale cost           =  600
+## Sale cost is greater than reduced cost (500) so no taxable losses
+## Sale cost is less than adjusted cost  (1000) so no taxable gains
+##
+
+## The difference is that in the former case $500 of capital returns flowed
+## into other assets before the sale; so the overall return was actually $1100
+## In the case of the depreciating asset the $500 of depreciation was just
+## a tax deduction; no corresponding monies accrued to any fund assets
+## the overall return was actually a loss of ($400); but tax deductions
+## pertaining to $500 had already been claimed; so no further claims can be made
+## If we compare the case of a sale for $1100 instead then the overall
+## taxable profits are $100; and as in the above case tax would be payable
+## on this $100. (Although in this case as income rather than capital gains.)
+
+## To account for this a tax adjustment can be associated with each of the
+## cost elements and is indicated by surrounding the cost element in question
+## with brackets; for depreciation this is always the first cost element (I).
+
+## Depreciation can thus be entered manually by using the cost element (I).
+## Alternatively the special symbol (D) can be used which triggers automatic
+## depreciation at the date requested; e.g.
+
+2013 Jan 01,  FARM.FENCES,    DEPRECIATION,     0.00,      (D),        # Automatic depreciation at an arbitrary date
+
+## The amount will be ignored and the internally computed value used; therefore
+## and amount of 0 can be used.
+##
+## The final depreciation report for the fences might look like the following if
+## altogether five separate payments were made to complete the project over a
+## period of a few months;
+
+
+## Depreciation Schedule for the Period [2012 Jul 01, 2013 Jul 01]
+##
+##           Asset      Method  Parcel      From          To           Opening        Closing       Second Element  Adjusted    Depreciation
+##      ____________________________________________________________________________________________________________________________________
+##                                  0  [2012 Dec 19, 2013 Jul 01]      1,029.60         993.21           0.00         993.21          36.39
+##                                  1  [2013 Apr 16, 2013 Jul 01]      6,468.58       6,379.38           0.00       6,379.38          89.20
+##                                  2  [2013 May 12, 2013 Jul 01]        873.76         865.86           0.00         865.86           7.90
+##                                  3  [2013 Jun 23, 2013 Jul 01]      2,035.72       2,032.93           0.00       2,032.93           2.79
+##                                  4  [2013 Jun 26, 2013 Jul 01]      8,327.10       8,320.26           0.00       8,320.26           6.84
+##    AMEYS.FENCES  Dim. Value         [2012 Dec 19, 2013 Jul 01]     18,734.76      18,591.64           0.00      18,591.64         143.12
+##      ____________________________________________________________________________________________________________________________________
+##     Period Depreciation                                                                                                           143.12
+
+## No second element costs were incurred because each cost corresponded to a new section of fencing rather than modifications or
+## adjustments to earlier work. This could have equally been accounted for as five different assets with different names, but this
+## approach is more elegant. If the stages of the project had (for some reason) different lifetimes or were depreciated in a different
+## way (eg prime cost rather than diminishing value) then it would be necessary to use separate accounts for those that differed.
+
+## The concept of named parcels is applicable to any unitized asset, and is sometimes necessary to avoid ambiguity. We have seen that
+## default asset sales are first-in-first-out; but it is also possible to specify sales in detail at the parcel level.
+##
+## When

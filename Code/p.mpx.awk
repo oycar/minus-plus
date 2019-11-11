@@ -925,15 +925,6 @@ function parse_transaction(now, a, b, units, amount,
   # A sale transaction
   if (units < 0) {
     # The asset being sold must be "a" but if equity must be "b"
-    #
-    # correct_order = is_asset(a) && is_open(a, now)
-    # if (!correct_order) {
-    #   correct_order = is_equity(b) && is_open(b, now)
-    #   if (correct_order) {
-    #     swop = a; a = b; b = swop
-    #     amount = - amount
-    #   }
-    # }
     correct_order = is_sale(now, a, b)
     assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, get_short_name(a), get_short_name(b)))
 
@@ -1035,14 +1026,6 @@ function parse_transaction(now, a, b, units, amount,
 
   } else if (units > 0) {
     # # For a purchase the asset must be account "b"
-    # correct_order = is_asset(b)
-    # if (!correct_order) {
-    #   correct_order = is_equity(a)
-    #   if (correct_order) {
-    #     swop = a; a = b; b = swop
-    #     amount = - amount
-    #   }
-    # }
     # This must be a purchase
     correct_order = is_purchase(a, b)
     assert(correct_order, sprintf("%s => can't buy asset %s\n", $0, get_short_name(b)))
@@ -1988,7 +1971,9 @@ function copy_parcel(ac, p, q,     e, key) {
   Held_From[ac][q] = Held_From[ac][p]
   Held_Until[ac][q] = Held_Until[ac][p]
   Parcel_Proceeds[ac][q] = Parcel_Proceeds[ac][p]
-
+  if (keys_in(Parcel_Tag, ac, p))
+    Parcel_Tag[ac][q] = Parcel_Tag[ac][p]
+    
   # Copy all entries
   # Note keys will not match so need to delete old entries from parcel q
   delete Accounting_Cost[ac][q] # Delete old entries
@@ -2017,6 +2002,10 @@ function split_parcel(ac, p, du,   fraction_kept, e, key) {
 
   # Parcel Proceeds
   Parcel_Proceeds[ac][p + 1] = 0
+
+  # Parcel tag
+  if (keys_in(Parcel_Tag, ac, p))
+    Parcel_Tag[ac][p + 1] = Parcel_Tag[ac][p]
 
   # The New Adjustments
   # Need to delete old arrays because

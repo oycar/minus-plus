@@ -319,6 +319,13 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             # Print out the parcel information
             if (is_detailed && key) {
               # If printing out in detail
+              if (keys_in(Parcel_Tag, a, p)) {
+                if (label) # Deal with label first
+                  printf "%*s\n", asset_width + 1, label > reports_stream
+                label = Parcel_Tag[a][p]
+              }
+
+              # Print line
               printf "%*s %*d %*.3f %*s %*s   %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
                    asset_width + 1, label,
                    7, p,
