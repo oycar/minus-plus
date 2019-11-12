@@ -33,7 +33,7 @@ current_directory=`pwd`
 MPXDIR=~/Cloudstation/Projects/Minus-Plus/Code
 
 # Usage
-USAGE="Usage: $(basename $0) [-a: show-account-transactions] [-c: journal-currency] [-e export-format] [-i mpx-information-and-copyright-notice]\
+USAGE="Usage: $(basename $0) [-a: show-account-transactions] [-c: journal-currency] [-i mpx-information-and-copyright-notice]\
  [-l: log-function] [-p: write-price-file] [-q enforce-qualification] [-s: stop-time]\
  [-v write-variable-1,write_variable-2,...] [-w: write-state-file] [-x show-extra-detail] [-z preprocess_only]\
  [-ABCDIMOQTZ extra-report-toggles] <data-import-file> <state-file> <journal-file>"
@@ -43,9 +43,7 @@ USAGE="Usage: $(basename $0) [-a: show-account-transactions] [-c: journal-curren
 # default arguments
 account_name=""
 date_format=""
-Export_Format=0
 enforce_qualification=1
-#financial_year=0
 log_function=0
 write_file=0
 write_variables=""
@@ -64,20 +62,13 @@ shopt -s expand_aliases
 alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
 
 # Interpret options
-while getopts ":a:c:eil:p:qs:v:w:xzABCDIMOQTZ" opt; do
+while getopts ":a:c:il:p:qs:v:w:xzABCDIMOQTZ" opt; do
     case $opt in
 
     a) account_name=$OPTARG;;
 
     c) # AUD is the default
       journal_currency=${OPTARG};;
-
-    e) # Export format transactions
-      date_format="%d/%m/%Y"
-      Export_Format=1;;
-
-#    f) # Financial year
-#      financial_year=$OPTARG;;
 
     i) # Information
    printf "mpx - Minus-Plus command line accounting and financial reporting\n\
@@ -163,9 +154,9 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   # Preprocess (if its available...)
   if command -v app >/dev/null 2>&1 ; then
     if [ -z ${Show_Reports} ] ; then
-      app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+      app -D LOG=${log_function} -D JOURNAL_CURRENCY=\"${journal_currency}\" p.mpx.awk > ${MPXDIR}/mpx.awk
     else
-      app -D LOG=${log_function} -D EXPORT_FORMAT=${Export_Format} -D JOURNAL_CURRENCY=\"${journal_currency}\" -D SHOW_REPORTS=\"${Show_Reports}\" p.mpx.awk > ${MPXDIR}/mpx.awk
+      app -D LOG=${log_function} -D JOURNAL_CURRENCY=\"${journal_currency}\" -D SHOW_REPORTS=\"${Show_Reports}\" p.mpx.awk > ${MPXDIR}/mpx.awk
     fi
     app p.echo.awk > ${MPXDIR}/echo.awk
 

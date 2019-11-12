@@ -10,11 +10,6 @@
 @undef LOG
 @endif
 
-# // Control Export format
-@ifeq EXPORT_FORMAT 0
-@undef EXPORT_FORMAT
-@endif
-
 # // Logic conventions
 @define  TRUE   (1)
 @define  FALSE  (0)

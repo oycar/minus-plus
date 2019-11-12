@@ -879,6 +879,21 @@ function parse_optional_value(field,     value) {
 # Parse optional string
 # By default do not save any document found
 function parse_optional_string(field, save_document,    string, x) {
+  # Brackets?
+  if (field ~ /^\((.)+\)$/) {
+    # This is probably a tax adjustment
+    Tax_Adjustment = TRUE
+
+    # bracketed
+    len = length(field)
+    field = trim(toupper(substr(field, 2, len - 2)))
+    if (field ~ /D/) {
+      Cost_Element = I # First cost element
+      Tax_Adjustment = Automatic_Depreciation = TRUE
+    }
+  } else
+    Tax_Adjustment = FALSE
+
   # This should be a text flag
   switch (field) {
     # First check for a GST tag
@@ -900,6 +915,21 @@ function parse_optional_string(field, save_document,    string, x) {
     case "POOL" :
       Depreciation_Type = field
       return ""
+
+    # The units might still be I, II, III, IV, V, D or 0
+    case "0" : Cost_Element = COST_ELEMENT
+      # Zero defaults to cost element II
+      # Also a string (0) is not a tax adjustment
+      Tax_Adjustment = FALSE
+      return Cost_Element
+
+    case "I" :
+    case "II" :
+    case "III" :
+    case "IV" :
+    case "V" : # Cost elements
+      Cost_Element = field
+      return field
 
     default: # this is an optional string
       break # no-op
@@ -937,17 +967,23 @@ function parse_cost_element(u,       len) {
   len = length(u)
 
   # Brackets?
-  if (u ~ /^()/ && u ~ /)$/) {
+  #if (u ~ /^()/ && u ~ /)$/) {
+  if (u ~ /^\((.)+\)$/) {
     # This is probably a tax adjustment
     Tax_Adjustment = TRUE
 
     # bracketed
-    if (len > 2)
-      u = trim(toupper(substr(u, 2, len - 2)))
-    else
+    #if (len > 2)
+    u = trim(toupper(substr(u, 2, len - 2)))
+    if (u ~ /D/) {
+      Cost_Element = I # First cost element
+      Tax_Adjustment = Automatic_Depreciation = TRUE
+    }
+    #else
       # Empty String defaults to cost element II
-      u = COST_ELEMENT
-  }
+    #  u = COST_ELEMENT
+  } else
+    Tax_Adjustment = FALSE
 
   # The units might still be I, II, III, IV, V, D or 0
   switch (u) {
@@ -956,10 +992,10 @@ function parse_cost_element(u,       len) {
       # Also a string (0) is not a tax adjustment
       Tax_Adjustment = FALSE
       break
-    case "D" : # Depreciation
-      Cost_Element = I # First cost element
-      Tax_Adjustment = Automatic_Depreciation = TRUE
-      break
+    # case "D" : # Depreciation
+    #   Cost_Element = I # First cost element
+    #   Tax_Adjustment = Automatic_Depreciation = TRUE
+    #   break
     case "I" :
     case "II" :
     case "III" :
@@ -970,7 +1006,7 @@ function parse_cost_element(u,       len) {
 
     default: #
       # A string such as (12) is not a tax adjustment
-      Tax_Adjustment = FALSE
+      #Tax_Adjustment = FALSE
 
       # And this is not a legitimate cost element
       u = ""
@@ -1643,59 +1679,6 @@ function print_transaction(now, comments, a, b, u, amount, fields, n_fields,    
 }
 
 # Describe the transaction as a string
-@ifdef EXPORT_FORMAT
-# Export style
-function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,      i, string, swop) {
-  # Print statement
-  # This could be a zero, single or double entry transaction
-  #
-  # # floating point precision
-  # float_precision = ternary("" == float_precision, PRECISION, float_precision)
-
-  # First the date
-  string = sprintf("%11s", get_date(now))
-
-  # Export format always makes the matched account account b - the DEBIT account
-  if (match_account(a, Show_Account)) {
-    # Swop accounts
-    swop = b
-    b = a
-    a = swop
-
-    # Reverse amount
-    amount = -amount
-  }
-
-  # Is it not zero entry?
-  if ("" != a)
-    # At least single entry
-    string = string sprintf(", %13s, ", Leaf[a])
-
-  #
-  if ("" != b)
-    string = string sprintf("%13s, ", Leaf[b])
-
-  # Cost element and cost entry
-  if ("" != u)
-    # This is the normal case
-    string = string sprintf("%10s, %11.2f", u, amount)
-  else
-    # When export format is used and elements not provided
-    string = string sprintf("%11.2f", amount)
-
-  # Finish off the line
-  for (i = 1; i <= n_fields; i ++)
-    string = string ", " fields[i]
-  string = string ", " comments
-
-  # All done
-  return string
-} # End of printing a transaction
-
-@else
-
-# Normal style
-# Describe the transaction as a string
 function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,     i, string) {
   # Print statement
   # This could be a zero, single or double entry transaction
@@ -1713,9 +1696,13 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
   if ("" != b)
     string = string sprintf("%13s, ", Leaf[b])
 
-  # Cost element and cost entry - if at least one entry
+  # Amount  and cost element and or units - if at least one entry
   if (a || b) {
-    string = string sprintf("%10s, %11.2f", u, amount)
+    string = string sprintf("%11.2f, ", amount)
+    if (u)
+      string = string sprintf("%10s", u)
+    else # Pretty print
+      string = string sprintf("%10s", "")
 
     # Do we need to show the balance?
     if (matched)
@@ -1733,7 +1720,6 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
   # All done
   return string
 } # End of printing a transaction
-@endif #// EXPORT_FORMAT
 
 function initialize_account(account_name,     class_name, array, p, n,
                                               leaf_name, linked_name) {

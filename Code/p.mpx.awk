@@ -37,15 +37,15 @@
 #   2008 Apr 09, CASH, BHP.ASX, 8382.00, 200, # (in specie transfer in fact)
 #
 # To Do =>
+#   ***in progress
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
 #   Accumulated profits should not include unrealized losses/gains which are classified as capital
-#   In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
-#   Share splits could be considered using a similar mechanism to currencies - with a weighting formula
+#   ***In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
+#   ***Share splits could be considered using a similar mechanism to currencies - with a weighting formula
+#   ***Clean up Cost Element and Write_Units logic
 #
-#
-#   Fix up wiki files
-#   More flexible ordering of optional fields?
+#   ***Fix up wiki files
 #   other tax_statement calculations (eg UK, US, NZ etc...)
 #
 #   Allow non-rectangular arrays, i.e. only have [a][p][e] for active elements
@@ -53,7 +53,6 @@
 #   Read single entry transactions
 #   special notes for -l version
 #   describe gpp properly
-#   Share splits etc
 #   Short day-by-day performance summary (cost-value-etc.. estimated for EOFY)
 #
 #   Integrate with graphing/analysis package (eris)
@@ -987,26 +986,6 @@ function parse_transaction(now, a, b, units, amount,
       swop = ""
     }
 
-@ifeq EXPORT_FORMAT 1
-    # Export format
-    # Needs fixed number of fields
-    # A, B, -U, x, b, b*g, (parcel_timestamp || parcel_name), SELL, comment
-
-    # Record the GST on the brokerage
-    fields[1] = sprintf("%.*f", PRECISION, current_brokerage) # Always use 1st field
-    fields[2] = sprintf("%.*f", PRECISION, g)
-    # Need to save the parcel_name, or alternatively parcel_timestamp, if present
-    if (DATE_ERROR != Extra_Timestamp) # No timestamp
-      fields[3] = get_date(Extra_Timestamp)
-    else
-      # Otherwise save the parcel name
-      fields[3] = Parcel_Name
-
-    fields[3] = fields[1]
-    fields[4] = "SELL"
-    # Exclude brokerage here because the importing package usually expects to find the consideration alone
-    print_transaction(now, Comments, a, b, Write_Units, amount + g, fields, 4)
-@else
     # Record the transaction
     if (!near_zero(current_brokerage))
       fields[++ number_fields] = sprintf("%.*f", PRECISION, current_brokerage - g) # Always use 1st field
@@ -1022,8 +1001,6 @@ function parse_transaction(now, a, b, units, amount,
     # Normal format is much the same - but number of fields is not fixed
     # A, B, -U, x + bg, (optional_fields), comment
     print_transaction(now, Comments, a, b, Write_Units, amount + g, fields, number_fields)
-@endif
-
   } else if (units > 0) {
     # # For a purchase the asset must be account "b"
     # This must be a purchase
@@ -1107,25 +1084,12 @@ function parse_transaction(now, a, b, units, amount,
     }
 
     # Record the transaction
-@ifeq EXPORT_FORMAT 1
-    # Format is
-    # Needs fixed number of fields - we can ignore parcel name etc..
-    # A, B, U, x + b, b, b*g, <parcel-name>, BUY, Comments
-    # Record the GST on the brokerage
-    fields[3] = Parcel_Name
-    fields[1] = sprintf("%.*f", PRECISION, current_brokerage) # Always use 2nd field
-    fields[2] = sprintf("%.*f", PRECISION, g)
-    fields[4] = "BUY"
-
-    print_transaction(now, Comments, a, b, Write_Units, amount - g, fields, 4)
-@else
     # Normal transactions
     # A, B, U, x, b - b*g, <optional-fields>, Comments
     # Record the adjustment due to brokerage and gst
     if (!near_zero(current_brokerage))
       fields[++ number_fields] = sprintf("%.*f", PRECISION, current_brokerage - g)
     print_transaction(now, Comments, a, b, Write_Units, amount - g, fields, number_fields)
-@endif
   } else if (Automatic_Depreciation) {
     # This is automatic depreciation
     # Only need the assertion
@@ -1973,7 +1937,7 @@ function copy_parcel(ac, p, q,     e, key) {
   Parcel_Proceeds[ac][q] = Parcel_Proceeds[ac][p]
   if (keys_in(Parcel_Tag, ac, p))
     Parcel_Tag[ac][q] = Parcel_Tag[ac][p]
-    
+
   # Copy all entries
   # Note keys will not match so need to delete old entries from parcel q
   delete Accounting_Cost[ac][q] # Delete old entries
