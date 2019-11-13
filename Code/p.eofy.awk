@@ -1239,7 +1239,7 @@ function depreciate_all(now,      a, current_depreciation, comments) {
       adjust_cost(DEPRECIATION, current_depreciation, now)
 
       # Print the transaction
-      print_transaction(now, comments, a, DEPRECIATION, current_depreciation, Cost_Element)
+      print_transaction(now, comments, a, DEPRECIATION, current_depreciation, "(I)")
     }
 
   # Restore defaults

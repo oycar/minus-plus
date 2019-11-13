@@ -897,7 +897,7 @@ function parse_transaction(now, a, b, amount, units,
       # The transaction itself will be posted later a => b
       # Need to adjust amount transacted
       amount -= (g = GST_Claimable * gst_proportion(now) * amount)
-      print_transaction(now, ("# GST " Leaf[b]), GST, b, g, II)
+      print_transaction(now, ("# GST " Leaf[b]), GST, b, g)
 
       # GST claimed
       GST_Claimable = 0
@@ -952,7 +952,7 @@ function parse_transaction(now, a, b, amount, units,
 
         # This must be recorded
         # This reduces GST liability
-        print_transaction(now, ("# GST " Leaf[a]), GST, b, -g, II)
+        print_transaction(now, ("# GST " Leaf[a]), GST, b, -g)
         assert(FALSE, "GST Was levied on whole SELL transaction <" $0 ">")
       } else {
         # Brokerage Present => Adjust Brokerage
@@ -962,7 +962,7 @@ function parse_transaction(now, a, b, amount, units,
         g = GST_Claimable * gst_proportion(now) * current_brokerage
 
         # This must be recorded
-        print_transaction(now, ("# GST " Leaf[a]), b, GST, g, II)
+        print_transaction(now, ("# GST " Leaf[a]), b, GST, g)
       }
 
       # Non-zero GST to be paid
@@ -1061,7 +1061,7 @@ function parse_transaction(now, a, b, amount, units,
 
       # This must be recorded
       Cost_Element = II
-      print_transaction(now, ("# GST " Leaf[b]), a, GST, g, II)
+      print_transaction(now, ("# GST " Leaf[b]), a, GST, g)
       if (near_zero(current_brokerage))
         assert(FALSE, "GST Was levied on whole BUY transaction <" $0 ">")
       GST_Claimable = 0
@@ -1156,7 +1156,7 @@ function parse_transaction(now, a, b, amount, units,
       adjust_cost(b,   -g, now)
 
       # Record GST
-      print_transaction(now, ("# GST " Leaf[a]), b, GST, g, II)
+      print_transaction(now, ("# GST " Leaf[a]), b, GST, g)
       GST_Claimable = 0
     }
 
@@ -1165,7 +1165,7 @@ function parse_transaction(now, a, b, amount, units,
     adjust_cost(b,  amount, now)
 
     # Record the transaction
-    print_transaction(now, Comments, a, b, amount, Cost_Element, fields, number_fields)
+    print_transaction(now, Comments, a, b, amount, ternary(Tax_Adjustment, "(" Cost_Element ")", Cost_Element), fields, number_fields)
   }
 
   # Tidy up

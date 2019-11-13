@@ -863,109 +863,54 @@ function parse_line(now,    i, j, x, number_accounts) {
   # Must exist if number accounts > 0
   if (number_accounts) {
     i ++
+    j = 0
 
     # Must ba number
     assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
     amount = strtonum($i)
+  } else
+    j = 1
 
-    # Interpret units
-    #
-    # If number accounts > 0 this MUST be a legal units field
-    # Units indicate whether an item is bought or sold; or the cost element or whether adjusting
-    # the cost base or the reduced cost base
-    #
-    #  A non zero numerical value
-    #   units > 0 => BUY  cost element I
-    #   units < 0 => SELL cost element I
-    #
-    #  A blank or zero
-    #    units == 0 => Cost Base element II (the default)
-    #
-    #  A string  (roman numbers I to V are meaningful but could be anything without brackets)
-    #    units == I   => Cost Base element I
-    #    units == II  => Cost Base element II etc
-    #
-    #  A bracketed string
-    #    units == (I) => Tax Adjustment to Cost Base element I etc
-    #
-
-
-    # # always advance i
-    # i ++
-    # Units = 0
-    #
-    # # This field can be units or a cost element
-    # x = parse_optional_value($i)
-    #
-    # # Is this a non zero value?
-    # Units = 0
-    # if (x) {
-    #   # This might be the number of units; is this a buy or sell transaction?
-    #   if (above_zero(x) && is_purchase(Account[1], Account[2]))
-    #     # Interpret these as units
-    #     Units = x
-    #   else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
-    #     Units = x
-    #   else { # No units - rescan field
-    #     Units = 0
-    #     i --
-    #   }
-    # } else if ("" != x) { # Ignore the case of this being a time-stamp
-    #   #Cost_Element = parse_cost_element($i)
-    #   x = parse_optional_string($i, TRUE)
-    #
-    #   # The output syntax
-    #   if (COST_ELEMENT == Cost_Element)
-    #     # Rescan
-    #     i --
-    # }
-  }
-  i ++
-
-
-
-  # Finally the special value (D) or (d) means depreciate automatically
   # From now on the fields are context dependent
   # Possibilities are:
+  # * **Field 5**
+  #   * **The Units** in a buy or sell
+  #   * **The Cost Element** in any transaction
+  #   * **Anything in Field 6 except LIC Deduction**
+
   # * **Field 6**
-  #   * **A Parcel Date** in a buy or sell transaction
-  #   * **An Ex-Dividend Date** in an income transaction
   #   * **Brokerage** in a buy or sell transaction
-  #   * **Tax Credits** in an income transaction
-  #   * **Effective Life** in a depreciating asset purchase
-  #   * **A Parcel Name** in a buy or sell transaction
-  #   * **A GST Tag** in an income, expense, buy or sell transaction. If brokerage is present the GST is applied only on the brokerage.
-  #   * **A document name** in any transaction
-  #   * **A comment** in any transaction
+  #   * **Anything in Field 7**
+
   # * **Field 7**
-  #   * **A Parcel Date** in a buy or sell transaction
-  #   * **An Ex-Dividend Date** in an income transaction
-  #   * **LIC (listed investment company) Credits** in an income transaction
-  #   * **A Parcel Name** in a buy or sell transaction
+  #   * **LIC (listed investment company) Deduction** in an income transaction
   #   * **Depreciation method** in a depreciating asset purchase
-  #   * **A GST Tag** in an income, expense, buy or sell transaction. If brokerage is present the GST is applied only on the brokerage.
-  #   * **A document name** in any transaction
-  #   * **A comment** in any transaction
+  #   * **A Parcel Date** in a buy or sell transaction
+  #   * **Anything in Field 8**
+
   # * **Field 8**
-  #   * **A Parcel Name** in a dividend reinvestment -
   #   * **An Ex-Dividend Date** in an income transaction
   #   * **A GST Tag** in an income, expense, buy or sell transaction. If brokerage is present the GST is applied only on the brokerage.
-  #   * **A document name** in any transaction
-  #   * **A comment** in any transaction
+  #   * **Anything in Field 9**
+
   # * **Field 9**
-  #   * **A document name** in any transaction
   #   * **A Parcel Name** in a dividend reinvestment -
-  #   * **A comment** in any transaction
+  #   * **Anything in Field 10**
+
   # * **Field 10** and higher
   #   * **A document name** in any transaction
   #   * **A comment** in any transaction
+
+
   # The next three fields can contain real numbers, time-stamps or strings
   # Check first for real numbers or time-stamps
+
+  # Next field
+  i ++
+
+  # Units are assumed to be zero
   Units = 0
-  for (j = !number_accounts; i <= NF;) {
-
-  #for (j = 1; i <= NF;) {
-
+  while (i <= NF) {
     # Set x
     if (j <= 3)
       x = parse_optional_value($i)
@@ -981,7 +926,7 @@ function parse_line(now,    i, j, x, number_accounts) {
           Units = x
         else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now))))
           Units = x
-        else
+        else # This is the j == 1 case (eg Franking credits etc)
           Real_Value[j = 1] = x
       } else
         Real_Value[j] = x
@@ -999,7 +944,6 @@ function parse_line(now,    i, j, x, number_accounts) {
     i ++
     j ++
   }
-
 
   # Comments should be signified with an octothorpe
   if (Comments !~ /^#/)
@@ -1085,7 +1029,6 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
         # Add the date
         prefix = prefix (( use_format)?( (" " get_date(now,  use_format))):( ""))
       break;;
-
 
       case "D": # Distribution
         if (((Leaf[Account[1]]) ~ /^(DIV|DIST|FOR|GAINS)\./))
@@ -1219,6 +1162,21 @@ function parse_optional_value(field,     value) {
 # Parse optional string
 # By default do not save any document found
 function parse_optional_string(field, save_document,    string, adjustment_flag) {
+  # Interpret cost element
+  #
+  # Units indicate whether an item is bought or sold; or the cost element or whether adjusting
+  # the cost base or the reduced cost base
+  #  A blank or zero
+  #    units == 0 => Cost Base element II (the default)
+  #
+  #  A string  (roman numbers I to V are meaningful but could be anything without brackets)
+  #    units == I   => Cost Base element I
+  #    units == II  => Cost Base element II etc
+  #
+  #  A bracketed string
+  #    units == (I) => Tax Adjustment to Cost Base element I etc
+  #
+
 
   ## Check for cost element first
   # Brackets?
@@ -1259,6 +1217,7 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
       Depreciation_Type = field
       return ""
 
+    # Cost element
     case "I" :
     case "II" :
     case "III" :
@@ -1296,77 +1255,6 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
 
   # All done
   return ""
-}
-
-# Is this a cost element?
-function parse_cost_element(field,       len) {
-  # Brackets?
-  if (field ~ /^\((.)+\)$/) {
-    # This is probably a tax adjustment
-    Tax_Adjustment = (1)
-
-    # bracketed
-    len = length(field)
-    field = trim(toupper(substr(field, 2, len - 2)))
-    if (field ~ /D/) {
-      Tax_Adjustment = Automatic_Depreciation = (1)
-      return I
-    }
-  } else
-    Tax_Adjustment = (0)
-
-  # Might still be I, II, III, IV, V, D or 0
-  switch (field) {
-    case "I" :
-    case "II" :
-    case "III" :
-    case "IV" :
-    case "V" : # Cost elements
-      break
-
-    default: #
-      # And this is not a legitimate cost element
-      Tax_Adjustment = (0)
-      return ("II")
-   }
-
-  return field
-}
-
-# optional fields
-# add optional fields in the correct order to an output string
-function add_optional_field(optional_fields, field_value, field_rank,
-                            number_fields) {
-  # Optional fields are ordered as follows
-  # Rank 1  * **A Unique Timestamp**
-  # Rank 2  * **Floating Point Number(s)**
-  # Rank 3  * **"string" enclosed in double quotes**
-  # Rank 4  * **A GST Tag**
-  # Rank 5  * **A [document name]**
-  # Rank 6  * **A # comment**
-  #
-  # so
-  # optional_fields[2][2] contains the second floating point field
-  # optional_fields[3][1] contains a "string"
-  # optional_fields[6][4] contains the fourth comment
-  #
-  #
-  # Initially optional_fields[X]["length"] is not set (no entries)
-  # If one is added it becomes optional_fields[X][0] => 1
-  if (field_rank in optional_fields)
-    # One extra field
-    number_fields = optional_fields[field_rank]["length"] + 1
-  else {
-    # Initialize this Rank
-    ((SUBSEP in optional_fields[field_rank])?((1)):((0)))
-    number_fields = 1
-  }
-
-  # Save the value
-  optional_fields[field_rank][number_fields] = field_value
-
-  # Save the number of fields of this rank
-  optional_fields[field_rank]["length"] = number_fields
 }
 
 # Initialize special accounts
@@ -1968,7 +1856,7 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
   # Amount  and cost element and or units - if at least one entry
   if (a || b) {
     string = string sprintf("%11.2f, ", amount)
-    if (element_string)
+    if (element_string && element_string != ("II"))
       string = string sprintf("%10s", element_string)
     else # Pretty print
       string = string sprintf("%10s", "")
