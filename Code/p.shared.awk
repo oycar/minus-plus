@@ -559,10 +559,11 @@ function parse_line(now,    i, j, x, number_accounts) {
     #  A bracketed string
     #    units == (I) => Tax Adjustment to Cost Base element I etc
     #
-    # Finally the special value (D) or (d) means depreciate automatically
 
-    # Move on to the next field
+
+    # always advance i
     i ++
+    Units = 0
 
     # This field can be units or a cost element
     x = parse_optional_value($i)
@@ -581,7 +582,8 @@ function parse_line(now,    i, j, x, number_accounts) {
         i --
       }
     } else if ("" != x) { # Ignore the case of this being a time-stamp
-      Cost_Element = parse_cost_element($i)
+      #Cost_Element = parse_cost_element($i)
+      x = parse_optional_string($i, TRUE)
 
       # The output syntax
       if (COST_ELEMENT == Cost_Element)
@@ -589,7 +591,11 @@ function parse_line(now,    i, j, x, number_accounts) {
         i --
     }
   }
+  i ++
 
+
+
+  # Finally the special value (D) or (d) means depreciate automatically
   # From now on the fields are context dependent
   # Possibilities are:
   # * **Field 6**
@@ -624,13 +630,12 @@ function parse_line(now,    i, j, x, number_accounts) {
   # * **Field 10** and higher
   #   * **A document name** in any transaction
   #   * **A comment** in any transaction
-
-  # always advance i
-  i ++
-
   # The next three fields can contain real numbers, time-stamps or strings
   # Check first for real numbers or time-stamps
+  #for (j = !number_accounts; i <= NF; j++) {
+
   for (j = 1; i <= NF; j++) {
+
     # Set x
     if (j <= 3)
       x = parse_optional_value($i)
@@ -638,9 +643,17 @@ function parse_line(now,    i, j, x, number_accounts) {
       x = 0
 
     # Shared code - save x if set
-    if (x) # x is not zero or ""
-      Real_Value[j] = x
-    else if ("" != x) { # Will be "" when a timestamp set
+    if (x) { # x is not zero or ""
+      # The zeroth case can be Units
+      if (0 == j) {
+        if (above_zero(x) && is_purchase(Account[1], Account[2]))
+          # Interpret these as units
+          Units = x
+        else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
+          Units = x
+      } else
+        Real_Value[j] = x
+    } else if ("" != x) { # Will be "" when a timestamp set
       # x not set so look for strings
       # Can reuse x
       x = parse_optional_string($i, TRUE)
@@ -653,6 +666,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     # Increment i
     i ++
   }
+
 
   # Comments should be signified with an octothorpe
   if (Comments !~ /^#/)
@@ -871,21 +885,24 @@ function parse_optional_value(field,     value) {
 
 # Parse optional string
 # By default do not save any document found
-function parse_optional_string(field, save_document,    string, x) {
+function parse_optional_string(field, save_document,    string, adjustment_flag) {
+
+  ## Check for cost element first
   # Brackets?
   if (field ~ /^\((.)+\)$/) {
-    # This is probably a tax adjustment
-    Tax_Adjustment = TRUE
-
     # bracketed
     len = length(field)
     field = trim(toupper(substr(field, 2, len - 2)))
     if (field ~ /D/) {
-      Cost_Element = I # First cost element
       Tax_Adjustment = Automatic_Depreciation = TRUE
+      Cost_Element = I
+      return ""
     }
-  } else
-    Tax_Adjustment = FALSE
+
+    # This is probably a tax adjustment
+    adjustment_flag = TRUE
+  } else # Not a tax adjustment
+    adjustment_flag = FALSE
 
   # This should be a text flag
   switch (field) {
@@ -909,20 +926,14 @@ function parse_optional_string(field, save_document,    string, x) {
       Depreciation_Type = field
       return ""
 
-    # The units might still be I, II, III, IV, V, D or 0
-    case "0" : Cost_Element = COST_ELEMENT
-      # Zero defaults to cost element II
-      # Also a string (0) is not a tax adjustment
-      Tax_Adjustment = FALSE
-      return Cost_Element
-
     case "I" :
     case "II" :
     case "III" :
     case "IV" :
     case "V" : # Cost elements
+      Tax_Adjustment = adjustment_flag
       Cost_Element = field
-      return field
+      return ""
 
     default: # this is an optional string
       break # no-op

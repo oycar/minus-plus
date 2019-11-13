@@ -43,7 +43,7 @@
 #   Accumulated profits should not include unrealized losses/gains which are classified as capital
 #   ***In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
 #   ***Share splits could be considered using a similar mechanism to currencies - with a weighting formula
-#   ***Clean up Cost Element and Write_Units logic
+#   ***Clean up Cost Element and Units logic
 #
 #   ***Fix up wiki files
 #   other tax_statement calculations (eg UK, US, NZ etc...)
@@ -741,7 +741,7 @@ function read_input_record(   t, n, a, threshold) {
 }
 
 # Break out transaction parsing into a separate module
-function parse_transaction(now, a, b, amount, Units,
+function parse_transaction(now, a, b, amount, units,
 
                            underlying_asset, credit_account,
                            swop, g,
@@ -922,7 +922,7 @@ function parse_transaction(now, a, b, amount, Units,
   }
 
   # A sale transaction
-  if (Units < 0) {
+  if (units < 0) {
     # The asset being sold must be "a" but if equity must be "b"
     correct_order = is_sale(now, a, b)
     assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, get_short_name(a), get_short_name(b)))
@@ -974,7 +974,7 @@ function parse_transaction(now, a, b, amount, Units,
     # Sell units -> cash is flowing out of a
     # Ensure positive values for units and amount are passed
     # Brokerage is treated as a cost so it can be applied to the units actually sold
-    sell_units(now, a, -Units, amount + g, Parcel_Name, Extra_Timestamp)
+    sell_units(now, a, -units, amount + g, Parcel_Name, Extra_Timestamp)
 
     # And simply adjust settlement account b by the
     adjust_cost(b, amount, now)
@@ -1000,8 +1000,8 @@ function parse_transaction(now, a, b, amount, Units,
 
     # The number of fields is not fixed
     # A, B, -U, x + bg, (optional_fields), comment
-    print_transaction(now, Comments, a, b, amount + g, sprintf("%10.3f", Units), fields, number_fields)
-  } else if (Units > 0) {
+    print_transaction(now, Comments, a, b, amount + g, sprintf("%10.3f", units), fields, number_fields)
+  } else if (units > 0) {
     # # For a purchase the asset must be account "b"
     # This must be a purchase
     correct_order = is_purchase(a, b)
@@ -1069,7 +1069,7 @@ function parse_transaction(now, a, b, amount, Units,
       g = 0
 
     # Buy units in asset (b) - this ignores impact of brokerage
-    bought_parcel = buy_units(now, b, Units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
+    bought_parcel = buy_units(now, b, units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
 
     # Adjust the cost of this **parcel** for the impact of brokerage and GST
     adjust_parcel_cost(b, bought_parcel, now, current_brokerage - g,  II, FALSE)
@@ -1090,7 +1090,7 @@ function parse_transaction(now, a, b, amount, Units,
     # Record the adjustment due to brokerage and gst
     if (!near_zero(current_brokerage))
       fields[++ number_fields] = sprintf("%.*f", PRECISION, current_brokerage - g)
-    print_transaction(now, Comments, a, b, amount - g, sprintf("%10.3f", Units), fields, number_fields)
+    print_transaction(now, Comments, a, b, amount - g, sprintf("%10.3f", units), fields, number_fields)
   } else if (Automatic_Depreciation) {
     # This is automatic depreciation
     # Only need the assertion

@@ -888,10 +888,11 @@ function parse_line(now,    i, j, x, number_accounts) {
     #  A bracketed string
     #    units == (I) => Tax Adjustment to Cost Base element I etc
     #
-    # Finally the special value (D) or (d) means depreciate automatically
 
-    # Move on to the next field
+
+    # always advance i
     i ++
+    Units = 0
 
     # This field can be units or a cost element
     x = parse_optional_value($i)
@@ -910,7 +911,8 @@ function parse_line(now,    i, j, x, number_accounts) {
         i --
       }
     } else if ("" != x) { # Ignore the case of this being a time-stamp
-      Cost_Element = parse_cost_element($i)
+      #Cost_Element = parse_cost_element($i)
+      x = parse_optional_string($i, (1))
 
       # The output syntax
       if (("II") == Cost_Element)
@@ -918,7 +920,11 @@ function parse_line(now,    i, j, x, number_accounts) {
         i --
     }
   }
+  i ++
 
+
+
+  # Finally the special value (D) or (d) means depreciate automatically
   # From now on the fields are context dependent
   # Possibilities are:
   # * **Field 6**
@@ -953,13 +959,12 @@ function parse_line(now,    i, j, x, number_accounts) {
   # * **Field 10** and higher
   #   * **A document name** in any transaction
   #   * **A comment** in any transaction
-
-  # always advance i
-  i ++
-
   # The next three fields can contain real numbers, time-stamps or strings
   # Check first for real numbers or time-stamps
+  #for (j = !number_accounts; i <= NF; j++) {
+
   for (j = 1; i <= NF; j++) {
+
     # Set x
     if (j <= 3)
       x = parse_optional_value($i)
@@ -967,9 +972,17 @@ function parse_line(now,    i, j, x, number_accounts) {
       x = 0
 
     # Shared code - save x if set
-    if (x) # x is not zero or ""
-      Real_Value[j] = x
-    else if ("" != x) { # Will be "" when a timestamp set
+    if (x) { # x is not zero or ""
+      # The zeroth case can be Units
+      if (0 == j) {
+        if ((((x) - ( Epsilon)) > 0) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((Account[1]) ~ /^EQUITY[.:]/)))
+          # Interpret these as units
+          Units = x
+        else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now))))
+          Units = x
+      } else
+        Real_Value[j] = x
+    } else if ("" != x) { # Will be "" when a timestamp set
       # x not set so look for strings
       # Can reuse x
       x = parse_optional_string($i, (1))
@@ -982,6 +995,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     # Increment i
     i ++
   }
+
 
   # Comments should be signified with an octothorpe
   if (Comments !~ /^#/)
@@ -1200,21 +1214,24 @@ function parse_optional_value(field,     value) {
 
 # Parse optional string
 # By default do not save any document found
-function parse_optional_string(field, save_document,    string, x) {
+function parse_optional_string(field, save_document,    string, adjustment_flag) {
+
+  ## Check for cost element first
   # Brackets?
   if (field ~ /^\((.)+\)$/) {
-    # This is probably a tax adjustment
-    Tax_Adjustment = (1)
-
     # bracketed
     len = length(field)
     field = trim(toupper(substr(field, 2, len - 2)))
     if (field ~ /D/) {
-      Cost_Element = I # First cost element
       Tax_Adjustment = Automatic_Depreciation = (1)
+      Cost_Element = I
+      return ""
     }
-  } else
-    Tax_Adjustment = (0)
+
+    # This is probably a tax adjustment
+    adjustment_flag = (1)
+  } else # Not a tax adjustment
+    adjustment_flag = (0)
 
   # This should be a text flag
   switch (field) {
@@ -1238,20 +1255,14 @@ function parse_optional_string(field, save_document,    string, x) {
       Depreciation_Type = field
       return ""
 
-    # The units might still be I, II, III, IV, V, D or 0
-    case "0" : Cost_Element = ("II")
-      # Zero defaults to cost element II
-      # Also a string (0) is not a tax adjustment
-      Tax_Adjustment = (0)
-      return Cost_Element
-
     case "I" :
     case "II" :
     case "III" :
     case "IV" :
     case "V" : # Cost elements
+      Tax_Adjustment = adjustment_flag
       Cost_Element = field
-      return field
+      return ""
 
     default: # this is an optional string
       break # no-op
@@ -1938,16 +1949,6 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
   if (Show_Account && !matched)
     return
 
-#     # Print the transaction out
-#     printf "%s\n", transaction_string(now, comments, a, b, amount, element_string, fields, n_fields, matched)
-# }
-#
-# # Describe the transaction as a string
-# function transaction_string(now, comments, a, b, amount, element_string, fields, n_fields, matched,     i, string) {
-  # Print statement
-  # This could be a zero, single or double entry transaction
-  #
-
   # First the date
   string = sprintf("%11s", get_date(now))
 
@@ -1977,9 +1978,6 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
       for (i = 1; i <= n_fields; i ++)
         string = string ", " fields[i]
   }
-
-  # Finish off the line
-  #string = string ", " comments
 
   # All done
   print string ", " comments

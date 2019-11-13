@@ -907,10 +907,11 @@ function parse_line(now,    i, j, x, number_accounts) {
     #  A bracketed string
     #    units == (I) => Tax Adjustment to Cost Base element I etc
     #
-    # Finally the special value (D) or (d) means depreciate automatically
 
-    # Move on to the next field
+
+    # always advance i
     i ++
+    Units = 0
 
     # This field can be units or a cost element
     x = parse_optional_value($i)
@@ -929,7 +930,8 @@ function parse_line(now,    i, j, x, number_accounts) {
         i --
       }
     } else if ("" != x) { # Ignore the case of this being a time-stamp
-      Cost_Element = parse_cost_element($i)
+      #Cost_Element = parse_cost_element($i)
+      x = parse_optional_string($i, (1))
 
       # The output syntax
       if (("II") == Cost_Element)
@@ -937,7 +939,11 @@ function parse_line(now,    i, j, x, number_accounts) {
         i --
     }
   }
+  i ++
 
+
+
+  # Finally the special value (D) or (d) means depreciate automatically
   # From now on the fields are context dependent
   # Possibilities are:
   # * **Field 6**
@@ -972,13 +978,12 @@ function parse_line(now,    i, j, x, number_accounts) {
   # * **Field 10** and higher
   #   * **A document name** in any transaction
   #   * **A comment** in any transaction
-
-  # always advance i
-  i ++
-
   # The next three fields can contain real numbers, time-stamps or strings
   # Check first for real numbers or time-stamps
+  #for (j = !number_accounts; i <= NF; j++) {
+
   for (j = 1; i <= NF; j++) {
+
     # Set x
     if (j <= 3)
       x = parse_optional_value($i)
@@ -986,9 +991,17 @@ function parse_line(now,    i, j, x, number_accounts) {
       x = 0
 
     # Shared code - save x if set
-    if (x) # x is not zero or ""
-      Real_Value[j] = x
-    else if ("" != x) { # Will be "" when a timestamp set
+    if (x) { # x is not zero or ""
+      # The zeroth case can be Units
+      if (0 == j) {
+        if ((((x) - ( Epsilon)) > 0) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((Account[1]) ~ /^EQUITY[.:]/)))
+          # Interpret these as units
+          Units = x
+        else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now))))
+          Units = x
+      } else
+        Real_Value[j] = x
+    } else if ("" != x) { # Will be "" when a timestamp set
       # x not set so look for strings
       # Can reuse x
       x = parse_optional_string($i, (1))
@@ -1001,6 +1014,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     # Increment i
     i ++
   }
+
 
   # Comments should be signified with an octothorpe
   if (Comments !~ /^#/)
@@ -1219,21 +1233,24 @@ function parse_optional_value(field,     value) {
 
 # Parse optional string
 # By default do not save any document found
-function parse_optional_string(field, save_document,    string, x) {
+function parse_optional_string(field, save_document,    string, adjustment_flag) {
+
+  ## Check for cost element first
   # Brackets?
   if (field ~ /^\((.)+\)$/) {
-    # This is probably a tax adjustment
-    Tax_Adjustment = (1)
-
     # bracketed
     len = length(field)
     field = trim(toupper(substr(field, 2, len - 2)))
     if (field ~ /D/) {
-      Cost_Element = I # First cost element
       Tax_Adjustment = Automatic_Depreciation = (1)
+      Cost_Element = I
+      return ""
     }
-  } else
-    Tax_Adjustment = (0)
+
+    # This is probably a tax adjustment
+    adjustment_flag = (1)
+  } else # Not a tax adjustment
+    adjustment_flag = (0)
 
   # This should be a text flag
   switch (field) {
@@ -1257,20 +1274,14 @@ function parse_optional_string(field, save_document,    string, x) {
       Depreciation_Type = field
       return ""
 
-    # The units might still be I, II, III, IV, V, D or 0
-    case "0" : Cost_Element = ("II")
-      # Zero defaults to cost element II
-      # Also a string (0) is not a tax adjustment
-      Tax_Adjustment = (0)
-      return Cost_Element
-
     case "I" :
     case "II" :
     case "III" :
     case "IV" :
     case "V" : # Cost elements
+      Tax_Adjustment = adjustment_flag
       Cost_Element = field
-      return field
+      return ""
 
     default: # this is an optional string
       break # no-op
@@ -1957,16 +1968,6 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
   if (Show_Account && !matched)
     return
 
-#     # Print the transaction out
-#     printf "%s\n", transaction_string(now, comments, a, b, amount, element_string, fields, n_fields, matched)
-# }
-#
-# # Describe the transaction as a string
-# function transaction_string(now, comments, a, b, amount, element_string, fields, n_fields, matched,     i, string) {
-  # Print statement
-  # This could be a zero, single or double entry transaction
-  #
-
   # First the date
   string = sprintf("%11s", get_date(now))
 
@@ -1996,9 +1997,6 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
       for (i = 1; i <= n_fields; i ++)
         string = string ", " fields[i]
   }
-
-  # Finish off the line
-  #string = string ", " comments
 
   # All done
   print string ", " comments
@@ -3270,7 +3268,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("Q" ~ /[cC]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("B" ~ /[cC]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3608,7 +3606,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Q" ~ /[oO]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[oO]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3748,7 +3746,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Q" ~ /[bB]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[bB]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3881,7 +3879,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("Q" ~ /[mM]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("B" ~ /[mM]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3953,7 +3951,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Q" ~ /[dD]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[dD]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4088,7 +4086,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("Q" ~ /[qQ]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[qQ]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4588,7 +4586,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("Q" ~ /[tT]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("B" ~ /[tT]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5374,7 +5372,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Q" ~ /[iI]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[iI]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5856,7 +5854,7 @@ function process_member_benefits_smsf(now, array, amount,
 #   Accumulated profits should not include unrealized losses/gains which are classified as capital
 #   ***In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
 #   ***Share splits could be considered using a similar mechanism to currencies - with a weighting formula
-#   ***Clean up Cost Element and Write_Units logic
+#   ***Clean up Cost Element and Units logic
 #
 #   ***Fix up wiki files
 #   other tax_statement calculations (eg UK, US, NZ etc...)
@@ -6537,7 +6535,7 @@ function read_input_record(   t, n, a, threshold) {
 }
 
 # Break out transaction parsing into a separate module
-function parse_transaction(now, a, b, amount, Units,
+function parse_transaction(now, a, b, amount, units,
 
                            underlying_asset, credit_account,
                            swop, g,
@@ -6718,7 +6716,7 @@ function parse_transaction(now, a, b, amount, Units,
   }
 
   # A sale transaction
-  if (Units < 0) {
+  if (units < 0) {
     # The asset being sold must be "a" but if equity must be "b"
     correct_order = (((( a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( a, now)) || ((( b) ~ /^EQUITY[.:]/) && is_open( b, now)))
     assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, (Leaf[a]), (Leaf[b])))
@@ -6770,7 +6768,7 @@ function parse_transaction(now, a, b, amount, Units,
     # Sell units -> cash is flowing out of a
     # Ensure positive values for units and amount are passed
     # Brokerage is treated as a cost so it can be applied to the units actually sold
-    sell_units(now, a, -Units, amount + g, Parcel_Name, Extra_Timestamp)
+    sell_units(now, a, -units, amount + g, Parcel_Name, Extra_Timestamp)
 
     # And simply adjust settlement account b by the
     adjust_cost(b, amount, now)
@@ -6796,8 +6794,8 @@ function parse_transaction(now, a, b, amount, Units,
 
     # The number of fields is not fixed
     # A, B, -U, x + bg, (optional_fields), comment
-    print_transaction(now, Comments, a, b, amount + g, sprintf("%10.3f", Units), fields, number_fields)
-  } else if (Units > 0) {
+    print_transaction(now, Comments, a, b, amount + g, sprintf("%10.3f", units), fields, number_fields)
+  } else if (units > 0) {
     # # For a purchase the asset must be account "b"
     # This must be a purchase
     correct_order = ((( b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((a) ~ /^EQUITY[.:]/))
@@ -6865,7 +6863,7 @@ function parse_transaction(now, a, b, amount, Units,
       g = 0
 
     # Buy units in asset (b) - this ignores impact of brokerage
-    bought_parcel = buy_units(now, b, Units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
+    bought_parcel = buy_units(now, b, units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
 
     # Adjust the cost of this **parcel** for the impact of brokerage and GST
     adjust_parcel_cost(b, bought_parcel, now, current_brokerage - g,  II, (0))
@@ -6886,7 +6884,7 @@ function parse_transaction(now, a, b, amount, Units,
     # Record the adjustment due to brokerage and gst
     if (!((((current_brokerage) - ( Epsilon)) <= 0) && (((current_brokerage) - ( -Epsilon)) >= 0)))
       fields[++ number_fields] = sprintf("%.*f", (2), current_brokerage - g)
-    print_transaction(now, Comments, a, b, amount - g, sprintf("%10.3f", Units), fields, number_fields)
+    print_transaction(now, Comments, a, b, amount - g, sprintf("%10.3f", units), fields, number_fields)
   } else if (Automatic_Depreciation) {
     # This is automatic depreciation
     # Only need the assertion
