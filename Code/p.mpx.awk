@@ -187,8 +187,8 @@ BEGIN {
   # Default import fields
   Key_Field    = KEY_FIELD
   Value_Field  = VALUE_FIELD
-  Key_Date     = KEY_DATE
-  Value_Date   = VALUE_DATE
+  Key_is_Date     = KEY_IS_DATE
+  Value_is_Date   = VALUE_IS_DATE
   Import_Zero  = FALSE
   Import_Time  = HOUR
 
@@ -333,7 +333,7 @@ BEGIN {
 ## <<,Account_Code, XYZ.ABC,>>
 ## <<,Key_Field, X,>>
 ## <<,Value_Field, Y,>>
-## <<,Key_Date, 1,>>
+## <<,Key_is_Date, 1,>>
 ## <<,Import_Array_Name, XXX,>>
 ##
 ## So for CBA price Data
@@ -362,7 +362,7 @@ function import_csv_data(array, symbol, name,
   a = initialize_account(symbol)
 
   # Get the key
-  if (Key_Date) {
+  if (Key_is_Date) {
     key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
     assert(DATE_ERROR != key, Read_Date_Error)
 
@@ -373,7 +373,7 @@ function import_csv_data(array, symbol, name,
     key = trim($Key_Field)
 
   # Get the value
-  if (Value_Date) {
+  if (Value_is_Date) {
     value = read_date(trim($Value_Field))
     assert(DATE_ERROR != value, Read_Date_Error)
 
@@ -388,7 +388,7 @@ function import_csv_data(array, symbol, name,
 
   # Logging
 @ifeq LOG import_record
-  printf "%s %16s[%11s] => %14s\n", name, Leaf[a], ternary(Key_Date, get_date(key), key), ternary(Value_Date, get_date(value), print_cash(value, 4)) > STDERR
+  printf "%s %16s[%11s] => %14s\n", name, Leaf[a], ternary(Key_is_Date, get_date(key), key), ternary(Value_is_Date, get_date(value), print_cash(value, 4)) > STDERR
 @endif
 
   # Set the price
@@ -807,8 +807,8 @@ function parse_transaction(now, a, b, units, amount,
   if (is_class(a, "INCOME")) {
     # Income accounts are caught to check for franking credits
     # Income must always be account a
-    tax_credits = Real_Value[1]
-    Real_Value[1] = 0
+    tax_credits = Real_Value[TAX_CREDITS_KEY]
+    Real_Value[TAX_CREDITS_KEY] = 0
 
     # Get the underlying asset (if there is one)
     if (a in Underlying_Asset)
@@ -854,11 +854,11 @@ function parse_transaction(now, a, b, units, amount,
     } else
       tax_credits = 0
 
-    # Now LIC credits if any
-    if (!near_zero(Real_Value[2])) {
+    # Now LIC deduction if any
+    if (!near_zero(Real_Value[LIC_DEDUCTION_KEY])) {
       # Always treated as positive
-      adjust_cost(LIC_CREDITS, - Real_Value[2], now)
-      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_CREDITS, NULL, 0, Real_Value[2])
+      adjust_cost(LIC_DEDUCTION, - Real_Value[LIC_DEDUCTION_KEY], now)
+      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTIONS, NULL, 0, Real_Value[LIC_DEDUCTION_KEY])
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present
@@ -907,8 +907,8 @@ function parse_transaction(now, a, b, units, amount,
     @Process_Member_Contributions(now, amount, Member_Liability, a)
   } else if (is_class(b, "EXPENSE.NON-DEDUCTIBLE.DIVIDEND")) {
     # A franking entity (eg company) can distribute franking credits
-    tax_credits = Real_Value[1]
-    Real_Value[1] = 0
+    tax_credits = Real_Value[TAX_CREDITS_KEY]
+    Real_Value[TAX_CREDITS_KEY] = 0
 
     # Simplified version of above
     if (!near_zero(tax_credits)) {
@@ -934,8 +934,8 @@ function parse_transaction(now, a, b, units, amount,
     }
 
     # Get brokerage (if any)
-    current_brokerage = Real_Value[1]
-    Real_Value[1] = 0
+    current_brokerage = Real_Value[BROKERAGE_KEY]
+    Real_Value[BROKERAGE_KEY] = 0
 
     # Amount should be the consideration as recorded by the broker
     #
@@ -1024,7 +1024,7 @@ function parse_transaction(now, a, b, units, amount,
     # Is this a new depreciating asset?
     if (is_fixed(b) && !(b in Method_Name)) {
       # This is  the asset Lifetime
-      fields[++ number_fields] = Lifetime[b]  = Real_Value[1]; Real_Value[1] = 0
+      fields[++ number_fields] = Lifetime[b]  = Real_Value[LIFETIME_KEY]; Real_Value[LIFETIME_KEY] = 0
       assert(!near_zero(Lifetime[b]), sprintf("%s => Can't have a fixed asset %s with zero life", $0, get_short_name(b)))
 
       # We need the method name
@@ -1033,9 +1033,9 @@ function parse_transaction(now, a, b, units, amount,
     }
 
     # Allow for brokerage if required - note can't have brokerage with depreciation
-    if (!near_zero(Real_Value[1])) {
-      current_brokerage = Real_Value[1]
-      Real_Value[1] = 0
+    if (!near_zero(Real_Value[BROKERAGE_KEY])) {
+      current_brokerage = Real_Value[BROKERAGE_KEY]
+      Real_Value[BROKERAGE_KEY] = 0
     }
 
     # Simply adjust cost of <a> by the whole amount
@@ -1178,23 +1178,23 @@ function set_account_term(a, now) {
   # It is possible for a current account to have no term set
 
   # If the term is set make a note of it
-  if (Real_Value[1] > 0)
+  if (Real_Value[MATURITY_DATE_KEY] > 0)
    # It can change as long as it doesn't make a CURRENT asset non current
-   set_entry(Account_Term[a], Real_Value[1], now)
+   set_entry(Account_Term[a], Real_Value[MATURITY_DATE_KEY], now)
 
   # At this stage term is assumed to be set in months
   if (Extra_Timestamp > now) { # Use the time stamp if it exists
     set_entry(Maturity_Date[a], Extra_Timestamp, now)
 
     # Don't use real value again
-    Real_Value[1] = 0
-  } else if (Real_Value[1] > 0) {
+    Real_Value[MATURITY_DATE_KEY] = 0
+  } else if (Real_Value[MATURITY_DATE_KEY] > 0) {
     # Need to set the first maturity date - real value is the same as account term
-    Extra_Timestamp = add_months(now, Real_Value[1])
+    Extra_Timestamp = add_months(now, Real_Value[MATURITY_DATE_KEY])
     set_entry(Maturity_Date[a], Extra_Timestamp, now)
 
     # Don't use real value again
-    Real_Value[1] = 0
+    Real_Value[MATURITY_DATE_KEY] = 0
   } else if ((a in Maturity_Date) && now > find_entry(Maturity_Date[a], just_before(now))) {
     # Compute the maturity date
     Extra_Timestamp = add_months(now, find_entry(Account_Term[a], now))

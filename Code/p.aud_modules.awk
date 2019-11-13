@@ -290,7 +290,7 @@ function income_tax_aud(now, past, benefits,
   # LIC deductions 1/3 for SMSF
   #                1/2 for individual
   #                0/3 for company
-  lic_deductions = - rational_value(LIC_Allowance) * (get_cost(LIC_CREDITS, now) - get_cost(LIC_CREDITS, past))
+  lic_deductions = - rational_value(LIC_Allowance) * (get_cost(LIC_DEDUCTIONS, now) - get_cost(LIC_DEDUCTIONS, past))
 
   # Always apply allowance at this point to catch explicit allocations to LIC
   if (!near_zero(lic_deductions)) {

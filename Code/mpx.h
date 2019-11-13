@@ -47,8 +47,15 @@
 # // Default Import Values
 @define KEY_FIELD  (1)
 @define VALUE_FIELD (2)
-@define KEY_DATE @eval (TRUE)
-@define VALUE_DATE @eval (FALSE)
+@define KEY_IS_DATE @eval (TRUE)
+@define VALUE_IS_DATE @eval (FALSE)
+
+# // Constants for Real_Value keys
+@define BROKERAGE_KEY (1)
+@define LIFETIME_KEY (1)
+@define MATURITY_DATE_KEY (1)
+@define TAX_CREDITS_KEY (1)
+@define LIC_DEDUCTION_KEY (2)
 
 # // Output Date Formats
 @define MONTH_FORMAT ("%Y %b %d") # // 2010 Jun 10

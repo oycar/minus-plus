@@ -457,7 +457,12 @@ function ctrim(s, left_c, right_c,      string) {
 }
 
 # Clear global values ready to read a new input record
-function new_line() {
+function new_line(  key) {
+  # Clear real values
+  for (key in Real_Value)
+    Real_Value[key] = 0
+
+
   Extra_Timestamp = DATE_ERROR
   Parcel_Name = ""
   Real_Value[1] = Real_Value[2] = 0
@@ -1115,7 +1120,7 @@ function set_special_accounts() {
   FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
 
   # Other tax credits, offsets & deductions
-  LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
+  LIC_DEDUCTION    = initialize_account("SPECIAL.TAX:LIC.DEDUCTION")
 
   # Accounting capital gains accounts
   REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
