@@ -1224,7 +1224,7 @@ function get_market_gains(now, past, is_detailed,    reports_stream) {
 }
 
 # Compute annual depreciation
-function depreciate_all(now,      a, current_depreciation, comments) {
+function depreciate_all(now,      a, current_depreciation) {
   # Depreciation is Cost Element I
   Cost_Element = I
 
@@ -1239,7 +1239,7 @@ function depreciate_all(now,      a, current_depreciation, comments) {
       adjust_cost(DEPRECIATION, current_depreciation, now)
 
       # Print the transaction
-      print_transaction(now, comments, a, DEPRECIATION, current_depreciation, "(I)")
+      # print_transaction(now, "# Automatic Depreciation", a, DEPRECIATION, current_depreciation, "(I)")
     }
 
   # Restore defaults

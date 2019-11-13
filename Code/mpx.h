@@ -51,6 +51,7 @@
 @define VALUE_IS_DATE @eval (FALSE)
 
 # // Constants for Real_Value keys
+@define UNITS_KEY (0)
 @define BROKERAGE_KEY (1)
 @define LIFETIME_KEY (1)
 @define MATURITY_DATE_KEY (1)

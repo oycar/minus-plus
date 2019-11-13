@@ -587,7 +587,7 @@ function read_control_record(       now, i, x, p, is_check){
 
       # Now either check or set the quantity
       assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
-      checkset(now, Account[1], Account[2], Units, amount, is_check)
+      checkset(now, Account[1], Account[2], Real_Value[UNITS_KEY], amount, is_check)
       break
 
     case "SET_BANDS" :
@@ -727,9 +727,10 @@ function read_input_record(   t, n, a, threshold) {
   # If the transaction is already parsed simply print it out
   if (t < just_after(Last_State)) {
     if (2 == n)
-      print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], amount, Units)
+      # Truncated line
+      print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], amount)
   } else if (2 == n) {
-    parse_transaction(t, Account[1], Account[2], amount, Units)
+    parse_transaction(t, Account[1], Account[2], amount)
   } else # A zero entry line - a null transaction or a comment in the journal
     print_transaction(t, Comments)
 
@@ -741,8 +742,8 @@ function read_input_record(   t, n, a, threshold) {
 }
 
 # Break out transaction parsing into a separate module
-function parse_transaction(now, a, b, amount, units,
-
+function parse_transaction(now, a, b, amount,
+                           units,
                            underlying_asset, credit_account,
                            swop, g,
                            n, account_array,
@@ -817,7 +818,7 @@ function parse_transaction(now, a, b, amount, units,
       underlying_asset = FALSE
 
     # Foreign or franking credits
-    if (!near_zero(tax_credits)) {
+    if (not_zero(tax_credits)) {
       # Keep an account of tax credits
       # We need the underlying asset to
       assert(underlying_asset, sprintf("Income account %s must have an underlying asset to receive tax credits", Leaf[a]))
@@ -855,7 +856,7 @@ function parse_transaction(now, a, b, amount, units,
       tax_credits = 0
 
     # Now LIC deduction if any
-    if (!near_zero(Real_Value[LIC_DEDUCTION_KEY])) {
+    if (not_zero(Real_Value[LIC_DEDUCTION_KEY])) {
       # Always treated as positive
       adjust_cost(LIC_DEDUCTION, - Real_Value[LIC_DEDUCTION_KEY], now)
       print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTION, NULL, Real_Value[LIC_DEDUCTION_KEY])
@@ -892,7 +893,7 @@ function parse_transaction(now, a, b, amount, units,
     }
 
     # Now check for GST
-    if (!near_zero(GST_Claimable)) {
+    if (not_zero(GST_Claimable)) {
       # This is GST collected
       # The transaction itself will be posted later a => b
       # Need to adjust amount transacted
@@ -911,7 +912,7 @@ function parse_transaction(now, a, b, amount, units,
     Real_Value[TAX_CREDITS_KEY] = 0
 
     # Simplified version of above
-    if (!near_zero(tax_credits)) {
+    if (not_zero(tax_credits)) {
       # The credits are adjusted in the FRANKING balance
       adjust_cost(FRANKING,    - tax_credits, now)
       adjust_cost(FRANKING_PAID,  tax_credits, now)
@@ -920,6 +921,10 @@ function parse_transaction(now, a, b, amount, units,
     } else
       tax_credits = 0
   }
+
+  # Obtain units
+  units = Real_Value[UNITS_KEY]
+  Real_Value[UNITS_KEY] = 0
 
   # A sale transaction
   if (units < 0) {
@@ -940,7 +945,7 @@ function parse_transaction(now, a, b, amount, units,
     # Amount should be the consideration as recorded by the broker
     #
     # Impact of GST
-    if (!near_zero(GST_Claimable)) {
+    if (not_zero(GST_Claimable)) {
       # Two cases
       #   Not Present => Adjust Whole Amount
       if (near_zero(current_brokerage)) {
@@ -980,14 +985,13 @@ function parse_transaction(now, a, b, amount, units,
     adjust_cost(b, amount, now)
 
     # Did we swop? If so swop back
-    if ("" != swop) {
-      swop = a; a = b; b = swop
+    if (b == swop) {
+      b = a; a = swop
       amount = - amount
-      swop = ""
     }
 
     # Record the transaction
-    if (!near_zero(current_brokerage))
+    if (not_zero(current_brokerage))
       fields[++ number_fields] = sprintf("%.*f", PRECISION, current_brokerage - g) # Always use 1st field
 
     # Need to save the parcel_name, or alternatively parcel_timestamp, if present
@@ -1025,7 +1029,7 @@ function parse_transaction(now, a, b, amount, units,
     if (is_fixed(b) && !(b in Method_Name)) {
       # This is  the asset Lifetime
       fields[++ number_fields] = Lifetime[b]  = Real_Value[LIFETIME_KEY]; Real_Value[LIFETIME_KEY] = 0
-      assert(!near_zero(Lifetime[b]), sprintf("%s => Can't have a fixed asset %s with zero life", $0, get_short_name(b)))
+      assert(not_zero(Lifetime[b]), sprintf("%s => Can't have a fixed asset %s with zero life", $0, get_short_name(b)))
 
       # We need the method name
       # Currently a choice of POOL, DV, or PC
@@ -1033,7 +1037,7 @@ function parse_transaction(now, a, b, amount, units,
     }
 
     # Allow for brokerage if required - note can't have brokerage with depreciation
-    if (!near_zero(Real_Value[BROKERAGE_KEY])) {
+    if (not_zero(Real_Value[BROKERAGE_KEY])) {
       current_brokerage = Real_Value[BROKERAGE_KEY]
       Real_Value[BROKERAGE_KEY] = 0
     }
@@ -1042,7 +1046,7 @@ function parse_transaction(now, a, b, amount, units,
     adjust_cost(a, -amount, now)
 
     # Impact of GST
-    if (!near_zero(GST_Claimable)) {
+    if (not_zero(GST_Claimable)) {
       # Two cases
       #   No Brokerage Present => Adjust Whole Amount
       if (near_zero(current_brokerage))
@@ -1078,17 +1082,16 @@ function parse_transaction(now, a, b, amount, units,
     update_cost(b, amount - g, now)
 
     # Did we swop? If so swop back
-    if ("" != swop) {
-      swop = a; a = b; b = swop
+    if (b == swop) {
+      b = a; a = swop
       amount = - amount
-      swop = ""
     }
 
     # Record the transaction
     # Normal transactions
     # A, B, U, x, b - b*g, <optional-fields>, Comments
     # Record the adjustment due to brokerage and gst
-    if (!near_zero(current_brokerage))
+    if (not_zero(current_brokerage))
       fields[++ number_fields] = sprintf("%.*f", PRECISION, current_brokerage - g)
     print_transaction(now, Comments, a, b, amount - g, sprintf("%10.3f", units), fields, number_fields)
   } else if (Automatic_Depreciation) {
@@ -1145,7 +1148,7 @@ function parse_transaction(now, a, b, amount, units,
   } else {
     # All Other Transactions
     # This must be an expense if GST is involved
-    if (!near_zero(GST_Claimable)) {
+    if (not_zero(GST_Claimable)) {
       # An expense
       # A, B, 0, (1 - g) * x
       # A, G, 0,      g * x
@@ -1525,7 +1528,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 @endif # LOG
 
   # Some units are bought
-  assert(!near_zero(u), sprintf("buy_units[%s] : can't buy zero units", $0))
+  assert(not_zero(u), sprintf("buy_units[%s] : can't buy zero units", $0))
 
   # Override timestamp
   if (parcel_timestamp >= Epoch)
@@ -1645,14 +1648,14 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     if (now > FY_Time) {
       t = just_before(FY_Time)
       catch_up_depreciation = depreciate_now(ac, t)
-      if (!near_zero(catch_up_depreciation)) {
+      if (not_zero(catch_up_depreciation)) {
         update_cost(ac, - catch_up_depreciation, t)
 
         # Balance accounts
         adjust_cost(DEPRECIATION, catch_up_depreciation, t)
 
         # Print the transaction
-        print_transaction(t, "Catch-Up Depreciation", ac, DEPRECIATION, catch_up_depreciation, "(D)")
+        print_transaction(t, "# Closing Depreciation", ac, DEPRECIATION, catch_up_depreciation, "(D)")
 @ifeq LOG sell_units
         printf "\tCatch-Up Depreciation => %s\n", print_cash(catch_up_depreciation) > STDERR
         printf "\tApplied At Time => %s\n", get_date(t, LONG_FORMAT) > STDERR
@@ -1675,7 +1678,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
       # Not pooled
       # Care is needed when the cost is zero
       p = get_cost(ac, now)
-      if (!near_zero(p))
+      if (not_zero(p))
         proportional_cost = x / p
       else
         new_price = 0
@@ -2039,7 +2042,7 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
 @endif #// LOG
 
   # Is there an error?
-  if (!near_zero(balance)) {
+  if (not_zero(balance)) {
     printf "Problem - Accounts Unbalanced <%s>\n", $0 > output_stream
     show_balance = TRUE
   } else

@@ -459,9 +459,8 @@ function ctrim(s, left_c, right_c,      string) {
 # Clear global values ready to read a new input record
 function new_line(  key) {
   # Clear real values
-  for (key in Real_Value)
+  for (key = 0; key < 3; key ++)
     Real_Value[key] = 0
-
 
   Extra_Timestamp = DATE_ERROR
   Parcel_Name = ""
@@ -490,7 +489,7 @@ function print_cash(x,   precision) {
 
 # Possible record styles
 # Journal styles (date format is somewhat flexible)
-#      2017 Aug 24, AMH.DIV, AMH.ASX, 3072, 2703.96, [1025.64,] [1655.49], # DRP & LIC
+#      2017 Aug 24, AMH.DIV, AMH.ASX, 2703.96, 3072, [1025.64,] [1655.49], # DRP & LIC
 function parse_line(now,    i, j, x, number_accounts) {
   #
   # The record may be
@@ -572,15 +571,8 @@ function parse_line(now,    i, j, x, number_accounts) {
   #   * **A document name** in any transaction
   #   * **A comment** in any transaction
 
-
-  # The next three fields can contain real numbers, time-stamps or strings
-  # Check first for real numbers or time-stamps
-
   # Next field
   i ++
-
-  # Units are assumed to be zero
-  Units = 0
   while (i <= NF) {
     # Set x
     if (j <= 3)
@@ -594,10 +586,10 @@ function parse_line(now,    i, j, x, number_accounts) {
       if (0 == j) {
         if (above_zero(x) && is_purchase(Account[1], Account[2]))
           # Interpret these as units
-          Units = x
+          Real_Value[j] = x
         else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
-          Units = x
-        else # This is the j == 1 case (eg Franking credits etc)
+          Real_Value[j] = x
+        else # This is not Units so it is the next possible real value, index 1
           Real_Value[j = 1] = x
       } else
         Real_Value[j] = x
@@ -689,7 +681,7 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
       case "H":
 
         # Is this a buy, sell or holding statement?
-        if (Units < 0) {
+        if (Real_Value[UNITS_KEY] < 0) {
           prefix = ternary("H" == prefix, "Holding Statement", "Sell")
           account_name = get_name_component(Leaf[Account[1]], 1)
         } else {
@@ -835,17 +827,15 @@ function parse_optional_value(field,     value) {
 function parse_optional_string(field, save_document,    string, adjustment_flag) {
   # Interpret cost element
   #
-  # Units indicate whether an item is bought or sold; or the cost element or whether adjusting
-  # the cost base or the reduced cost base
   #  A blank or zero
-  #    units == 0 => Cost Base element II (the default)
+  #    Cost Base element II (the default)
   #
   #  A string  (roman numbers I to V are meaningful but could be anything without brackets)
-  #    units == I   => Cost Base element I
-  #    units == II  => Cost Base element II etc
+  #    I   => Cost Base element I
+  #    II  => Cost Base element II etc
   #
   #  A bracketed string
-  #    units == (I) => Tax Adjustment to Cost Base element I etc
+  #    (I) => Tax Adjustment to Cost Base element I etc
   #
 
 
