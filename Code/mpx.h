@@ -57,6 +57,9 @@
 @define TAX_CREDITS_KEY (1)
 @define LIC_DEDUCTION_KEY (2)
 
+# // Default Cost Element
+@define COST_ELEMENT ("II")
+
 # // Output Date Formats
 @define MONTH_FORMAT ("%Y %b %d") # // 2010 Jun 10
 @define ISO_FORMAT   ("%F")       # // 2010-Jun-10

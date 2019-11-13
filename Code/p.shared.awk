@@ -465,7 +465,6 @@ function new_line(  key) {
 
   Extra_Timestamp = DATE_ERROR
   Parcel_Name = ""
-  Real_Value[1] = Real_Value[2] = 0
   Tax_Adjustment = FALSE
   Cost_Element = COST_ELEMENT # The default value
   Automatic_Depreciation = FALSE
@@ -569,36 +568,25 @@ function parse_line(now,    i, j, x, number_accounts) {
     x = parse_optional_value($i)
 
     # Is this a non zero value?
-    units = 0
+    Units = 0
     if (x) {
-      units = x
-
       # This might be the number of units; is this a buy or sell transaction?
       if (above_zero(x) && is_purchase(Account[1], Account[2]))
         # Interpret these as units
-        Write_Units  = sprintf("%10.3f", x)
+        Units = x
       else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
-        Write_Units  = sprintf("%10.3f", x)
+        Units = x
       else { # No units - rescan field
-        Write_Units = units = 0
+        Units = 0
         i --
       }
     } else if ("" != x) { # Ignore the case of this being a time-stamp
-      Write_Units = parse_cost_element($i)
+      Cost_Element = parse_cost_element($i)
 
       # The output syntax
-      if (Tax_Adjustment)
-        # Bracket it
-        Write_Units =  "(" Write_Units ")"
-      else if (COST_ELEMENT == Cost_Element) {
-        # Default case
-        Write_Units = 0 # Simpler to read and most common case
+      if (COST_ELEMENT == Cost_Element)
+        # Rescan
         i --
-      } else if ("" == Write_Units) {
-        Write_Units = 0
-        Cost_Element = COST_ELEMENT
-        i --
-      }
     }
   }
 
@@ -739,7 +727,7 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
       case "H":
 
         # Is this a buy, sell or holding statement?
-        if (units < 0 || "SELL" == Write_Units) {
+        if (Units < 0) {
           prefix = ternary("H" == prefix, "Holding Statement", "Sell")
           account_name = get_name_component(Leaf[Account[1]], 1)
         } else {
@@ -967,57 +955,38 @@ function parse_optional_string(field, save_document,    string, x) {
 }
 
 # Is this a cost element?
-function parse_cost_element(u,       len) {
-  # Need to examine the original string more closely
-  len = length(u)
-
+function parse_cost_element(field,       len) {
   # Brackets?
-  #if (u ~ /^()/ && u ~ /)$/) {
-  if (u ~ /^\((.)+\)$/) {
+  if (field ~ /^\((.)+\)$/) {
     # This is probably a tax adjustment
     Tax_Adjustment = TRUE
 
     # bracketed
-    #if (len > 2)
-    u = trim(toupper(substr(u, 2, len - 2)))
-    if (u ~ /D/) {
-      Cost_Element = I # First cost element
+    len = length(field)
+    field = trim(toupper(substr(field, 2, len - 2)))
+    if (field ~ /D/) {
       Tax_Adjustment = Automatic_Depreciation = TRUE
+      return I
     }
-    #else
-      # Empty String defaults to cost element II
-    #  u = COST_ELEMENT
   } else
     Tax_Adjustment = FALSE
 
-  # The units might still be I, II, III, IV, V, D or 0
-  switch (u) {
-    case "0" : Cost_Element = COST_ELEMENT
-      # Zero defaults to cost element II
-      # Also a string (0) is not a tax adjustment
-      Tax_Adjustment = FALSE
-      break
-    # case "D" : # Depreciation
-    #   Cost_Element = I # First cost element
-    #   Tax_Adjustment = Automatic_Depreciation = TRUE
-    #   break
+  # Might still be I, II, III, IV, V, D or 0
+  switch (field) {
     case "I" :
     case "II" :
     case "III" :
     case "IV" :
     case "V" : # Cost elements
-      Cost_Element = u
       break
 
     default: #
-      # A string such as (12) is not a tax adjustment
-      #Tax_Adjustment = FALSE
-
       # And this is not a legitimate cost element
-      u = ""
+      Tax_Adjustment = FALSE
+      return COST_ELEMENT
    }
 
-  return u
+  return field
 }
 
 # optional fields
@@ -1672,22 +1641,14 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 
 # Print out transactions
 # Generalize for the case of a single entry transaction
-function print_transaction(now, comments, a, b, u, amount, fields, n_fields,     matched) {
+function print_transaction(now, comments, a, b, amount, element_string, fields, n_fields,     matched, i, string) {
   if (greater_than(now, Stop_Time))
     return
 
   # Are we matching particular accounts?
   match_accounts(matched, Show_Account, a, b)
-  if (!Show_Account || matched)
-    # Print the transaction out
-    printf "%s\n", transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched)
-}
-
-# Describe the transaction as a string
-function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,     i, string) {
-  # Print statement
-  # This could be a zero, single or double entry transaction
-  #
+  if (Show_Account && !matched)
+    return
 
   # First the date
   string = sprintf("%11s", get_date(now))
@@ -1704,8 +1665,8 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
   # Amount  and cost element and or units - if at least one entry
   if (a || b) {
     string = string sprintf("%11.2f, ", amount)
-    if (u)
-      string = string sprintf("%10s", u)
+    if (element_string)
+      string = string sprintf("%10s", element_string)
     else # Pretty print
       string = string sprintf("%10s", "")
 
@@ -1719,11 +1680,8 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
         string = string ", " fields[i]
   }
 
-  # Finish off the line
-  string = string ", " comments
-
   # All done
-  return string
+  print string ", " comments
 } # End of printing a transaction
 
 function initialize_account(account_name,     class_name, array, p, n,

@@ -79,6 +79,16 @@ END {
 
 
 
+# // Constants for Real_Value keys
+
+
+
+
+
+
+# // Default Cost Element
+
+
 # // Output Date Formats
 
 
@@ -89,8 +99,6 @@ END {
 
 
 # // Default Reports
-
-
 
 
 
@@ -797,12 +805,16 @@ function ctrim(s, left_c, right_c,      string) {
 }
 
 # Clear global values ready to read a new input record
-function new_line() {
+function new_line(  key) {
+  # Clear real values
+  for (key in Real_Value)
+    Real_Value[key] = 0
+
+
   Extra_Timestamp = (-1)
   Parcel_Name = ""
-  Real_Value[1] = Real_Value[2] = 0
   Tax_Adjustment = (0)
-  Cost_Element = COST_ELEMENT # The default value
+  Cost_Element = ("II") # The default value
   Automatic_Depreciation = (0)
   GST_Claimable = 0
   Depreciation_Type = ""
@@ -904,36 +916,25 @@ function parse_line(now,    i, j, x, number_accounts) {
     x = parse_optional_value($i)
 
     # Is this a non zero value?
-    units = 0
+    Units = 0
     if (x) {
-      units = x
-
       # This might be the number of units; is this a buy or sell transaction?
       if ((((x) - ( Epsilon)) > 0) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((Account[1]) ~ /^EQUITY[.:]/)))
         # Interpret these as units
-        Write_Units  = sprintf("%10.3f", x)
+        Units = x
       else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now))))
-        Write_Units  = sprintf("%10.3f", x)
+        Units = x
       else { # No units - rescan field
-        Write_Units = units = 0
+        Units = 0
         i --
       }
     } else if ("" != x) { # Ignore the case of this being a time-stamp
-      Write_Units = parse_cost_element($i)
+      Cost_Element = parse_cost_element($i)
 
       # The output syntax
-      if (Tax_Adjustment)
-        # Bracket it
-        Write_Units =  "(" Write_Units ")"
-      else if (COST_ELEMENT == Cost_Element) {
-        # Default case
-        Write_Units = 0 # Simpler to read and most common case
+      if (("II") == Cost_Element)
+        # Rescan
         i --
-      } else if ("" == Write_Units) {
-        Write_Units = 0
-        Cost_Element = COST_ELEMENT
-        i --
-      }
     }
   }
 
@@ -1074,7 +1075,7 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
       case "H":
 
         # Is this a buy, sell or holding statement?
-        if (units < 0 || "SELL" == Write_Units) {
+        if (Units < 0) {
           prefix = (("H" == prefix)?( "Holding Statement"):( "Sell"))
           account_name = get_name_component(Leaf[Account[1]], 1)
         } else {
@@ -1257,7 +1258,7 @@ function parse_optional_string(field, save_document,    string, x) {
       return ""
 
     # The units might still be I, II, III, IV, V, D or 0
-    case "0" : Cost_Element = COST_ELEMENT
+    case "0" : Cost_Element = ("II")
       # Zero defaults to cost element II
       # Also a string (0) is not a tax adjustment
       Tax_Adjustment = (0)
@@ -1302,57 +1303,38 @@ function parse_optional_string(field, save_document,    string, x) {
 }
 
 # Is this a cost element?
-function parse_cost_element(u,       len) {
-  # Need to examine the original string more closely
-  len = length(u)
-
+function parse_cost_element(field,       len) {
   # Brackets?
-  #if (u ~ /^()/ && u ~ /)$/) {
-  if (u ~ /^\((.)+\)$/) {
+  if (field ~ /^\((.)+\)$/) {
     # This is probably a tax adjustment
     Tax_Adjustment = (1)
 
     # bracketed
-    #if (len > 2)
-    u = trim(toupper(substr(u, 2, len - 2)))
-    if (u ~ /D/) {
-      Cost_Element = I # First cost element
+    len = length(field)
+    field = trim(toupper(substr(field, 2, len - 2)))
+    if (field ~ /D/) {
       Tax_Adjustment = Automatic_Depreciation = (1)
+      return I
     }
-    #else
-      # Empty String defaults to cost element II
-    #  u = COST_ELEMENT
   } else
     Tax_Adjustment = (0)
 
-  # The units might still be I, II, III, IV, V, D or 0
-  switch (u) {
-    case "0" : Cost_Element = COST_ELEMENT
-      # Zero defaults to cost element II
-      # Also a string (0) is not a tax adjustment
-      Tax_Adjustment = (0)
-      break
-    # case "D" : # Depreciation
-    #   Cost_Element = I # First cost element
-    #   Tax_Adjustment = Automatic_Depreciation = TRUE
-    #   break
+  # Might still be I, II, III, IV, V, D or 0
+  switch (field) {
     case "I" :
     case "II" :
     case "III" :
     case "IV" :
     case "V" : # Cost elements
-      Cost_Element = u
       break
 
     default: #
-      # A string such as (12) is not a tax adjustment
-      #Tax_Adjustment = FALSE
-
       # And this is not a legitimate cost element
-      u = ""
+      Tax_Adjustment = (0)
+      return ("II")
    }
 
-  return u
+  return field
 }
 
 # optional fields
@@ -1455,7 +1437,7 @@ function set_special_accounts() {
   FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
 
   # Other tax credits, offsets & deductions
-  LIC_CREDITS     = initialize_account("SPECIAL.TAX:LIC.CREDITS")
+  LIC_DEDUCTION    = initialize_account("SPECIAL.TAX:LIC.DEDUCTION")
 
   # Accounting capital gains accounts
   REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
@@ -1966,19 +1948,21 @@ function get_parcel_cost(a, p, now, adjusted,    sum) {
 
 # Print out transactions
 # Generalize for the case of a single entry transaction
-function print_transaction(now, comments, a, b, u, amount, fields, n_fields,     matched) {
+function print_transaction(now, comments, a, b, amount, element_string, fields, n_fields,     matched, i, string) {
   if ((((now) - ( Stop_Time)) > 0))
     return
 
   # Are we matching particular accounts?
   ((matched= Show_Account)?(((matched=match_account( a,  Show_Account))?( matched):( matched=match_account( b,  Show_Account)))):(matched=""))
-  if (!Show_Account || matched)
-    # Print the transaction out
-    printf "%s\n", transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched)
-}
+  if (Show_Account && !matched)
+    return
 
-# Describe the transaction as a string
-function transaction_string(now, comments, a, b, u, amount, fields, n_fields, matched,     i, string) {
+#     # Print the transaction out
+#     printf "%s\n", transaction_string(now, comments, a, b, amount, element_string, fields, n_fields, matched)
+# }
+#
+# # Describe the transaction as a string
+# function transaction_string(now, comments, a, b, amount, element_string, fields, n_fields, matched,     i, string) {
   # Print statement
   # This could be a zero, single or double entry transaction
   #
@@ -1998,8 +1982,8 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
   # Amount  and cost element and or units - if at least one entry
   if (a || b) {
     string = string sprintf("%11.2f, ", amount)
-    if (u)
-      string = string sprintf("%10s", u)
+    if (element_string)
+      string = string sprintf("%10s", element_string)
     else # Pretty print
       string = string sprintf("%10s", "")
 
@@ -2014,10 +1998,10 @@ function transaction_string(now, comments, a, b, u, amount, fields, n_fields, ma
   }
 
   # Finish off the line
-  string = string ", " comments
+  #string = string ", " comments
 
   # All done
-  return string
+  print string ", " comments
 } # End of printing a transaction
 
 function initialize_account(account_name,     class_name, array, p, n,
@@ -3286,7 +3270,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("Q" ~ /[cC]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3624,7 +3608,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[oO]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3764,7 +3748,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[bB]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3897,7 +3881,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("Q" ~ /[mM]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3907,7 +3891,6 @@ function get_market_gains(now, past, is_detailed,    reports_stream) {
 # Compute annual depreciation
 function depreciate_all(now,      a, current_depreciation, comments) {
   # Depreciation is Cost Element I
-  comments = "Automatic EOFY Depreciation"
   Cost_Element = I
 
   # Depreciate all open fixed assets
@@ -3921,11 +3904,11 @@ function depreciate_all(now,      a, current_depreciation, comments) {
       adjust_cost(DEPRECIATION, current_depreciation, now)
 
       # Print the transaction
-      print_transaction(now, comments, a, DEPRECIATION, "(D)", current_depreciation)
+      print_transaction(now, comments, a, DEPRECIATION, current_depreciation, Cost_Element)
     }
 
   # Restore defaults
-  Cost_Element = COST_ELEMENT
+  Cost_Element = ("II")
 }
 
 # Allocate second element costs
@@ -3970,7 +3953,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[dD]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4105,7 +4088,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[qQ]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4605,7 +4588,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("Q" ~ /[tT]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -4742,7 +4725,7 @@ function income_tax_aud(now, past, benefits,
   # LIC deductions 1/3 for SMSF
   #                1/2 for individual
   #                0/3 for company
-  lic_deductions = - ((LIC_Allowance[2])?( (LIC_Allowance[1]/LIC_Allowance[2])):( assert((0), "Division by zero in rational fraction" LIC_Allowance[1] "/" LIC_Allowance[2]))) * (get_cost(LIC_CREDITS, now) - get_cost(LIC_CREDITS, past))
+  lic_deductions = - ((LIC_Allowance[2])?( (LIC_Allowance[1]/LIC_Allowance[2])):( assert((0), "Division by zero in rational fraction" LIC_Allowance[1] "/" LIC_Allowance[2]))) * (get_cost(LIC_DEDUCTIONS, now) - get_cost(LIC_DEDUCTIONS, past))
 
   # Always apply allowance at this point to catch explicit allocations to LIC
   if (!((((lic_deductions) - ( Epsilon)) <= 0) && (((lic_deductions) - ( -Epsilon)) >= 0))) {
@@ -5391,7 +5374,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[iI]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5840,9 +5823,9 @@ function process_member_benefits_smsf(now, array, amount,
 
       # Record this sub-transaction
       if (taxable_account)
-        print_transaction(now, Comments, taxable_account, b, Write_Units, amount_taxed)
+        print_transaction(now, Comments, taxable_account, b, amount_taxed, Cost_Element)
       else
-        print_transaction(now, Comments, a, b, Write_Units, amount_taxed)
+        print_transaction(now, Comments, a, b, amount_taxed, Cost_Element)
 
       # Replace account b with tax-free account
       b = initialize_account(sprintf("%s.TAX-FREE", use_name))
@@ -5946,12 +5929,11 @@ BEGIN {
   III = "III"
   IV  = "IV"
   V   = "V"
-  Elements[I]   = I
-  Elements[II]  = II
+  Elements[I]   =   I
+  Elements[II]  =  II
   Elements[III] = III
-  Elements[IV]  = IV
-  Elements[V]   = V
-  COST_ELEMENT = II # Default value
+  Elements[IV]  =  IV
+  Elements[V]   =   V
 
   # url encoding lookup table
   url_init()
@@ -6017,8 +5999,8 @@ BEGIN {
   # Default import fields
   Key_Field    = (1)
   Value_Field  = (2)
-  Key_Date     = 1
-  Value_Date   = 0
+  Key_is_Date     = 1
+  Value_is_Date   = 0
   Import_Zero  = (0)
   Import_Time  = (12)
 
@@ -6156,7 +6138,7 @@ BEGIN {
 ## <<,Account_Code, XYZ.ABC,>>
 ## <<,Key_Field, X,>>
 ## <<,Value_Field, Y,>>
-## <<,Key_Date, 1,>>
+## <<,Key_is_Date, 1,>>
 ## <<,Import_Array_Name, XXX,>>
 ##
 ## So for CBA price Data
@@ -6185,7 +6167,7 @@ function import_csv_data(array, symbol, name,
   a = initialize_account(symbol)
 
   # Get the key
-  if (Key_Date) {
+  if (Key_is_Date) {
     key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
     assert((-1) != key, Read_Date_Error)
 
@@ -6196,7 +6178,7 @@ function import_csv_data(array, symbol, name,
     key = trim($Key_Field)
 
   # Get the value
-  if (Value_Date) {
+  if (Value_is_Date) {
     value = read_date(trim($Value_Field))
     assert((-1) != value, Read_Date_Error)
 
@@ -6409,7 +6391,7 @@ function read_control_record(       now, i, x, p, is_check){
 
       # Now either check or set the quantity
       assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
-      checkset(now, Account[1], Account[2], units, amount, is_check)
+      checkset(now, Account[1], Account[2], Units, amount, is_check)
       break
 
     case "SET_BANDS" :
@@ -6514,6 +6496,7 @@ function read_input_record(   t, n, a, threshold) {
     # Update the Last_Record
     Last_Record = t
 
+    # EOFY actions
     while (FY_Time + EOFY_Window < t) {
       # Get each EOFY in turn
       eofy_actions(FY_Time)
@@ -6540,9 +6523,9 @@ function read_input_record(   t, n, a, threshold) {
   # If the transaction is already parsed simply print it out
   if (t < ((Last_State) + 1)) {
     if (2 == n)
-      print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], units, amount)
+      print_transaction(t, Comments " <**STATE**>", Account[1], Account[2], amount, Units)
   } else if (2 == n) {
-    parse_transaction(t, Account[1], Account[2], units, amount)
+    parse_transaction(t, Account[1], Account[2], amount, Units)
   } else # A zero entry line - a null transaction or a comment in the journal
     print_transaction(t, Comments)
 
@@ -6554,7 +6537,7 @@ function read_input_record(   t, n, a, threshold) {
 }
 
 # Break out transaction parsing into a separate module
-function parse_transaction(now, a, b, units, amount,
+function parse_transaction(now, a, b, amount, Units,
 
                            underlying_asset, credit_account,
                            swop, g,
@@ -6581,7 +6564,7 @@ function parse_transaction(now, a, b, units, amount,
     # Note this as a reduction in the balance
     adjust_cost(FRANKING_STAMPED, amount, now)
 
-    print_transaction(now, "Reduce Franking Balance", FRANKING, FRANKING_STAMPED, 0, amount)
+    print_transaction(now, "Reduce Franking Balance", FRANKING, FRANKING_STAMPED, amount)
    } else if (b != GST && ((b) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)) {
     # Increase franking
     adjust_cost(FRANKING, amount, now)
@@ -6589,7 +6572,7 @@ function parse_transaction(now, a, b, units, amount,
     # Note this as an increase in the balance
     adjust_cost(FRANKING_STAMPED, -amount, now)
 
-    print_transaction(now, "Increase Franking Balance", FRANKING_STAMPED, FRANKING, 0, amount)
+    print_transaction(now, "Increase Franking Balance", FRANKING_STAMPED, FRANKING, amount)
   }
 
   # For a SMSF process member benefits
@@ -6620,8 +6603,8 @@ function parse_transaction(now, a, b, units, amount,
   if (((a) ~ ("^" ( "INCOME") "[.:]"))) {
     # Income accounts are caught to check for franking credits
     # Income must always be account a
-    tax_credits = Real_Value[1]
-    Real_Value[1] = 0
+    tax_credits = Real_Value[(1)]
+    Real_Value[(1)] = 0
 
     # Get the underlying asset (if there is one)
     if (a in Underlying_Asset)
@@ -6658,20 +6641,20 @@ function parse_transaction(now, a, b, units, amount,
       if (((a) ~ ("^" ( "INCOME.FOREIGN") "[.:]"))) {
         # Foreign Credits
         adjust_cost(NULL, tax_credits, now)
-        print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, 0, tax_credits)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, tax_credits)
       } else {
         # Frannking Credits
         adjust_cost(FRANKING, tax_credits, now)
-        print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, 0, tax_credits)
+        print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, tax_credits)
       }
     } else
       tax_credits = 0
 
-    # Now LIC credits if any
-    if (!((((Real_Value[2]) - ( Epsilon)) <= 0) && (((Real_Value[2]) - ( -Epsilon)) >= 0))) {
+    # Now LIC deduction if any
+    if (!((((Real_Value[(2)]) - ( Epsilon)) <= 0) && (((Real_Value[(2)]) - ( -Epsilon)) >= 0))) {
       # Always treated as positive
-      adjust_cost(LIC_CREDITS, - Real_Value[2], now)
-      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_CREDITS, NULL, 0, Real_Value[2])
+      adjust_cost(LIC_DEDUCTION, - Real_Value[(2)], now)
+      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTION, NULL, Real_Value[(2)])
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present
@@ -6710,7 +6693,7 @@ function parse_transaction(now, a, b, units, amount,
       # The transaction itself will be posted later a => b
       # Need to adjust amount transacted
       amount -= (g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount)
-      print_transaction(now, ("# GST " Leaf[b]), GST, b, II, g)
+      print_transaction(now, ("# GST " Leaf[b]), GST, b, g, II)
 
       # GST claimed
       GST_Claimable = 0
@@ -6720,8 +6703,8 @@ function parse_transaction(now, a, b, units, amount,
     @Process_Member_Contributions(now, amount, Member_Liability, a)
   } else if (((b) ~ ("^" ( "EXPENSE.NON-DEDUCTIBLE.DIVIDEND") "[.:]"))) {
     # A franking entity (eg company) can distribute franking credits
-    tax_credits = Real_Value[1]
-    Real_Value[1] = 0
+    tax_credits = Real_Value[(1)]
+    Real_Value[(1)] = 0
 
     # Simplified version of above
     if (!((((tax_credits) - ( Epsilon)) <= 0) && (((tax_credits) - ( -Epsilon)) >= 0))) {
@@ -6729,13 +6712,13 @@ function parse_transaction(now, a, b, units, amount,
       adjust_cost(FRANKING,    - tax_credits, now)
       adjust_cost(FRANKING_PAID,  tax_credits, now)
 
-      print_transaction(now, ("# " Leaf[a] " Franking Credits Distributed"), FRANKING, FRANKING_PAID, 0, tax_credits)
+      print_transaction(now, ("# " Leaf[a] " Franking Credits Distributed"), FRANKING, FRANKING_PAID, tax_credits)
     } else
       tax_credits = 0
   }
 
   # A sale transaction
-  if (units < 0) {
+  if (Units < 0) {
     # The asset being sold must be "a" but if equity must be "b"
     correct_order = (((( a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( a, now)) || ((( b) ~ /^EQUITY[.:]/) && is_open( b, now)))
     assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, (Leaf[a]), (Leaf[b])))
@@ -6747,8 +6730,8 @@ function parse_transaction(now, a, b, units, amount,
     }
 
     # Get brokerage (if any)
-    current_brokerage = Real_Value[1]
-    Real_Value[1] = 0
+    current_brokerage = Real_Value[(1)]
+    Real_Value[(1)] = 0
 
     # Amount should be the consideration as recorded by the broker
     #
@@ -6765,7 +6748,7 @@ function parse_transaction(now, a, b, units, amount,
 
         # This must be recorded
         # This reduces GST liability
-        print_transaction(now, ("# GST " Leaf[a]), GST, b, II, -g)
+        print_transaction(now, ("# GST " Leaf[a]), GST, b, -g, II)
         assert((0), "GST Was levied on whole SELL transaction <" $0 ">")
       } else {
         # Brokerage Present => Adjust Brokerage
@@ -6775,7 +6758,7 @@ function parse_transaction(now, a, b, units, amount,
         g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * current_brokerage
 
         # This must be recorded
-        print_transaction(now, ("# GST " Leaf[a]), b, GST, II, g)
+        print_transaction(now, ("# GST " Leaf[a]), b, GST, g, II)
       }
 
       # Non-zero GST to be paid
@@ -6787,7 +6770,7 @@ function parse_transaction(now, a, b, units, amount,
     # Sell units -> cash is flowing out of a
     # Ensure positive values for units and amount are passed
     # Brokerage is treated as a cost so it can be applied to the units actually sold
-    sell_units(now, a, -units, amount + g, Parcel_Name, Extra_Timestamp)
+    sell_units(now, a, -Units, amount + g, Parcel_Name, Extra_Timestamp)
 
     # And simply adjust settlement account b by the
     adjust_cost(b, amount, now)
@@ -6811,10 +6794,10 @@ function parse_transaction(now, a, b, units, amount,
     if ("" != Parcel_Name)
       fields[++ number_fields] = Parcel_Name
 
-    # Normal format is much the same - but number of fields is not fixed
+    # The number of fields is not fixed
     # A, B, -U, x + bg, (optional_fields), comment
-    print_transaction(now, Comments, a, b, Write_Units, amount + g, fields, number_fields)
-  } else if (units > 0) {
+    print_transaction(now, Comments, a, b, amount + g, sprintf("%10.3f", Units), fields, number_fields)
+  } else if (Units > 0) {
     # # For a purchase the asset must be account "b"
     # This must be a purchase
     correct_order = ((( b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((a) ~ /^EQUITY[.:]/))
@@ -6837,7 +6820,7 @@ function parse_transaction(now, a, b, units, amount,
     # Is this a new depreciating asset?
     if (((b) ~ /^ASSET\.FIXED[.:]/) && !(b in Method_Name)) {
       # This is  the asset Lifetime
-      fields[++ number_fields] = Lifetime[b]  = Real_Value[1]; Real_Value[1] = 0
+      fields[++ number_fields] = Lifetime[b]  = Real_Value[(1)]; Real_Value[(1)] = 0
       assert(!((((Lifetime[b]) - ( Epsilon)) <= 0) && (((Lifetime[b]) - ( -Epsilon)) >= 0)), sprintf("%s => Can't have a fixed asset %s with zero life", $0, (Leaf[b])))
 
       # We need the method name
@@ -6846,9 +6829,9 @@ function parse_transaction(now, a, b, units, amount,
     }
 
     # Allow for brokerage if required - note can't have brokerage with depreciation
-    if (!((((Real_Value[1]) - ( Epsilon)) <= 0) && (((Real_Value[1]) - ( -Epsilon)) >= 0))) {
-      current_brokerage = Real_Value[1]
-      Real_Value[1] = 0
+    if (!((((Real_Value[(1)]) - ( Epsilon)) <= 0) && (((Real_Value[(1)]) - ( -Epsilon)) >= 0))) {
+      current_brokerage = Real_Value[(1)]
+      Real_Value[(1)] = 0
     }
 
     # Simply adjust cost of <a> by the whole amount
@@ -6873,7 +6856,8 @@ function parse_transaction(now, a, b, units, amount,
       adjust_cost(GST, g, now)
 
       # This must be recorded
-      print_transaction(now, ("# GST " Leaf[b]), a, GST, II, g)
+      Cost_Element = II
+      print_transaction(now, ("# GST " Leaf[b]), a, GST, g, II)
       if (((((current_brokerage) - ( Epsilon)) <= 0) && (((current_brokerage) - ( -Epsilon)) >= 0)))
         assert((0), "GST Was levied on whole BUY transaction <" $0 ">")
       GST_Claimable = 0
@@ -6881,7 +6865,7 @@ function parse_transaction(now, a, b, units, amount,
       g = 0
 
     # Buy units in asset (b) - this ignores impact of brokerage
-    bought_parcel = buy_units(now, b, units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
+    bought_parcel = buy_units(now, b, Units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
 
     # Adjust the cost of this **parcel** for the impact of brokerage and GST
     adjust_parcel_cost(b, bought_parcel, now, current_brokerage - g,  II, (0))
@@ -6902,7 +6886,7 @@ function parse_transaction(now, a, b, units, amount,
     # Record the adjustment due to brokerage and gst
     if (!((((current_brokerage) - ( Epsilon)) <= 0) && (((current_brokerage) - ( -Epsilon)) >= 0)))
       fields[++ number_fields] = sprintf("%.*f", (2), current_brokerage - g)
-    print_transaction(now, Comments, a, b, Write_Units, amount - g, fields, number_fields)
+    print_transaction(now, Comments, a, b, amount - g, sprintf("%10.3f", Units), fields, number_fields)
   } else if (Automatic_Depreciation) {
     # This is automatic depreciation
     # Only need the assertion
@@ -6918,7 +6902,7 @@ function parse_transaction(now, a, b, units, amount,
     adjust_cost(b, amount, now)
 
     # Record the transaction
-    print_transaction(now, Comments, a, b, "(I)", amount)
+    print_transaction(now, Comments, a, b, amount, "(I)")
   } else if (Extra_Timestamp > Epoch) {
     # The timestamp must be associated with a parcel
     fields[++ number_fields] = get_date(Extra_Timestamp)
@@ -6953,7 +6937,7 @@ function parse_transaction(now, a, b, units, amount,
              $0, (Leaf[a]), (Leaf[b]), (Leaf[b]), get_date(Extra_Timestamp)))
 
      # Record the transaction
-     print_transaction(now, Comments, a, b, Write_Units, amount, fields, number_fields)
+     print_transaction(now, Comments, a, b, amount, Cost_Element, fields, number_fields)
   } else {
     # All Other Transactions
     # This must be an expense if GST is involved
@@ -6968,7 +6952,7 @@ function parse_transaction(now, a, b, units, amount,
       adjust_cost(b,   -g, now)
 
       # Record GST
-      print_transaction(now, ("# GST " Leaf[a]), b, GST, II, g)
+      print_transaction(now, ("# GST " Leaf[a]), b, GST, g, II)
       GST_Claimable = 0
     }
 
@@ -6977,7 +6961,7 @@ function parse_transaction(now, a, b, units, amount,
     adjust_cost(b,  amount, now)
 
     # Record the transaction
-    print_transaction(now, Comments, a, b, Write_Units, amount, fields, number_fields)
+    print_transaction(now, Comments, a, b, amount, Cost_Element, fields, number_fields)
   }
 
   # Tidy up
@@ -6991,23 +6975,23 @@ function set_account_term(a, now) {
   # It is possible for a current account to have no term set
 
   # If the term is set make a note of it
-  if (Real_Value[1] > 0)
+  if (Real_Value[(1)] > 0)
    # It can change as long as it doesn't make a CURRENT asset non current
-   (Account_Term[a][ now] = ( Real_Value[1]))
+   (Account_Term[a][ now] = ( Real_Value[(1)]))
 
   # At this stage term is assumed to be set in months
   if (Extra_Timestamp > now) { # Use the time stamp if it exists
     (Maturity_Date[a][ now] = ( Extra_Timestamp))
 
     # Don't use real value again
-    Real_Value[1] = 0
-  } else if (Real_Value[1] > 0) {
+    Real_Value[(1)] = 0
+  } else if (Real_Value[(1)] > 0) {
     # Need to set the first maturity date - real value is the same as account term
-    Extra_Timestamp = add_months(now, Real_Value[1])
+    Extra_Timestamp = add_months(now, Real_Value[(1)])
     (Maturity_Date[a][ now] = ( Extra_Timestamp))
 
     # Don't use real value again
-    Real_Value[1] = 0
+    Real_Value[(1)] = 0
   } else if ((a in Maturity_Date) && now > ((__MPX_KEY__ = find_key(Maturity_Date[a],  ((now) - 1)))?( Maturity_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Maturity_Date[a][0]):( 0))))) {
     # Compute the maturity date
     Extra_Timestamp = add_months(now, ((__MPX_KEY__ = find_key(Account_Term[a],  now))?( Account_Term[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Account_Term[a][0]):( 0)))))
@@ -7170,7 +7154,7 @@ END {
     # it would lead to duplication of data processing
     # if the last record is not already beyond the Stop_Time
     do {
-
+      depreciate_all(FY_Time)
       # Get each EOFY in turn
       eofy_actions(FY_Time)
 
@@ -7389,7 +7373,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
         adjust_cost(DEPRECIATION, catch_up_depreciation, t)
 
         # Print the transaction
-        print_transaction(t, "Catch-Up Depreciation", ac, DEPRECIATION, "(D)", catch_up_depreciation)
+        print_transaction(t, "Catch-Up Depreciation", ac, DEPRECIATION, catch_up_depreciation, "(D)")
 
       }
     }

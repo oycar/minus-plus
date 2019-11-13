@@ -428,9 +428,9 @@ function process_member_benefits_smsf(now, array, amount,
 
       # Record this sub-transaction
       if (taxable_account)
-        print_transaction(now, Comments, taxable_account, b, Write_Units, amount_taxed)
+        print_transaction(now, Comments, taxable_account, b, amount_taxed, Cost_Element)
       else
-        print_transaction(now, Comments, a, b, Write_Units, amount_taxed)
+        print_transaction(now, Comments, a, b, amount_taxed, Cost_Element)
 
       # Replace account b with tax-free account
       b = initialize_account(sprintf("%s.TAX-FREE", use_name))
