@@ -111,6 +111,8 @@ END {
 
 
 
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -909,35 +911,35 @@ function parse_line(now,    i, j, x, number_accounts) {
     #
 
 
-    # always advance i
-    i ++
-    Units = 0
-
-    # This field can be units or a cost element
-    x = parse_optional_value($i)
-
-    # Is this a non zero value?
-    Units = 0
-    if (x) {
-      # This might be the number of units; is this a buy or sell transaction?
-      if ((((x) - ( Epsilon)) > 0) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((Account[1]) ~ /^EQUITY[.:]/)))
-        # Interpret these as units
-        Units = x
-      else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now))))
-        Units = x
-      else { # No units - rescan field
-        Units = 0
-        i --
-      }
-    } else if ("" != x) { # Ignore the case of this being a time-stamp
-      #Cost_Element = parse_cost_element($i)
-      x = parse_optional_string($i, (1))
-
-      # The output syntax
-      if (("II") == Cost_Element)
-        # Rescan
-        i --
-    }
+    # # always advance i
+    # i ++
+    # Units = 0
+    #
+    # # This field can be units or a cost element
+    # x = parse_optional_value($i)
+    #
+    # # Is this a non zero value?
+    # Units = 0
+    # if (x) {
+    #   # This might be the number of units; is this a buy or sell transaction?
+    #   if (above_zero(x) && is_purchase(Account[1], Account[2]))
+    #     # Interpret these as units
+    #     Units = x
+    #   else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
+    #     Units = x
+    #   else { # No units - rescan field
+    #     Units = 0
+    #     i --
+    #   }
+    # } else if ("" != x) { # Ignore the case of this being a time-stamp
+    #   #Cost_Element = parse_cost_element($i)
+    #   x = parse_optional_string($i, TRUE)
+    #
+    #   # The output syntax
+    #   if (COST_ELEMENT == Cost_Element)
+    #     # Rescan
+    #     i --
+    # }
   }
   i ++
 
@@ -980,9 +982,10 @@ function parse_line(now,    i, j, x, number_accounts) {
   #   * **A comment** in any transaction
   # The next three fields can contain real numbers, time-stamps or strings
   # Check first for real numbers or time-stamps
-  #for (j = !number_accounts; i <= NF; j++) {
+  Units = 0
+  for (j = !number_accounts; i <= NF;) {
 
-  for (j = 1; i <= NF; j++) {
+  #for (j = 1; i <= NF;) {
 
     # Set x
     if (j <= 3)
@@ -999,6 +1002,8 @@ function parse_line(now,    i, j, x, number_accounts) {
           Units = x
         else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now))))
           Units = x
+        else
+          Real_Value[j = 1] = x
       } else
         Real_Value[j] = x
     } else if ("" != x) { # Will be "" when a timestamp set
@@ -1011,8 +1016,9 @@ function parse_line(now,    i, j, x, number_accounts) {
         Comments = (("" == Comments)?(  x):( (("" ==  x)?( Comments):( (Comments  ", "  x)))))
     }
 
-    # Increment i
+    # Increment i & j
     i ++
+    j ++
   }
 
 
@@ -3268,7 +3274,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("B" ~ /[cC]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3606,7 +3612,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[oO]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3746,7 +3752,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[bB]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3879,7 +3885,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("B" ~ /[mM]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3951,7 +3957,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[dD]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4086,7 +4092,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("B" ~ /[qQ]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4586,7 +4592,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("B" ~ /[tT]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5372,7 +5378,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[iI]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

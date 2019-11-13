@@ -561,35 +561,35 @@ function parse_line(now,    i, j, x, number_accounts) {
     #
 
 
-    # always advance i
-    i ++
-    Units = 0
-
-    # This field can be units or a cost element
-    x = parse_optional_value($i)
-
-    # Is this a non zero value?
-    Units = 0
-    if (x) {
-      # This might be the number of units; is this a buy or sell transaction?
-      if (above_zero(x) && is_purchase(Account[1], Account[2]))
-        # Interpret these as units
-        Units = x
-      else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
-        Units = x
-      else { # No units - rescan field
-        Units = 0
-        i --
-      }
-    } else if ("" != x) { # Ignore the case of this being a time-stamp
-      #Cost_Element = parse_cost_element($i)
-      x = parse_optional_string($i, TRUE)
-
-      # The output syntax
-      if (COST_ELEMENT == Cost_Element)
-        # Rescan
-        i --
-    }
+    # # always advance i
+    # i ++
+    # Units = 0
+    #
+    # # This field can be units or a cost element
+    # x = parse_optional_value($i)
+    #
+    # # Is this a non zero value?
+    # Units = 0
+    # if (x) {
+    #   # This might be the number of units; is this a buy or sell transaction?
+    #   if (above_zero(x) && is_purchase(Account[1], Account[2]))
+    #     # Interpret these as units
+    #     Units = x
+    #   else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
+    #     Units = x
+    #   else { # No units - rescan field
+    #     Units = 0
+    #     i --
+    #   }
+    # } else if ("" != x) { # Ignore the case of this being a time-stamp
+    #   #Cost_Element = parse_cost_element($i)
+    #   x = parse_optional_string($i, TRUE)
+    #
+    #   # The output syntax
+    #   if (COST_ELEMENT == Cost_Element)
+    #     # Rescan
+    #     i --
+    # }
   }
   i ++
 
@@ -632,9 +632,10 @@ function parse_line(now,    i, j, x, number_accounts) {
   #   * **A comment** in any transaction
   # The next three fields can contain real numbers, time-stamps or strings
   # Check first for real numbers or time-stamps
-  #for (j = !number_accounts; i <= NF; j++) {
+  Units = 0
+  for (j = !number_accounts; i <= NF;) {
 
-  for (j = 1; i <= NF; j++) {
+  #for (j = 1; i <= NF;) {
 
     # Set x
     if (j <= 3)
@@ -651,6 +652,8 @@ function parse_line(now,    i, j, x, number_accounts) {
           Units = x
         else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
           Units = x
+        else
+          Real_Value[j = 1] = x
       } else
         Real_Value[j] = x
     } else if ("" != x) { # Will be "" when a timestamp set
@@ -663,8 +666,9 @@ function parse_line(now,    i, j, x, number_accounts) {
         Comments = add_field(Comments, x, ", ")
     }
 
-    # Increment i
+    # Increment i & j
     i ++
+    j ++
   }
 
 
