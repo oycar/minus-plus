@@ -24,7 +24,7 @@
  Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date\
  Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units\
  Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
- Threshold_Dates Total_Units Underlying_Asset Units_Held "
+ Total_Units Underlying_Asset Units_Held "
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
  Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency\

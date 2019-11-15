@@ -2037,7 +2037,7 @@ function split_account(now, a, b, split_factor,
   split_factor = ((split_factor)?( split_factor):( 1))
 
   # Label
-  label = ((split_factor > 1)?( "Split"):( ((split_factor < 1)?( "Merge"):( "Copy "))))
+  label = ((split_factor > 1)?( "Split "):( ((split_factor < 1)?( "Merge "):( "Change"))))
 
   # Write to tranaction file
   printf "##\n"

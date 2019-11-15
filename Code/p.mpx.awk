@@ -151,7 +151,6 @@ BEGIN {
   make_array(Tax_Adjustments)
   make_array(Tax_Bands)
   make_array(Tax_Credits)
-  make_array(Threshold_Dates)
   make_array(Total_Units)
   make_array(Underlying_Asset)
   make_array(Units_Held)
@@ -491,9 +490,9 @@ function set_financial_year(now,   new_fy) {
 #  CHECK
 #  SPLIT
 #  MERGE
-#  COPY
+#  CHANGE
 #
-$1 ~  /^([[:space:]])*(CHECK|SET|SPLIT|MERGE|COPY)/  {
+$1 ~  /^([[:space:]])*(CHECK|SET|SPLIT|MERGE|CHANGE)/  {
  # Use a function so we can control scope of variables
  read_control_record()
  next
@@ -583,7 +582,7 @@ function read_control_record(       now, i, x, p, is_check){
       checkset(now, Account[1], Account[2], Real_Value[UNITS_KEY], amount, is_check)
       break
 
-    case "COPY"  :
+    case "CHANGE"  :
     case "MERGE" :
     case "SPLIT" :
       # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
@@ -591,7 +590,7 @@ function read_control_record(       now, i, x, p, is_check){
       $1 = get_date(now)
 
       # Copy?
-      if ("COPY" == x)
+      if ("CHANGE" == x)
         $4 = 1
 
       # Parse the line
@@ -688,30 +687,6 @@ function read_input_record(   t, n, a, threshold) {
       # this record will not be processed so
       # don't update Last_Record
       exit
-
-    # We need to check for accounts changing from TERM=>CURRENT
-    # Find the most recent threshold
-    threshold = find_key(Threshold_Dates, t)
-
-    #
-    # Does if occur before now?
-    # Comment this will not work if no transactions in that year
-    # so need to ensure check at EOFY
-    while (threshold > Last_Record) {
-      # Which accounts does this key correpond to?
-      for (a in Threshold_Dates[threshold]) {
-        if (Threshold_Dates[threshold][a] > t) {
-          # It is updated
-          convert_term_account(a, t, Threshold_Dates[threshold][a])
-
-          # Make sure this won't be picked up again
-          Threshold_Dates[threshold][a] = t
-        }
-      }
-
-      # Get the next earlier maturity date
-      threshold = find_key(Threshold_Dates, just_before(threshold))
-    }
 
     # Update the Last_Record
     Last_Record = t
@@ -813,9 +788,9 @@ function parse_transaction(now, a, b, amount,
            sprintf("Transactions between two fixed term accounts %s & %s are not supported due to ambiguity of timestamps",
                    a, b))
     # Set the term
-    a = set_account_term(a, now)
+    set_account_term(a, now)
   } else if (is_term(b))
-    b = set_account_term(b, now)
+    set_account_term(b, now)
 
   # Initially no optional fields
   number_fields = 0
@@ -1218,68 +1193,7 @@ function set_account_term(a, now) {
     # Compute the maturity date
     Extra_Timestamp = add_months(now, find_entry(Account_Term[a], now))
     set_entry(Maturity_Date[a], Extra_Timestamp, now)
-  } else
-    # No term was set
-    return a
-
-  # Ensure the name  of this account is correct
-  #   X.TERM => non-current
-  #   X.CURRENT => current
-  return convert_term_account(a, now, Extra_Timestamp)
-}
-
-#
-# # Make sure current assets and liabilities are correctly identified
-# Ensure the name  of this account is correct
-#   X.TERM => non-current
-#   X.CURRENT => current
-# This is deprecated
-# Use a filter function in print_account_class
-# Use the absence of
-function convert_term_account(a, now, maturity,       active_account, x, threshold) {
-@ifeq LOG convert_term_account
-  printf "Convert Term %s\n", get_date(now) > STDERR
-  printf "\tActive account => %s\n", a > STDERR
-  printf "\t\t Cost     => %s\n", print_cash(get_cost(a, now)) > STDERR
-  printf "\t\t Maturity => %s\n", get_date(maturity) > STDERR
-  printf "\t\t Term     => %d\n", find_entry(Account_Term[a], now) > STDERR
-@endif
-
-  # Is this a current or non-current account?
-  active_account = a
-  if (maturity > next_year(now)) {
-    # Never switch a current account to a non-current account
-    assert(is_term(a), sprintf("Cannot convert %s to a non-current account with maturity %s",
-                                a, get_date(maturity)))
-
-    # Store the timestamp  - the first entry will be the last timestamp
-    # Actually this is not needed...
-    # Make sure the array exists and  the  entry is unique
-    threshold = last_year(maturity) # Not  the same as now!
-    Threshold_Dates[threshold][SUBSEP] = 0
-    delete Threshold_Dates[threshold][SUBSEP]
-
-    # The time "now" is recorded since  the entry can be modified later
-    set_entry(Threshold_Dates[threshold], maturity, active_account)
-@ifeq LOG convert_term_account
-    printf "\tThreshold_Dates => \n" > STDERR
-    # This is just output...
-    walk_array(Threshold_Dates, 1, STDERR)
-    printf "\n" > STDERR
-@endif
-  } else if (is_term(a)) {
-    # Need to identify this as a current account
-    # This breaks the reporting in the state file
-    if (a in Maturity_Date)
-      delete Maturity_Date[a]
-@ifeq LOG convert_term_account
-    printf "\tRelabelled account => %s\n", a > STDERR
-    printf "\tCurrent Account [%s] => %d\n", a, is_current(a) > STDERR
-@endif
   }
-
-  # Return the active account
-  return active_account
 }
 
 # Some no-ops covering for SMSF related functions

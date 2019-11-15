@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Logic conventions
 
 
@@ -98,8 +100,6 @@ END {
 
 
 # // Default Reports
-
-
 
 
 
@@ -2056,7 +2056,7 @@ function split_account(now, a, b, split_factor,
   split_factor = ((split_factor)?( split_factor):( 1))
 
   # Label
-  label = ((split_factor > 1)?( "Split"):( ((split_factor < 1)?( "Merge"):( "Copy "))))
+  label = ((split_factor > 1)?( "Split "):( ((split_factor < 1)?( "Merge "):( "Change"))))
 
   # Write to tranaction file
   printf "##\n"
@@ -3243,7 +3243,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("B" ~ /[cC]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3581,7 +3581,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[oO]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3721,7 +3721,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[bB]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3854,7 +3854,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("B" ~ /[mM]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3926,7 +3926,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[dD]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4061,7 +4061,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[qQ]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4195,7 +4195,7 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
   # First list all the subclasses
   # Record the totals using the infrastructure for accounts
   for (x in Leaf) {
-    if (@selector(x, class_name, blocked_class)) {
+    if (@selector(x, class_name, blocked_class, now)) {
 
       # The required name component is the last in the parent - watch out for
       # the leading "*" if only a single component
@@ -4290,12 +4290,12 @@ function print_subclass_sum(name, sum_now, sum_past, stream) {
 # The selector functions are filters for controlling
 # what is printed out
 # The simplest
-function select_class(a, class_name, blocked_class) {
+function select_class(a, class_name, blocked_class, now) {
   return ((a) ~ ("^" ( class_name) "[.:]"))
 }
 
 # Include class blocking
-function block_class(a, class_name, blocked_class) {
+function block_class(a, class_name, blocked_class, now) {
   if (((a) ~ ("^" ( blocked_class) "[.:]")))
     return (0) # Blocked!
 
@@ -4304,7 +4304,7 @@ function block_class(a, class_name, blocked_class) {
 }
 
 # Block multiple classes...
-function block_class_list(a, class_name, blocked_class_list,      x) {
+function block_class_list(a, class_name, blocked_class_list, now,     x) {
   # blocked class might actually be an array of blocked classes
   for (x in blocked_class_list)
     if (((a) ~ ("^" ( x) "[.:]"))) # Blocked!
@@ -4315,13 +4315,37 @@ function block_class_list(a, class_name, blocked_class_list,      x) {
 }
 
 # Special purpose filter for current accounts
-function current_class(a, class_name, blocked_class) {
-  return ((a) ~ ("^" ( class_name) "[.:]")) && !(a in Maturity_Date)
+function current_class(a, class_name, blocked_class, now,    maturity) {
+  # Is this the right class
+  if (((a) ~ ("^" ( class_name) "[.:]"))) {
+    # Get current maturity date
+    if (a in Maturity_Date) {
+      maturity = ((__MPX_KEY__ = find_key(Maturity_Date[a],  now))?( Maturity_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Maturity_Date[a][0]):( 0))))
+      if (maturity > ((now) + one_year(now,  1)))
+        return (0)
+    }
+
+    return (1)
+  }
+
+  return (0)
+  #return is_class(a, class_name) && !(a in Maturity_Date)
 }
 
 # And its pigeon pair
-function not_current_class(a, class_name, blocked_class) {
-  return ((a) ~ ("^" ( class_name) "[.:]")) && (a in Maturity_Date)
+function not_current_class(a, class_name, blocked_class, now,    maturity) {
+  # Is this the right class
+  if (((a) ~ ("^" ( class_name) "[.:]"))) {
+    # Get current maturity date
+    if (a in Maturity_Date) {
+      maturity = ((__MPX_KEY__ = find_key(Maturity_Date[a],  now))?( Maturity_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Maturity_Date[a][0]):( 0))))
+      if (maturity > ((now) + one_year(now,  1)))
+        return (1)
+    }
+  }
+
+  return (0)
+  #return is_class(a, class_name) && (a in Maturity_Date)
 }
 
 # A write back function
@@ -4561,7 +4585,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("B" ~ /[tT]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5347,7 +5371,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("B" ~ /[iI]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5937,7 +5961,6 @@ BEGIN {
   ((SUBSEP in Tax_Adjustments)?((1)):((0)))
   ((SUBSEP in Tax_Bands)?((1)):((0)))
   ((SUBSEP in Tax_Credits)?((1)):((0)))
-  ((SUBSEP in Threshold_Dates)?((1)):((0)))
   ((SUBSEP in Total_Units)?((1)):((0)))
   ((SUBSEP in Underlying_Asset)?((1)):((0)))
   ((SUBSEP in Units_Held)?((1)):((0)))
@@ -6268,9 +6291,9 @@ function set_financial_year(now,   new_fy) {
 #  CHECK
 #  SPLIT
 #  MERGE
-#  COPY
+#  CHANGE
 #
-$1 ~  /^([[:space:]])*(CHECK|SET|SPLIT|MERGE|COPY)/  {
+$1 ~  /^([[:space:]])*(CHECK|SET|SPLIT|MERGE|CHANGE)/  {
  # Use a function so we can control scope of variables
  read_control_record()
  next
@@ -6297,13 +6320,13 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
-      if (!index(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
+      if (!index(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
         assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
@@ -6313,7 +6336,7 @@ function initialize_state(    x) {
   } else {
     # Use default read and write list
     Write_Variables = (0)
-    MPX_Arrays = ("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Threshold_Dates Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
+    MPX_Arrays = ("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
     MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
@@ -6360,7 +6383,7 @@ function read_control_record(       now, i, x, p, is_check){
       checkset(now, Account[1], Account[2], Real_Value[(0)], amount, is_check)
       break
 
-    case "COPY"  :
+    case "CHANGE"  :
     case "MERGE" :
     case "SPLIT" :
       # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
@@ -6368,7 +6391,7 @@ function read_control_record(       now, i, x, p, is_check){
       $1 = get_date(now)
 
       # Copy?
-      if ("COPY" == x)
+      if ("CHANGE" == x)
         $4 = 1
 
       # Parse the line
@@ -6457,30 +6480,6 @@ function read_input_record(   t, n, a, threshold) {
       # this record will not be processed so
       # don't update Last_Record
       exit
-
-    # We need to check for accounts changing from TERM=>CURRENT
-    # Find the most recent threshold
-    threshold = find_key(Threshold_Dates, t)
-
-    #
-    # Does if occur before now?
-    # Comment this will not work if no transactions in that year
-    # so need to ensure check at EOFY
-    while (threshold > Last_Record) {
-      # Which accounts does this key correpond to?
-      for (a in Threshold_Dates[threshold]) {
-        if (Threshold_Dates[threshold][a] > t) {
-          # It is updated
-          convert_term_account(a, t, Threshold_Dates[threshold][a])
-
-          # Make sure this won't be picked up again
-          Threshold_Dates[threshold][a] = t
-        }
-      }
-
-      # Get the next earlier maturity date
-      threshold = find_key(Threshold_Dates, ((threshold) - 1))
-    }
 
     # Update the Last_Record
     Last_Record = t
@@ -6582,9 +6581,9 @@ function parse_transaction(now, a, b, amount,
            sprintf("Transactions between two fixed term accounts %s & %s are not supported due to ambiguity of timestamps",
                    a, b))
     # Set the term
-    a = set_account_term(a, now)
+    set_account_term(a, now)
   } else if (((b) ~ /^(ASSET|LIABILITY)\.TERM[.:]/))
-    b = set_account_term(b, now)
+    set_account_term(b, now)
 
   # Initially no optional fields
   number_fields = 0
@@ -6971,7 +6970,7 @@ function set_account_term(a, now) {
    (Account_Term[a][ now] = ( Real_Value[(1)]))
 
   # At this stage term is assumed to be set in months
-  if (Extra_Timestamp > now) { # Use the time stamp if it exists
+  if ((((Extra_Timestamp) - ( now)) > 0)) { # Use the time stamp if it exists
     (Maturity_Date[a][ now] = ( Extra_Timestamp))
 
     # Don't use real value again
@@ -6983,72 +6982,11 @@ function set_account_term(a, now) {
 
     # Don't use real value again
     Real_Value[(1)] = 0
-  } else if ((a in Maturity_Date) && now > ((__MPX_KEY__ = find_key(Maturity_Date[a],  ((now) - 1)))?( Maturity_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Maturity_Date[a][0]):( 0))))) {
+  } else if ((a in Maturity_Date) && (((now) - ( ((__MPX_KEY__ = find_key(Maturity_Date[a],  ((now) - 1)))?( Maturity_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Maturity_Date[a][0]):( 0)))))) > 0)) {
     # Compute the maturity date
     Extra_Timestamp = add_months(now, ((__MPX_KEY__ = find_key(Account_Term[a],  now))?( Account_Term[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Account_Term[a][0]):( 0)))))
     (Maturity_Date[a][ now] = ( Extra_Timestamp))
-  } else
-    # No term was set
-    return a
-
-  # Ensure the name  of this account is correct
-  #   X.TERM => non-current
-  #   X.CURRENT => current
-  return convert_term_account(a, now, Extra_Timestamp)
-}
-
-#
-# # Make sure current assets and liabilities are correctly identified
-# Ensure the name  of this account is correct
-#   X.TERM => non-current
-#   X.CURRENT => current
-# This is deprecated
-# Use a filter function in print_account_class
-# Use the absence of
-function convert_term_account(a, now, maturity,       active_account, x, threshold) {
-
-  printf "Convert Term %s\n", get_date(now) > "/dev/stderr"
-  printf "\tActive account => %s\n", a > "/dev/stderr"
-  printf "\t\t Cost     => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
-  printf "\t\t Maturity => %s\n", get_date(maturity) > "/dev/stderr"
-  printf "\t\t Term     => %d\n", ((__MPX_KEY__ = find_key(Account_Term[a],  now))?( Account_Term[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Account_Term[a][0]):( 0)))) > "/dev/stderr"
-
-
-  # Is this a current or non-current account?
-  active_account = a
-  if (maturity > ((now) + one_year(now,  1))) {
-    # Never switch a current account to a non-current account
-    assert(((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/), sprintf("Cannot convert %s to a non-current account with maturity %s",
-                                a, get_date(maturity)))
-
-    # Store the timestamp  - the first entry will be the last timestamp
-    # Actually this is not needed...
-    # Make sure the array exists and  the  entry is unique
-    threshold = ((maturity) - one_year(maturity, -1)) # Not  the same as now!
-    Threshold_Dates[threshold][SUBSEP] = 0
-    delete Threshold_Dates[threshold][SUBSEP]
-
-    # The time "now" is recorded since  the entry can be modified later
-    (Threshold_Dates[threshold][ active_account] = ( maturity))
-
-    printf "\tThreshold_Dates => \n" > "/dev/stderr"
-    # This is just output...
-    walk_array(Threshold_Dates, 1, "/dev/stderr")
-    printf "\n" > "/dev/stderr"
-
-  } else if (((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)) {
-    # Need to identify this as a current account
-    # This breaks the reporting in the state file
-    if (a in Maturity_Date)
-      delete Maturity_Date[a]
-
-    printf "\tRelabelled account => %s\n", a > "/dev/stderr"
-    printf "\tCurrent Account [%s] => %d\n", a, ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/) > "/dev/stderr"
-
   }
-
-  # Return the active account
-  return active_account
 }
 
 # Some no-ops covering for SMSF related functions

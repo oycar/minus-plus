@@ -1571,7 +1571,7 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
   # First list all the subclasses
   # Record the totals using the infrastructure for accounts
   for (x in Leaf) {
-    if (@selector(x, class_name, blocked_class)) {
+    if (@selector(x, class_name, blocked_class, now)) {
 
       # The required name component is the last in the parent - watch out for
       # the leading "*" if only a single component
@@ -1666,12 +1666,12 @@ function print_subclass_sum(name, sum_now, sum_past, stream) {
 # The selector functions are filters for controlling
 # what is printed out
 # The simplest
-function select_class(a, class_name, blocked_class) {
+function select_class(a, class_name, blocked_class, now) {
   return is_class(a, class_name)
 }
 
 # Include class blocking
-function block_class(a, class_name, blocked_class) {
+function block_class(a, class_name, blocked_class, now) {
   if (is_class(a, blocked_class))
     return FALSE # Blocked!
 
@@ -1680,7 +1680,7 @@ function block_class(a, class_name, blocked_class) {
 }
 
 # Block multiple classes...
-function block_class_list(a, class_name, blocked_class_list,      x) {
+function block_class_list(a, class_name, blocked_class_list, now,     x) {
   # blocked class might actually be an array of blocked classes
   for (x in blocked_class_list)
     if (is_class(a, x)) # Blocked!
@@ -1691,13 +1691,37 @@ function block_class_list(a, class_name, blocked_class_list,      x) {
 }
 
 # Special purpose filter for current accounts
-function current_class(a, class_name, blocked_class) {
-  return is_class(a, class_name) && !(a in Maturity_Date)
+function current_class(a, class_name, blocked_class, now,    maturity) {
+  # Is this the right class
+  if (is_class(a, class_name)) {
+    # Get current maturity date
+    if (a in Maturity_Date) {
+      maturity = find_entry(Maturity_Date[a], now)
+      if (maturity > next_year(now))
+        return FALSE
+    }
+
+    return TRUE
+  }
+
+  return FALSE
+  #return is_class(a, class_name) && !(a in Maturity_Date)
 }
 
 # And its pigeon pair
-function not_current_class(a, class_name, blocked_class) {
-  return is_class(a, class_name) && (a in Maturity_Date)
+function not_current_class(a, class_name, blocked_class, now,    maturity) {
+  # Is this the right class
+  if (is_class(a, class_name)) {
+    # Get current maturity date
+    if (a in Maturity_Date) {
+      maturity = find_entry(Maturity_Date[a], now)
+      if (maturity > next_year(now))
+        return TRUE
+    }
+  }
+
+  return FALSE
+  #return is_class(a, class_name) && (a in Maturity_Date)
 }
 
 # A write back function
