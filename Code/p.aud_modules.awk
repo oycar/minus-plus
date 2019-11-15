@@ -142,7 +142,7 @@ function income_tax_aud(now, past, benefits,
                                         foreign_income, exempt_income,
                                         foreign_expenses, extra_tax,
                                         contributions, income_due, other_expenses,
-                                        lic_deductions,
+                                        lic_deduction,
                                         other_income, deferred_tax, deferred_gains,
                                         capital_losses,
                                         tax_owed, tax_paid, tax_due, tax_with, tax_cont, income_tax,
@@ -290,12 +290,12 @@ function income_tax_aud(now, past, benefits,
   # LIC deductions 1/3 for SMSF
   #                1/2 for individual
   #                0/3 for company
-  lic_deductions = - rational_value(LIC_Allowance) * (get_cost(LIC_DEDUCTIONS, now) - get_cost(LIC_DEDUCTIONS, past))
+  lic_deduction = - rational_value(LIC_Allowance) * (get_cost(LIC_DEDUCTION, now) - get_cost(LIC_DEDUCTION, past))
 
   # Always apply allowance at this point to catch explicit allocations to LIC
-  if (!near_zero(lic_deductions)) {
-    printf "%s\t%40s %32s\n", header,"LIC Deduction", print_cash(lic_deductions) > write_stream
-    other_expenses += lic_deductions
+  if (!near_zero(lic_deduction)) {
+    printf "%s\t%40s %32s\n", header,"LIC Deduction", print_cash(lic_deduction) > write_stream
+    other_expenses += lic_deduction
     header = ""
   }
 

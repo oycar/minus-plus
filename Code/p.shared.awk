@@ -345,7 +345,10 @@ function sum_entry(array, x, now,   key, delta) {
   }
 
   # Finished
-  array[now] = x + array[key]
+  # if (key in array)
+  #   array[now] = x + array[key]
+  # else
+    array[now] = x + array[key]
 }
 
 # Remove the oldest entries from the reverse ordered array
@@ -614,8 +617,7 @@ function parse_line(now,    i, j, x, number_accounts) {
 
   # Documents can be added as comments
   # Some special document names are supported
-  # So for example [<Buy>] expands to ABC Buy YYYY Mon
-  # and            [<Chess.x>] expands to ABC Chess YYYY Mon DD
+  # So for example [B] expands to ABC Buy YYYY Mon
   for (x in Documents) {
     delete Documents[x]
 
@@ -1692,8 +1694,8 @@ function initialize_account(account_name,     class_name, array, p, n,
     Parcel_Tag[account_name][SUBSEP] ; delete Parcel_Tag[account_name][SUBSEP] #
 
     # Keep track of units
-    Total_Units[account_name][Epoch]     = 0
-    Qualified_Units[account_name][SUBSEP]; delete Qualified_Units[account_name][SUBSEP]
+    Total_Units[account_name][Epoch]     = Qualified_Units[account_name][Epoch] = 0
+    #Qualified_Units[account_name][SUBSEP]; delete Qualified_Units[account_name][SUBSEP]
 
     # Each account also has a number of parcels
     set_key(Number_Parcels, account_name, 0)
@@ -1733,6 +1735,102 @@ function unlink_account(a) {
     delete Leaf[a]
 }
 
+# Split a unitized account
+#  Split account a => s * b
+function split_account(now, a, b, split_factor,
+                            p, key) {
+  # This takes a capital account a
+  # and splits the units by a factor split_factor
+  # and creates a new account b
+  #
+  # Both accounts must be initialized
+  # Both accounts must be of the same class
+  # Both accounts must be unitized (this can be revisited)
+  assert(Parent_Name[a] == Parent_Name[b], "split: Class<" a "> != Class<" b ">")
+  assert(is_unitized(a), "split_account: <" a "> not a unitized account")
+
+  # Set split factor
+  split_factor = ternary(split_factor, split_factor, 1)
+
+  # Label
+  label = ternary(split_factor > 1, "Split", ternary(split_factor < 1, "Merge", "Copy "))
+
+  # Write to tranaction file
+  printf "##\n"
+  printf "## %s %s => %s by factor %7.2f\n", label, Leaf[a], Leaf[b], ternary(split_factor < 1, 1.0 / split_factor, split_factor)
+  printf "##   Date => %s\n", get_date(now) > STDERR
+  printf "##   %s Cost            => %s\n", Leaf[a], print_cash(get_cost(a, now))
+  printf "##   %s Units           => %10.3f\n", Leaf[a], get_units(a, now)
+  printf "##   %s Qualified Units => %10.3f\n", Leaf[a], get_qualified_units(a, now)
+
+  # Copy parcels
+  Number_Parcels[b] = Number_Parcels[a]
+
+  # Get each open parcel in account a and copy it to account b
+  for (p = 0; p < Number_Parcels[a]; p ++) {
+    # Is this parcel purchased yet?
+    if (greater_than(Held_From[a][p], now))
+      # This is an error
+      assert(FALSE, "Cannot split <" Leaf[a] "> before all its transactions are complete")
+
+    # Copy the parcel - this invocation copies from one account to another
+    copy_parcel(a, p, b, p)
+
+    # Adjust units in q if split_factor is not unity
+    if (1 != split_factor)
+      Units_Held[b][p] *= split_factor
+
+    # Close down pre-split account - at cost so no gains
+    if (is_unsold(a, p, now)) {
+      set_parcel_proceeds(a, p, - get_parcel_cost(a, p, now))
+      Held_Until[a][p] = now
+    }
+  }
+
+  # Total units
+  for (key in Total_Units[a])
+      Total_Units[b][key] = split_factor * Total_Units[a][key]
+  for (key in Qualified_Units[a])
+      Qualified_Units[b][key] = split_factor * Qualified_Units[a][key]
+
+  # Is this a fixed account?
+  if (is_fixed(a)) {
+    if (a in Method_Name)
+      Method_Name[b] = Method_Name[a]
+    if (a in Lifetime)
+      Lifetime[b] = Lifetime[a]
+  }
+
+  # Price records
+  for (key in Price[a])
+    if (less_than_or_equal(key, now)) { # These prices are for pre-split
+      Price[b][key] = Price[a][key] / split_factor
+      delete Price[a][key]
+    } # else # These prices are assumed to be accurate
+    #  Price[b][key] = Price[a][key]
+
+  # Also need exdividend dates
+  for (key in Payment_Date[a])
+    if (greater_than(key, now)) {
+      Payment_Date[b][key] = Payment_Date[a][key]
+      delete Payment_Date[a][key]
+    }
+
+  # All done
+  printf "##   After %s\n", label
+  printf "##   %s Cost            => %s\n", Leaf[b], print_cash(get_cost(b, now))
+  printf "##   %s Units           => %10.3f\n", Leaf[b], get_units(b, now)
+  printf "##   %s Qualified Units => %10.3f\n", Leaf[b], get_qualified_units(b, now)
+  printf "##\n"
+}
+
+# Useful
+function scale_array(source_array, target_array, factor,   key) {
+  # Clear target
+  delete target_array
+  for (key in source_array)
+    target_array[key] = factor * source_array[key]
+}
 
 #
 # Filter Data

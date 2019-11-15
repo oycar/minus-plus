@@ -489,8 +489,11 @@ function set_financial_year(now,   new_fy) {
 #  SET_BANDS
 #  SET
 #  CHECK
+#  SPLIT
+#  MERGE
+#  COPY
 #
-$1 ~  /^([[:space:]])*(CHECK|SET)/  {
+$1 ~  /^([[:space:]])*(CHECK|SET|SPLIT|MERGE|COPY)/  {
  # Use a function so we can control scope of variables
  read_control_record()
  next
@@ -559,22 +562,12 @@ function read_control_record(       now, i, x, p, is_check){
       # Syntax for check and set is
       # CHECKSET, ACCOUNT, WHAT, X, # Comment
       # We need to rebuild the line into something more standard
-      # DATE, ACCOUNT, WHAT, X, 0, # Comment
+      # DATE, ACCOUNT, WHAT, X, # Comment
       #
       # Some special accounts are needed
 
       # Put DATE in 1st Field
       $1 = get_date(now)
-
-      # Shuffle up fields
-      for (i = NF; i > 5; i --)
-        $(i+1) = $i
-
-      # Set cost element field
-      #$5 = 0
-
-      # Add one field
-      #NF ++
 
       # Check amount is set
       if (NF < 4) {
@@ -588,6 +581,29 @@ function read_control_record(       now, i, x, p, is_check){
       # Now either check or set the quantity
       assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
       checkset(now, Account[1], Account[2], Real_Value[UNITS_KEY], amount, is_check)
+      break
+
+    case "COPY"  :
+    case "MERGE" :
+    case "SPLIT" :
+      # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
+      # Put DATE in 1st Field
+      $1 = get_date(now)
+
+      # Copy?
+      if ("COPY" == x)
+        $4 = 1
+
+      # Parse the line
+      i = parse_line(now)
+
+      # Merge?
+      if ("MERGE" == x)
+        # The reciprocal of split
+        amount = ternary(amount, 1.0 / amount, 1)
+
+      # Split Account[1] => Account[2] by factor amount - zero means copy
+      split_account(now, Account[1], Account[2], amount)
       break
 
     case "SET_BANDS" :
@@ -1520,7 +1536,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 @ifeq LOG buy_units
   printf "%s: %s units => %.3f amount => %11.2f\n", "buy_units", get_short_name(a), u, x > STDERR
   printf "\tU => %.3f Cost => %.2f\n", get_units(a, now), get_cost(a, now) > STDERR
-  printf "\tTime => %s\n", get_date(now, LONG_FORMAT) > STDERR
+  printf "\tTime => %s\n", get_date(now) > STDERR
   if (parcel_tag)
     printf "\tParcel Name => %s\n", parcel_tag > STDERR
   if (parcel_timestamp >= Epoch)
@@ -1807,7 +1823,7 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
     # Shuffle parcels up by one
     for (i = Number_Parcels[a]; i > p + 1; i --)
       # Copy the parcels
-      copy_parcel(a, i - 1, i)
+      copy_parcel(a, i - 1, a, i)
 
     # At this point we need to split parcels p & p + 1
     split_parcel(a, p, du)
@@ -1929,29 +1945,28 @@ function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
 }
 
 # Copy and split parcels
-function copy_parcel(ac, p, q,     e, key) {
-@ifeq LOG sell_units
-  printf "\t\t\tCopy parcel %3d => %3d\n", p, q > STDERR
-@endif # LOG
-
-  # Copy parcel p => q
-  Units_Held[ac][q]  = Units_Held[ac][p]
-  Held_From[ac][q] = Held_From[ac][p]
-  Held_Until[ac][q] = Held_Until[ac][p]
-  Parcel_Proceeds[ac][q] = Parcel_Proceeds[ac][p]
+function copy_parcel(a, p, b, q,     e, key) {
+  # Copy parcel a:p => b:q
+  Units_Held[b][q]  = Units_Held[a][p]
+  Held_From[b][q] = Held_From[a][p]
+  Held_Until[b][q] = Held_Until[a][p]
+  Parcel_Proceeds[b][q] = Parcel_Proceeds[a][p]
   if (keys_in(Parcel_Tag, ac, p))
-    Parcel_Tag[ac][q] = Parcel_Tag[ac][p]
+    Parcel_Tag[b][q] = Parcel_Tag[a][p]
 
   # Copy all entries
   # Note keys will not match so need to delete old entries from parcel q
-  delete Accounting_Cost[ac][q] # Delete old entries
-  delete Tax_Adjustments[ac][q]
-  for (e in Accounting_Cost[ac][p])
-    for (key in Accounting_Cost[ac][p][e])
-        Accounting_Cost[ac][q][e][key] = Accounting_Cost[ac][p][e][key]
-  for (key in Tax_Adjustments[ac][p])
-    Tax_Adjustments[ac][q][key]  = Tax_Adjustments[ac][p][key]
+  delete Accounting_Cost[b][q] # Delete old entries
+  delete Tax_Adjustments[b][q]
+  for (e in Accounting_Cost[a][p])
+    for (key in Accounting_Cost[a][p][e])
+        Accounting_Cost[b][q][e][key] = Accounting_Cost[a][p][e][key]
+  for (key in Tax_Adjustments[a][p])
+    Tax_Adjustments[b][q][key]  = Tax_Adjustments[a][p][key]
 }
+
+
+
 
 function split_parcel(ac, p, du,   fraction_kept, e, key) {
   # Split partly sold parcel p into parcel p (all sold)

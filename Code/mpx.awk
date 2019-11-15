@@ -702,7 +702,10 @@ function sum_entry(array, x, now,   key, delta) {
   }
 
   # Finished
-  array[now] = x + array[key]
+  # if (key in array)
+  #   array[now] = x + array[key]
+  # else
+    array[now] = x + array[key]
 }
 
 # Remove the oldest entries from the reverse ordered array
@@ -963,8 +966,7 @@ function parse_line(now,    i, j, x, number_accounts) {
 
   # Documents can be added as comments
   # Some special document names are supported
-  # So for example [<Buy>] expands to ABC Buy YYYY Mon
-  # and            [<Chess.x>] expands to ABC Chess YYYY Mon DD
+  # So for example [B] expands to ABC Buy YYYY Mon
   for (x in Documents) {
     delete Documents[x]
 
@@ -2000,8 +2002,8 @@ function initialize_account(account_name,     class_name, array, p, n,
     Parcel_Tag[account_name][SUBSEP] ; delete Parcel_Tag[account_name][SUBSEP] #
 
     # Keep track of units
-    Total_Units[account_name][Epoch]     = 0
-    Qualified_Units[account_name][SUBSEP]; delete Qualified_Units[account_name][SUBSEP]
+    Total_Units[account_name][Epoch]     = Qualified_Units[account_name][Epoch] = 0
+    #Qualified_Units[account_name][SUBSEP]; delete Qualified_Units[account_name][SUBSEP]
 
     # Each account also has a number of parcels
     (( account_name in Number_Parcels)?( 0):(Number_Parcels[ account_name] = ( 0)))
@@ -2037,6 +2039,102 @@ function unlink_account(a) {
     delete Leaf[a]
 }
 
+# Split a unitized account
+#  Split account a => s * b
+function split_account(now, a, b, split_factor,
+                            p, key) {
+  # This takes a capital account a
+  # and splits the units by a factor split_factor
+  # and creates a new account b
+  #
+  # Both accounts must be initialized
+  # Both accounts must be of the same class
+  # Both accounts must be unitized (this can be revisited)
+  assert(Parent_Name[a] == Parent_Name[b], "split: Class<" a "> != Class<" b ">")
+  assert(((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), "split_account: <" a "> not a unitized account")
+
+  # Set split factor
+  split_factor = ((split_factor)?( split_factor):( 1))
+
+  # Label
+  label = ((split_factor > 1)?( "Split"):( ((split_factor < 1)?( "Merge"):( "Copy "))))
+
+  # Write to tranaction file
+  printf "##\n"
+  printf "## %s %s => %s by factor %7.2f\n", label, Leaf[a], Leaf[b], ((split_factor < 1)?( 1.0 / split_factor):( split_factor))
+  printf "##   Date => %s\n", get_date(now) > "/dev/stderr"
+  printf "##   %s Cost            => %s\n", Leaf[a], print_cash(get_cost(a, now))
+  printf "##   %s Units           => %10.3f\n", Leaf[a], ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
+  printf "##   %s Qualified Units => %10.3f\n", Leaf[a], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   now))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[a],    now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))))
+
+  # Copy parcels
+  Number_Parcels[b] = Number_Parcels[a]
+
+  # Get each open parcel in account a and copy it to account b
+  for (p = 0; p < Number_Parcels[a]; p ++) {
+    # Is this parcel purchased yet?
+    if ((((Held_From[a][p]) - ( now)) > 0))
+      # This is an error
+      assert((0), "Cannot split <" Leaf[a] "> before all its transactions are complete")
+
+    # Copy the parcel - this invocation copies from one account to another
+    copy_parcel(a, p, b, p)
+
+    # Adjust units in q if split_factor is not unity
+    if (1 != split_factor)
+      Units_Held[b][p] *= split_factor
+
+    # Close down pre-split account - at cost so no gains
+    if ((Held_Until[a][ p] > ( now))) {
+      (Parcel_Proceeds[a][ p] = ( - get_parcel_cost(a, p, now)))
+      Held_Until[a][p] = now
+    }
+  }
+
+  # Total units
+  for (key in Total_Units[a])
+      Total_Units[b][key] = split_factor * Total_Units[a][key]
+  for (key in Qualified_Units[a])
+      Qualified_Units[b][key] = split_factor * Qualified_Units[a][key]
+
+  # Is this a fixed account?
+  if (((a) ~ /^ASSET\.FIXED[.:]/)) {
+    if (a in Method_Name)
+      Method_Name[b] = Method_Name[a]
+    if (a in Lifetime)
+      Lifetime[b] = Lifetime[a]
+  }
+
+  # Price records
+  for (key in Price[a])
+    if ((((key) - ( now)) <= 0)) { # These prices are for pre-split
+      Price[b][key] = Price[a][key] / split_factor
+      delete Price[a][key]
+    } # else # These prices are assumed to be accurate
+    #  Price[b][key] = Price[a][key]
+
+  # Also need exdividend dates
+  for (key in Payment_Date[a])
+    if ((((key) - ( now)) > 0)) {
+      Payment_Date[b][key] = Payment_Date[a][key]
+      delete Payment_Date[a][key]
+    }
+
+  # All done
+  printf "##   After %s\n", label
+  printf "##   %s Cost            => %s\n", Leaf[b], print_cash(get_cost(b, now))
+  printf "##   %s Units           => %10.3f\n", Leaf[b], ((__MPX_KEY__ = find_key(Total_Units[b],   now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))
+  printf "##   %s Qualified Units => %10.3f\n", Leaf[b], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[b],   now))?( Qualified_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[b][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[b],    now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))))
+  printf "##\n"
+}
+
+# Useful
+function scale_array(source_array, target_array, factor,   key) {
+  # Clear target
+  delete target_array
+  for (key in source_array)
+    target_array[key] = factor * source_array[key]
+}
 
 #
 # Filter Data
@@ -3151,7 +3249,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("B" ~ /[cC]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("Q" ~ /[cC]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3489,7 +3587,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[oO]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[oO]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3629,7 +3727,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[bB]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[bB]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3762,7 +3860,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("B" ~ /[mM]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("Q" ~ /[mM]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3834,7 +3932,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[dD]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[dD]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -3969,7 +4067,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("B" ~ /[qQ]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[qQ]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4458,7 +4556,7 @@ function income_tax_aud(now, past, benefits,
                                         foreign_income, exempt_income,
                                         foreign_expenses, extra_tax,
                                         contributions, income_due, other_expenses,
-                                        lic_deductions,
+                                        lic_deduction,
                                         other_income, deferred_tax, deferred_gains,
                                         capital_losses,
                                         tax_owed, tax_paid, tax_due, tax_with, tax_cont, income_tax,
@@ -4469,7 +4567,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("B" ~ /[tT]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("Q" ~ /[tT]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -4606,12 +4704,12 @@ function income_tax_aud(now, past, benefits,
   # LIC deductions 1/3 for SMSF
   #                1/2 for individual
   #                0/3 for company
-  lic_deductions = - ((LIC_Allowance[2])?( (LIC_Allowance[1]/LIC_Allowance[2])):( assert((0), "Division by zero in rational fraction" LIC_Allowance[1] "/" LIC_Allowance[2]))) * (get_cost(LIC_DEDUCTIONS, now) - get_cost(LIC_DEDUCTIONS, past))
+  lic_deduction = - ((LIC_Allowance[2])?( (LIC_Allowance[1]/LIC_Allowance[2])):( assert((0), "Division by zero in rational fraction" LIC_Allowance[1] "/" LIC_Allowance[2]))) * (get_cost(LIC_DEDUCTION, now) - get_cost(LIC_DEDUCTION, past))
 
   # Always apply allowance at this point to catch explicit allocations to LIC
-  if (!((((lic_deductions) - ( Epsilon)) <= 0) && (((lic_deductions) - ( -Epsilon)) >= 0))) {
-    printf "%s\t%40s %32s\n", header,"LIC Deduction", print_cash(lic_deductions) > write_stream
-    other_expenses += lic_deductions
+  if (!((((lic_deduction) - ( Epsilon)) <= 0) && (((lic_deduction) - ( -Epsilon)) >= 0))) {
+    printf "%s\t%40s %32s\n", header,"LIC Deduction", print_cash(lic_deduction) > write_stream
+    other_expenses += lic_deduction
     header = ""
   }
 
@@ -5255,7 +5353,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[iI]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("Q" ~ /[iI]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6174,8 +6272,11 @@ function set_financial_year(now,   new_fy) {
 #  SET_BANDS
 #  SET
 #  CHECK
+#  SPLIT
+#  MERGE
+#  COPY
 #
-$1 ~  /^([[:space:]])*(CHECK|SET)/  {
+$1 ~  /^([[:space:]])*(CHECK|SET|SPLIT|MERGE|COPY)/  {
  # Use a function so we can control scope of variables
  read_control_record()
  next
@@ -6244,22 +6345,12 @@ function read_control_record(       now, i, x, p, is_check){
       # Syntax for check and set is
       # CHECKSET, ACCOUNT, WHAT, X, # Comment
       # We need to rebuild the line into something more standard
-      # DATE, ACCOUNT, WHAT, X, 0, # Comment
+      # DATE, ACCOUNT, WHAT, X, # Comment
       #
       # Some special accounts are needed
 
       # Put DATE in 1st Field
       $1 = get_date(now)
-
-      # Shuffle up fields
-      for (i = NF; i > 5; i --)
-        $(i+1) = $i
-
-      # Set cost element field
-      #$5 = 0
-
-      # Add one field
-      #NF ++
 
       # Check amount is set
       if (NF < 4) {
@@ -6273,6 +6364,29 @@ function read_control_record(       now, i, x, p, is_check){
       # Now either check or set the quantity
       assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
       checkset(now, Account[1], Account[2], Real_Value[(0)], amount, is_check)
+      break
+
+    case "COPY"  :
+    case "MERGE" :
+    case "SPLIT" :
+      # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
+      # Put DATE in 1st Field
+      $1 = get_date(now)
+
+      # Copy?
+      if ("COPY" == x)
+        $4 = 1
+
+      # Parse the line
+      i = parse_line(now)
+
+      # Merge?
+      if ("MERGE" == x)
+        # The reciprocal of split
+        amount = ((amount)?( 1.0 / amount):( 1))
+
+      # Split Account[1] => Account[2] by factor amount - zero means copy
+      split_account(now, Account[1], Account[2], amount)
       break
 
     case "SET_BANDS" :
@@ -7374,7 +7488,7 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
     # Shuffle parcels up by one
     for (i = Number_Parcels[a]; i > p + 1; i --)
       # Copy the parcels
-      copy_parcel(a, i - 1, i)
+      copy_parcel(a, i - 1, a, i)
 
     # At this point we need to split parcels p & p + 1
     split_parcel(a, p, du)
@@ -7482,27 +7596,28 @@ function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
 }
 
 # Copy and split parcels
-function copy_parcel(ac, p, q,     e, key) {
-
-
-  # Copy parcel p => q
-  Units_Held[ac][q]  = Units_Held[ac][p]
-  Held_From[ac][q] = Held_From[ac][p]
-  Held_Until[ac][q] = Held_Until[ac][p]
-  Parcel_Proceeds[ac][q] = Parcel_Proceeds[ac][p]
+function copy_parcel(a, p, b, q,     e, key) {
+  # Copy parcel a:p => b:q
+  Units_Held[b][q]  = Units_Held[a][p]
+  Held_From[b][q] = Held_From[a][p]
+  Held_Until[b][q] = Held_Until[a][p]
+  Parcel_Proceeds[b][q] = Parcel_Proceeds[a][p]
   if ((( ac in Parcel_Tag) && ( p in Parcel_Tag[ ac])))
-    Parcel_Tag[ac][q] = Parcel_Tag[ac][p]
+    Parcel_Tag[b][q] = Parcel_Tag[a][p]
 
   # Copy all entries
   # Note keys will not match so need to delete old entries from parcel q
-  delete Accounting_Cost[ac][q] # Delete old entries
-  delete Tax_Adjustments[ac][q]
-  for (e in Accounting_Cost[ac][p])
-    for (key in Accounting_Cost[ac][p][e])
-        Accounting_Cost[ac][q][e][key] = Accounting_Cost[ac][p][e][key]
-  for (key in Tax_Adjustments[ac][p])
-    Tax_Adjustments[ac][q][key]  = Tax_Adjustments[ac][p][key]
+  delete Accounting_Cost[b][q] # Delete old entries
+  delete Tax_Adjustments[b][q]
+  for (e in Accounting_Cost[a][p])
+    for (key in Accounting_Cost[a][p][e])
+        Accounting_Cost[b][q][e][key] = Accounting_Cost[a][p][e][key]
+  for (key in Tax_Adjustments[a][p])
+    Tax_Adjustments[b][q][key]  = Tax_Adjustments[a][p][key]
 }
+
+
+
 
 function split_parcel(ac, p, du,   fraction_kept, e, key) {
   # Split partly sold parcel p into parcel p (all sold)
