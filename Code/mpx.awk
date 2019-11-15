@@ -46,8 +46,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Logic conventions
 
 
@@ -100,6 +98,8 @@ END {
 
 
 # // Default Reports
+
+
 
 
 
@@ -2039,10 +2039,9 @@ function unlink_account(a) {
     delete Leaf[a]
 }
 
-# Split a unitized account
-#  Split account a => s * b
+# Split/Merge/Copy a unitized account
 function split_account(now, a, b, split_factor,
-                            p, key) {
+                            p, key, label) {
   # This takes a capital account a
   # and splits the units by a factor split_factor
   # and creates a new account b
@@ -2107,11 +2106,14 @@ function split_account(now, a, b, split_factor,
 
   # Price records
   for (key in Price[a])
-    if ((((key) - ( now)) <= 0)) { # These prices are for pre-split
+    if ((((key) - ( now)) <= 0))
+      # These prices are for pre-split
+      # They are needed after scaling
       Price[b][key] = Price[a][key] / split_factor
+    else # These prices are for pre-split asset post split date
+      # No way to know if accurate or not
+      # So delete them - [b] prices must be added explicitly
       delete Price[a][key]
-    } # else # These prices are assumed to be accurate
-    #  Price[b][key] = Price[a][key]
 
   # Also need exdividend dates
   for (key in Payment_Date[a])
@@ -2126,14 +2128,6 @@ function split_account(now, a, b, split_factor,
   printf "##   %s Units           => %10.3f\n", Leaf[b], ((__MPX_KEY__ = find_key(Total_Units[b],   now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))
   printf "##   %s Qualified Units => %10.3f\n", Leaf[b], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[b],   now))?( Qualified_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[b][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[b],    now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))))
   printf "##\n"
-}
-
-# Useful
-function scale_array(source_array, target_array, factor,   key) {
-  # Clear target
-  delete target_array
-  for (key in source_array)
-    target_array[key] = factor * source_array[key]
 }
 
 #
@@ -3249,7 +3243,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("Q" ~ /[cC]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3587,7 +3581,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Q" ~ /[oO]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3727,7 +3721,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Q" ~ /[bB]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3860,7 +3854,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("Q" ~ /[mM]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3932,7 +3926,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Q" ~ /[dD]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4067,7 +4061,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("Q" ~ /[qQ]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4567,7 +4561,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("Q" ~ /[tT]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5353,7 +5347,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Q" ~ /[iI]|[aA]/ && "Q" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( EOFY):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6910,18 +6904,18 @@ function parse_transaction(now, a, b, amount,
     # but only when an the asset is acquired and the timestamp is in the future
 
     # One account must be unitized or term limited
-    if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
-      assert(!((b) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/),
+    # This logic is opaque...
+    if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/) || ((b) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
+      assert(!((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/) ||  !((b) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/),
                sprintf("%s Both %s and %s cannot be unitized when parcel timestamp [%s] is set",
                $0, (Leaf[a]), (Leaf[b]), get_date(Extra_Timestamp)))
-      adjust_cost(a, -amount, Extra_Timestamp)
-      adjust_cost(b,  amount, now)
-    } else if (((b) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
       # Instalment purchase
       adjust_cost(b,  amount, Extra_Timestamp)
       adjust_cost(a, -amount, now)
 
       # This will not balance when re-read from the state file unless balancing entries made
+      # The reference to the future is confusing because
+      # it means that the payment came "from" the future
       adjust_cost(FUTURE_PAYMENT, -amount, Extra_Timestamp)
       adjust_cost(FUTURE_PAYMENT,  amount, now)
 
@@ -6968,7 +6962,6 @@ function parse_transaction(now, a, b, amount,
 
 # Set an account term for term limited assets and liabilities
 #
-# Fixme - This fails for state arrays because Leaf is overwritten
 function set_account_term(a, now) {
   # It is possible for a current account to have no term set
 
@@ -7014,6 +7007,12 @@ function set_account_term(a, now) {
 # Use the absence of
 function convert_term_account(a, now, maturity,       active_account, x, threshold) {
 
+  printf "Convert Term %s\n", get_date(now) > "/dev/stderr"
+  printf "\tActive account => %s\n", a > "/dev/stderr"
+  printf "\t\t Cost     => %s\n", print_cash(get_cost(a, now)) > "/dev/stderr"
+  printf "\t\t Maturity => %s\n", get_date(maturity) > "/dev/stderr"
+  printf "\t\t Term     => %d\n", ((__MPX_KEY__ = find_key(Account_Term[a],  now))?( Account_Term[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Account_Term[a][0]):( 0)))) > "/dev/stderr"
+
 
   # Is this a current or non-current account?
   active_account = a
@@ -7032,10 +7031,19 @@ function convert_term_account(a, now, maturity,       active_account, x, thresho
     # The time "now" is recorded since  the entry can be modified later
     (Threshold_Dates[threshold][ active_account] = ( maturity))
 
+    printf "\tThreshold_Dates => \n" > "/dev/stderr"
+    # This is just output...
+    walk_array(Threshold_Dates, 1, "/dev/stderr")
+    printf "\n" > "/dev/stderr"
+
   } else if (((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)) {
     # Need to identify this as a current account
+    # This breaks the reporting in the state file
     if (a in Maturity_Date)
       delete Maturity_Date[a]
+
+    printf "\tRelabelled account => %s\n", a > "/dev/stderr"
+    printf "\tCurrent Account [%s] => %d\n", a, ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/) > "/dev/stderr"
 
   }
 

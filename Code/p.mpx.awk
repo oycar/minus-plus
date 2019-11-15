@@ -1135,18 +1135,18 @@ function parse_transaction(now, a, b, amount,
     # but only when an the asset is acquired and the timestamp is in the future
 
     # One account must be unitized or term limited
-    if (is_unitized(a)) {
-      assert(!is_unitized(b),
+    # This logic is opaque...
+    if (is_unitized(a) || is_unitized(b)) {
+      assert(!is_unitized(a) ||  !is_unitized(b),
                sprintf("%s Both %s and %s cannot be unitized when parcel timestamp [%s] is set",
                $0, get_short_name(a), get_short_name(b), get_date(Extra_Timestamp)))
-      adjust_cost(a, -amount, Extra_Timestamp)
-      adjust_cost(b,  amount, now)
-    } else if (is_unitized(b)) {
       # Instalment purchase
       adjust_cost(b,  amount, Extra_Timestamp)
       adjust_cost(a, -amount, now)
 
       # This will not balance when re-read from the state file unless balancing entries made
+      # The reference to the future is confusing because
+      # it means that the payment came "from" the future
       adjust_cost(FUTURE_PAYMENT, -amount, Extra_Timestamp)
       adjust_cost(FUTURE_PAYMENT,  amount, now)
 
@@ -1193,7 +1193,6 @@ function parse_transaction(now, a, b, amount,
 
 # Set an account term for term limited assets and liabilities
 #
-# Fixme - This fails for state arrays because Leaf is overwritten
 function set_account_term(a, now) {
   # It is possible for a current account to have no term set
 
@@ -1203,7 +1202,7 @@ function set_account_term(a, now) {
    set_entry(Account_Term[a], Real_Value[MATURITY_DATE_KEY], now)
 
   # At this stage term is assumed to be set in months
-  if (Extra_Timestamp > now) { # Use the time stamp if it exists
+  if (greater_than(Extra_Timestamp, now)) { # Use the time stamp if it exists
     set_entry(Maturity_Date[a], Extra_Timestamp, now)
 
     # Don't use real value again
@@ -1215,7 +1214,7 @@ function set_account_term(a, now) {
 
     # Don't use real value again
     Real_Value[MATURITY_DATE_KEY] = 0
-  } else if ((a in Maturity_Date) && now > find_entry(Maturity_Date[a], just_before(now))) {
+  } else if ((a in Maturity_Date) && greater_than(now, find_entry(Maturity_Date[a], just_before(now)))) {
     # Compute the maturity date
     Extra_Timestamp = add_months(now, find_entry(Account_Term[a], now))
     set_entry(Maturity_Date[a], Extra_Timestamp, now)
@@ -1239,7 +1238,7 @@ function set_account_term(a, now) {
 # Use the absence of
 function convert_term_account(a, now, maturity,       active_account, x, threshold) {
 @ifeq LOG convert_term_account
-  printf "%s => %s\n", LOG, get_date(now) > STDERR
+  printf "Convert Term %s\n", get_date(now) > STDERR
   printf "\tActive account => %s\n", a > STDERR
   printf "\t\t Cost     => %s\n", print_cash(get_cost(a, now)) > STDERR
   printf "\t\t Maturity => %s\n", get_date(maturity) > STDERR
@@ -1264,11 +1263,13 @@ function convert_term_account(a, now, maturity,       active_account, x, thresho
     set_entry(Threshold_Dates[threshold], maturity, active_account)
 @ifeq LOG convert_term_account
     printf "\tThreshold_Dates => \n" > STDERR
+    # This is just output...
     walk_array(Threshold_Dates, 1, STDERR)
     printf "\n" > STDERR
 @endif
   } else if (is_term(a)) {
     # Need to identify this as a current account
+    # This breaks the reporting in the state file
     if (a in Maturity_Date)
       delete Maturity_Date[a]
 @ifeq LOG convert_term_account

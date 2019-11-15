@@ -2020,10 +2020,9 @@ function unlink_account(a) {
     delete Leaf[a]
 }
 
-# Split a unitized account
-#  Split account a => s * b
+# Split/Merge/Copy a unitized account
 function split_account(now, a, b, split_factor,
-                            p, key) {
+                            p, key, label) {
   # This takes a capital account a
   # and splits the units by a factor split_factor
   # and creates a new account b
@@ -2088,11 +2087,14 @@ function split_account(now, a, b, split_factor,
 
   # Price records
   for (key in Price[a])
-    if ((((key) - ( now)) <= 0)) { # These prices are for pre-split
+    if ((((key) - ( now)) <= 0))
+      # These prices are for pre-split
+      # They are needed after scaling
       Price[b][key] = Price[a][key] / split_factor
+    else # These prices are for pre-split asset post split date
+      # No way to know if accurate or not
+      # So delete them - [b] prices must be added explicitly
       delete Price[a][key]
-    } # else # These prices are assumed to be accurate
-    #  Price[b][key] = Price[a][key]
 
   # Also need exdividend dates
   for (key in Payment_Date[a])
@@ -2107,14 +2109,6 @@ function split_account(now, a, b, split_factor,
   printf "##   %s Units           => %10.3f\n", Leaf[b], ((__MPX_KEY__ = find_key(Total_Units[b],   now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))
   printf "##   %s Qualified Units => %10.3f\n", Leaf[b], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[b],   now))?( Qualified_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[b][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[b],    now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))))
   printf "##\n"
-}
-
-# Useful
-function scale_array(source_array, target_array, factor,   key) {
-  # Clear target
-  delete target_array
-  for (key in source_array)
-    target_array[key] = factor * source_array[key]
 }
 
 #
