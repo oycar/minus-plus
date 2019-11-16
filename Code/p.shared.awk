@@ -1770,7 +1770,7 @@ function split_account(now, a, b, split_factor,
     # Is this parcel purchased yet?
     if (greater_than(Held_From[a][p], now))
       # This is an error
-      assert(FALSE, "Cannot split <" Leaf[a] "> before all its transactions are complete")
+      assert(FALSE, "Cannot " tolower(label) " <" Leaf[a] "> before all its transactions are complete")
 
     # Copy the parcel - this invocation copies from one account to another
     copy_parcel(a, p, b, p)

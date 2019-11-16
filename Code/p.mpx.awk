@@ -203,25 +203,20 @@ BEGIN {
   set_months()
 
   # Show detailed summary
-  if ("" == Show_Extra)
+  if (!Show_Extra)
     Show_Extra = 0
 
-  # stop time - can be overriden by FY option
-  # Need to initialize FY information
-  if (FY)
-    # Initialize the financial year
-    Stop_Time = read_date(FY "-" FY_Date, 0)
-  else {
-    if (!Stop_Time)
-      Stop_Time = Future
-    else {
-      Stop_Time = read_date(Stop_Time)
-      assert(DATE_ERROR < Stop_Time, "Stop_Time " Read_Date_Error)
-    }
-  }
+  # Show a particular FY
+  if (!Show_FY)
+    Show_FY = 0
 
-  # EOFY statements are not printed until requested
-  EOFY = STDERR
+  # stop time
+  if (!Stop_Time)
+    Stop_Time = Future
+  else {
+    Stop_Time = read_date(Stop_Time)
+    assert(DATE_ERROR < Stop_Time, "Stop_Time " Read_Date_Error)
+  }
 
   # Which account to track
   if ("" == Show_Account)
@@ -404,8 +399,8 @@ function import_csv_data(array, symbol, name,
   if (Last_Record < Last_State)
     Last_Record = Last_State
 
-  # Flag this
-  Start_Journal = TRUE
+  # # Flag this
+  # Start_Journal = TRUE
 
   # Is the currency consistent
   assert(JOURNAL_CURRENCY == Journal_Currency, "Incompatible journal currency <" Journal_Currency "> in journal file - expected <" JOURNAL_CURRENCY "> instead")
@@ -456,6 +451,17 @@ function import_csv_data(array, symbol, name,
   # Initialize state file information
   initialize_state()
   Last_FY = last_year(FY_Time)
+
+  # Is a requested Show_FY available?
+  if (Show_FY && Last_State != -1) {
+    xxx = read_date(Show_FY "-" FY_Date, 0)
+    FY_Year = get_year_number(xxx)
+    if (xxx < Last_State)
+      eofy_actions(xxx)
+  }
+
+  # Flag this
+  Start_Journal = TRUE
 
   # All done
   next
@@ -1309,7 +1315,6 @@ END {
     # it would lead to duplication of data processing
     # if the last record is not already beyond the Stop_Time
     do {
-      depreciate_all(FY_Time)
       # Get each EOFY in turn
       eofy_actions(FY_Time)
 

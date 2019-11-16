@@ -35,7 +35,7 @@ MPXDIR=~/Cloudstation/Projects/Minus-Plus/Code
 # Usage
 USAGE="Usage: $(basename $0) [-a: show-account-transactions] [-c: journal-currency] [-i mpx-information-and-copyright-notice]\
  [-l: log-function] [-p: write-price-file] [-q enforce-qualification] [-s: stop-time]\
- [-v write-variable-1,write_variable-2,...] [-w: write-state-file] [-x show-extra-detail] [-z preprocess_only]\
+ [-v write-variable-1,write_variable-2,...] [-w: write-state-file] [-x show-extra-detail] [-y: show-fy] [-z preprocess_only]\
  [-ABCDIMOQTZ extra-report-toggles] <data-import-file> <state-file> <journal-file>"
 
 # This is a simple front end for mpx
@@ -50,6 +50,7 @@ write_variables=""
 preprocess_only=false
 stop_time=""
 Show_Extra=0
+Show_FY=0
 Show_Reports="" # Default reports
 fs=""
 
@@ -62,13 +63,16 @@ shopt -s expand_aliases
 alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
 
 # Interpret options
-while getopts ":a:c:il:p:qs:v:w:xzABCDIMOQTZ" opt; do
+while getopts ":a:c:il:p:qs:v:w:xy:zABCDIMOQTZ" opt; do
     case $opt in
 
     a) account_name=$OPTARG;;
 
     c) # AUD is the default
       journal_currency=${OPTARG};;
+
+    d) # date format
+       date_format="${OPTARG}";;
 
     i) # Information
    printf "mpx - Minus-Plus command line accounting and financial reporting\n\
@@ -100,7 +104,6 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
     q) # Enforce Qualification?
       enforce_qualification=0;;
 
-
     # Skinning a cat another way
     A) Show_Reports="A";;   # All
     B) Show_Reports+="B";;  # Balance
@@ -126,6 +129,8 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
       write_file=$OPTARG;;
 
     x)  Show_Extra=1;;
+
+    y)  Show_FY=$OPTARG;;
 
     z)  preprocess_only=true;;
 
@@ -167,7 +172,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   if [ "$preprocess_only" == "false" ]; then
     # Go back to original directory
     cd "${current_directory}"
-    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v Enforce_Qualification=${enforce_qualification} -v Show_Account=${account_name} -v Show_Extra=${Show_Extra} -v Stop_Time=${stop_time} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
+    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v Enforce_Qualification=${enforce_qualification} -v Show_Account=${account_name} -v Show_Extra=${Show_Extra} -v Show_FY=${Show_FY} -v Stop_Time=${stop_time} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
   fi
 
 exit 0;

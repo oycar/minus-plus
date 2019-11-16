@@ -95,6 +95,9 @@ END {
 
 
 
+# // The stream to write reports to
+
+
 # // Default Asset Prefix for Price Lists
 
 
@@ -2055,7 +2058,7 @@ function split_account(now, a, b, split_factor,
     # Is this parcel purchased yet?
     if ((((Held_From[a][p]) - ( now)) > 0))
       # This is an error
-      assert((0), "Cannot split <" Leaf[a] "> before all its transactions are complete")
+      assert((0), "Cannot " tolower(label) " <" Leaf[a] "> before all its transactions are complete")
 
     # Copy the parcel - this invocation copies from one account to another
     copy_parcel(a, p, b, p)

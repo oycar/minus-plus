@@ -46,8 +46,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Logic conventions
 
 
@@ -110,6 +108,11 @@ END {
 
 
 
+
+
+
+
+# // The stream to write reports to
 
 
 # // Default Asset Prefix for Price Lists
@@ -2074,7 +2077,7 @@ function split_account(now, a, b, split_factor,
     # Is this parcel purchased yet?
     if ((((Held_From[a][p]) - ( now)) > 0))
       # This is an error
-      assert((0), "Cannot split <" Leaf[a] "> before all its transactions are complete")
+      assert((0), "Cannot " tolower(label) " <" Leaf[a] "> before all its transactions are complete")
 
     # Copy the parcel - this invocation copies from one account to another
     copy_parcel(a, p, b, p)
@@ -2666,6 +2669,9 @@ function add_months(now, number_months,   y, m, d,
 function eofy_actions(now,      past, allocated_profits,
                                 benefits, unrealized_gains) {
 
+  # EOFY actions
+  printf "EOFY Actions\n\tDate => %s\n", get_date(now) > "/dev/stderr"
+
 
   # past is one year earlier
   past = ((now) - one_year(now, -1))
@@ -3243,7 +3249,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("B" ~ /[cC]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!(Show_FY) || ((Show_FY) == FY_Year))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3581,7 +3587,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[oO]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!(Show_FY) || ((Show_FY) == FY_Year))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3721,7 +3727,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[bB]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!(Show_FY) || ((Show_FY) == FY_Year))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3854,7 +3860,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("B" ~ /[mM]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!(Show_FY) || ((Show_FY) == FY_Year))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3926,7 +3932,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[dD]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!(Show_FY) || ((Show_FY) == FY_Year))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4061,7 +4067,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("B" ~ /[qQ]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!(Show_FY) || ((Show_FY) == FY_Year))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4585,7 +4591,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("B" ~ /[tT]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!(Show_FY) || ((Show_FY) == FY_Year))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5371,7 +5377,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("B" ~ /[iI]|[aA]/ && "B" !~ /[zZ]/)?( EOFY):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!(Show_FY) || ((Show_FY) == FY_Year))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6013,25 +6019,20 @@ BEGIN {
   set_months()
 
   # Show detailed summary
-  if ("" == Show_Extra)
+  if (!Show_Extra)
     Show_Extra = 0
 
-  # stop time - can be overriden by FY option
-  # Need to initialize FY information
-  if (FY)
-    # Initialize the financial year
-    Stop_Time = read_date(FY "-" FY_Date, 0)
-  else {
-    if (!Stop_Time)
-      Stop_Time = Future
-    else {
-      Stop_Time = read_date(Stop_Time)
-      assert((-1) < Stop_Time, "Stop_Time " Read_Date_Error)
-    }
-  }
+  # Show a particular FY
+  if (!Show_FY)
+    Show_FY = 0
 
-  # EOFY statements are not printed until requested
-  EOFY = "/dev/stderr"
+  # stop time
+  if (!Stop_Time)
+    Stop_Time = Future
+  else {
+    Stop_Time = read_date(Stop_Time)
+    assert((-1) < Stop_Time, "Stop_Time " Read_Date_Error)
+  }
 
   # Which account to track
   if ("" == Show_Account)
@@ -6205,8 +6206,8 @@ function import_csv_data(array, symbol, name,
   if (Last_Record < Last_State)
     Last_Record = Last_State
 
-  # Flag this
-  Start_Journal = (1)
+  # # Flag this
+  # Start_Journal = TRUE
 
   # Is the currency consistent
   assert("AUD" == Journal_Currency, "Incompatible journal currency <" Journal_Currency "> in journal file - expected <" "AUD" "> instead")
@@ -6257,6 +6258,17 @@ function import_csv_data(array, symbol, name,
   # Initialize state file information
   initialize_state()
   Last_FY = ((FY_Time) - one_year(FY_Time, -1))
+
+  # Is a requested Show_FY available?
+  if (Show_FY && Last_State != -1) {
+    xxx = read_date(Show_FY "-" FY_Date, 0)
+    FY_Year = (strftime("%Y", (xxx), UTC) + 0)
+    if (xxx < Last_State)
+      eofy_actions(xxx)
+  }
+
+  # Flag this
+  Start_Journal = (1)
 
   # All done
   next
@@ -6320,14 +6332,14 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time FY_Year Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
       if (!index(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
-        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
+        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time FY_Year Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
         Scalar_Names[x] = Array_Names[x]
@@ -6337,7 +6349,7 @@ function initialize_state(    x) {
     # Use default read and write list
     Write_Variables = (0)
     MPX_Arrays = ("Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
-    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
+    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time FY_Year Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
     split(MPX_Scalars, Scalar_Names, " ")
@@ -7098,7 +7110,6 @@ END {
     # it would lead to duplication of data processing
     # if the last record is not already beyond the Stop_Time
     do {
-      depreciate_all(FY_Time)
       # Get each EOFY in turn
       eofy_actions(FY_Time)
 
