@@ -153,7 +153,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = report_tax(eofy_stream(Show_FY))
+  write_stream = report_tax(eofy_stream(now))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -1000,7 +1000,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = report_imputation(eofy_stream(Show_FY))
+  reports_stream = report_imputation(eofy_stream(now))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

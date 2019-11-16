@@ -87,7 +87,7 @@ function income_tax_usd(now, past, benefits,
                                         x) {
 
   # Print this out?
-  reports_stream = report_tax(eofy_stream(Show_FY))
+  reports_stream = report_tax(eofy_stream(now))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)

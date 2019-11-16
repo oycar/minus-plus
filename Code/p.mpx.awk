@@ -206,10 +206,6 @@ BEGIN {
   if (!Show_Extra)
     Show_Extra = 0
 
-  # Show a particular FY
-  if (!Show_FY)
-    Show_FY = 0
-
   # stop time
   if (!Stop_Time)
     Stop_Time = Future
@@ -390,17 +386,28 @@ function import_csv_data(array, symbol, name,
   # Done
 }
 
+# Syntax is START_JOURNAL, Date
 /START_JOURNAL/ {
+
   # Allow multiple calls
   if (Start_Journal)
     next
+  else if (NF > 1)
+    # Interpret the date
+    Start_Record = read_date($2)
+  else
+    assert(FALSE, "START_JOURNAL, Date: Date is required on first call of start journal")
+
+  # Check Start_Record
+  assert(Start_Record > DATE_ERROR, Read_Date_Error)
+
+  # Set FY information if required
+  if (-1 == Last_State)
+    set_financial_year(Start_Record)
 
   # Ensure agreement of Last_Record with Last_State
   if (Last_Record < Last_State)
     Last_Record = Last_State
-
-  # # Flag this
-  # Start_Journal = TRUE
 
   # Is the currency consistent
   assert(JOURNAL_CURRENCY == Journal_Currency, "Incompatible journal currency <" Journal_Currency "> in journal file - expected <" JOURNAL_CURRENCY "> instead")
@@ -452,12 +459,15 @@ function import_csv_data(array, symbol, name,
   initialize_state()
   Last_FY = last_year(FY_Time)
 
-  # Is a requested Show_FY available?
-  if (Show_FY && Last_State != -1) {
-    xxx = read_date(Show_FY "-" FY_Date, 0)
-    FY_Year = get_year_number(xxx)
-    if (xxx < Last_State)
-      eofy_actions(xxx)
+  # Next set up FY Information
+  # Show a particular FY
+  if (!Show_FY)
+    Show_FY = 0
+  else {
+    # Use a timestamp
+    Show_FY = read_date(Show_FY "-" FY_Date, 0)
+    if (Show_FY > Start_Record && Show_FY <= Last_State)
+      eofy_actions(Show_FY)
   }
 
   # Flag this
@@ -630,15 +640,6 @@ function read_control_record(       now, i, x, p, is_check){
       printf "%%%%, %s[%s] => %11.2f\n", i, get_date(now), p > STDERR
 @endif
       set_entry(SYMTAB[i], p, now)
-      break
-
-    ## Several dates can be set
-    case "SET_FINANCIAL_YEAR" :
-      # This would set the first day of the next FY so go back one day
-      now = yesterday(read_date($2 "-" FY_DATE))
-      assert(now > DATE_ERROR, Read_Date_Error)
-      if (now > Last_State)
-        set_financial_year(now)
       break
 
     default: # This should not happen
@@ -1345,7 +1346,7 @@ END {
     # The last line is (oddly enough) when the journal starts -
     # this allows initialization to occur when the file is read back in
     if (!Write_Variables)
-      printf "START_JOURNAL\n" > Write_State
+      printf "START_JOURNAL, %s\n", get_date(Start_Record) > Write_State
   }
 
   # Log data about selected variables

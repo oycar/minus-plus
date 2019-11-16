@@ -27,8 +27,9 @@
  Total_Units Underlying_Asset Units_Held "
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
- Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time FY_Year\
- Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED\
+ Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time\
+ Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window\
+ Start_Record ALLOCATED\
  Dividend_Qualification_Function Get_Taxable_Gains_Function\
  Gross_Up_Gains_Function Imputation_Report_Function\
  Income_Tax_Function Initialize_Tax_Function "
@@ -86,7 +87,7 @@
 @define report_tax(s)          ternary(SHOW_REPORTS ~ /[tT]|[aA]/ && SHOW_REPORTS !~ /[zZ]/, s, DEVNULL)
 
 # // The stream to write reports to
-@define eofy_stream(t)         ternary(!(t) || ((t) == FY_Year), STDERR, DEVNULL)
+@define eofy_stream(t)         ternary(!Show_FY || ((t) == Show_FY), STDERR, DEVNULL)
 
 # // Default Asset Prefix for Price Lists
 @define ASSET_PREFIX ("ASSET.CAPITAL.SHARES")

@@ -602,7 +602,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = report_capital(eofy_stream(Show_FY))
+    reports_stream = report_capital(eofy_stream(now))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -943,7 +943,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = report_operating(eofy_stream(Show_FY))
+  reports_stream = report_operating(eofy_stream(now))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -1083,7 +1083,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = report_balance(eofy_stream(Show_FY))
+  reports_stream = report_balance(eofy_stream(now))
 
   # Return if nothing to do
   if (DEVNULL == reports_stream)
@@ -1216,7 +1216,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = report_market(eofy_stream(Show_FY))
+   reports_stream = report_market(eofy_stream(now))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -1301,7 +1301,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = report_depreciation(eofy_stream(Show_FY))
+  reports_stream = report_depreciation(eofy_stream(just_before(now)))
   if (DEVNULL == reports_stream)
     return
 
@@ -1406,9 +1406,9 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
   sale_appreciation = get_cost(SOLD_APPRECIATION, now) - get_cost(SOLD_APPRECIATION, past)
   sale_depreciation = get_cost(SOLD_DEPRECIATION, now) - get_cost(SOLD_DEPRECIATION, past)
   if (!near_zero(sale_depreciation))
-    printf  "\n%24s %115s\n", "Depreciation from Sales", print_cash(sale_depreciation) > reports_stream
+    printf  "\n%24s %*s\n", "Depreciation from Sales", 105 + 8 * is_detailed, print_cash(sale_depreciation) > reports_stream
   if (!near_zero(sale_appreciation))
-    printf  "\n%24s %115s\n", "Appreciation from Sales", print_cash(-sale_appreciation) > reports_stream
+    printf  "\n%24s %*s\n", "Appreciation from Sales", 105 + 8 * is_detailed, print_cash(-sale_appreciation) > reports_stream
   total_depreciation += sale_depreciation + sale_appreciation
 
   # Print a nice line
@@ -1436,7 +1436,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = report_dividend(eofy_stream(Show_FY))
+  reports_stream = report_dividend(eofy_stream(now))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
