@@ -3,16 +3,23 @@
 # Transaction Records #
 
 The main input file is the _journal_ consisting of lines of text where most lines describe transactions; for example a simple transaction is
+
 ```
 2018 Jun 01,           CBA,     BANK.FEES,          10.00, # CBA Fees
 ```
-Each transaction is comma-separated list of fields; the first field records the [date](https://github.com/oycar/minus-plus/wiki/Date-Format) in one of several supported formats
-In most cases the next two fields record a credit account (from which money is paid out) and a debit account; which receives the payment. The next field is the amount
-(which in the above example is _$10.00_), with an optional comment indicated by a **#** symbol. So the above transaction records that _$10_ was
-paid in bank fees from an account with the short name **CBA** (a bank account in this example) on June 1st, 2018.   
 
-_Minus Plus_ does not need to have accounts defined or declared; instead they will be created when first needed; however since _Minus Plus_ uses a hierarchical naming system
-to keep track of the accounts on their first use the full hierarchical name must be used. For example a bank account (_CBA_ say) would have a name like
+Each transaction is comma-separated list of fields; the first field records the date in one of the several supported [formats](https://github.com/oycar/minus-plus/wiki/Date-Format).
+Normally the next two fields record a credit account (from which money is paid out) and a debit account; which receives the payment. The next field is the amount transacted
+(which in the above example is _$10.00_), with a final optional comment indicated by a _#_ symbol. So the above transaction records that _$10_ was
+paid in bank fees from an account with the short name **CBA**  on June 1st, 2018.   
+
+_Minus Plus_ creates accounts on  the fly when first encountered using their full name to decide what type of
+account each is. The naming system is hierarchical with a dotted _class name_ followed by a colon and a unique
+_leaf name_. On subsequent uses the leaf name alone can be used to identify the account.
+There is some latitude in naming accounts, although certain rules need to be followed for accounts to
+be drawn up properly.
+
+Example bank account names might be as follows:
 
 ```
 # CLASS.NAME:LEAF.NAME
@@ -20,16 +27,16 @@ to keep track of the accounts on their first use the full hierarchical name must
 ASSET.CURRENT:CASH
 ASSET.CURRENT.BANK:CBA
 ASSET.CURRENT.BANK.CUA:SAVINGS.CUA
-
 ```
-At the very least a bank account must be named with _class name_ **_ASSET.CURRENT_**; this means it is has top
-level class **_ASSET_** and is a liquid or current asset.
+
+At the very least a bank account must have the leading components _class name_ **_ASSET.CURRENT_**; this means it is has top
+level class **_ASSET_** and is a current asset, i.e. is liquid or able to be liquid within one year.
 The leaf name must be unique and is the identifying name in later references to the account. The _class name_
-can have more than the minimum _ASSET.CURRENT_
+can have more than the minimum **ASSET.CURRENT**
 components; when financial statements are drawn up sub-headings will correspond to the
 final component of the class name; so a good option for the class
-name is _ASSET.CURRENT.BANK_; if there are many accounts
-they could be further sub-classified; by bank for example _ASSET.CURRENT.BANK.CBA_.
+name is **ASSET.CURRENT.BANK**; if there are many accounts
+they could be further sub-classified; by bank for example **ASSET.CURRENT.BANK.CBA**.
 
 All accounts are formed from
 one of five top level classes;
@@ -62,7 +69,7 @@ If a line starts with one or more _#_ characters the whole line is a comment;
 # State Records #
 
 Transactions and comments are the bulk of a journal file but other types of data are needed to complete a set of
-accounts, these are _state records_ which is the internal format _Minus Plus_ uses to write out its internal state
+accounts, these include _state records_ which is the internal format _Minus Plus_ uses to write out its internal state
 in output _state files_; which can be used to record a set of accounts without the need of processing the
 journal files (typically this is quicker). Whilst not designed as a data input format it is useful
 to set certain fixed properties; such as a journal title, the location of documents linked to transactions and so on.
@@ -95,7 +102,7 @@ listing.
 
 Apart from _state_records_ more fine control of how *Minus Plus* operates can be obtained with _control records_. Unlike
 _state_records_ these can either interrogate or modify the accounts or set time varying properties like taxation rates
-and levies.
+and levies. They can also indicate share splits, share merges and asset name changes.
 
 For an  individual tax payer tax rates, levies and offsets are quite complex and can vary from year to year.
 For example here they are for financial year 2018, (i.e 2017-2018) in Australia.
@@ -201,9 +208,9 @@ _Minus Plus_ will reassign this asset to the _ASSET.CURRENT_ class automatically
 * **LIABILITY.CURRENT** - a current liability
 * **LIABILITY.TERM** - A liability with a fixed term, such as a loan. Again when within twelve months of maturity this would be reassigned to the _LIABILITY.CURRENT_ class.
 * **LIABILITY.MEMBER** - Accounts used to track the members' interests in a superannuation fund
-* **LIABILITY.MEMBER.STREAM** - A liability supporting a member's income steam
+* **LIABILITY.MEMBER.STREAM** - A liability supporting a SMSF member's income steam
 
-* **INCOME.CONTRIBUTION** - And payments made by members to the fund
+* **INCOME.CONTRIBUTION** - payments made by SMSF members to the fund
 * **INCOME.EXEMPT** - income exempt of tax
 * **INCOME.DIVIDEND** - A dividend payment; subject to dividend qualification rules
 * **INCOME.DISTRIBUTION** - identifying income as a trust distribution
@@ -213,11 +220,11 @@ _Minus Plus_ will reassign this asset to the _ASSET.CURRENT_ class automatically
 * **EXPENSE.DIVIDEND** - A dividend paid by a company
 * **EXPENSE.BENEFIT** - A benefit paid by a SMSF to a member
 
-So for example a share holding in a company _BHP_ must commence with the name _ASSET.CAPITAL_ and record units bought and sold.
+So for example a share holding in a company _BHP_ must commence with the name **ASSET.CAPITAL** and record units bought and sold.
 The rest of the name can be freely chosen; but when financial statements are drawn up the last component of the class name
-will be used as a sub-heading; therefore a descriptive class name could be _ASSET.CAPITAL.SHARES_. This class name should
+will be used as a sub-heading; therefore a descriptive class name could be **ASSET.CAPITAL.SHARES**. This class name should
 then be used for other share holdings if they are to be displayed together in the financial statements. A full name could be
-_ASSET.CAPITAl.SHARES:BHP.ASX_ for example.
+**ASSET.CAPITAl.SHARES:BHP.ASX** for example.
 
 # Predefined Accounts #
 
@@ -267,10 +274,10 @@ Offsets are a tax credit; they should be inserted in the credit account field.
 # Linked Accounts #
 
 From the above example if a dividend is to be received from a company the account describing
-it must begin with class _INCOME.DIVIDEND_. Furthermore it needs to be linked to its underlying
+it must begin with class **INCOME.DIVIDEND**. Furthermore it needs to be linked to its underlying
 asset so that dividend qualification for can be carried out correctly. So if we have
-company account _ASSET.CAPITAL.SHARES:BHP.ASX_ then a dividend paid out by the company should
-be credited to account _INCOME.DIVIDEND:DIV.BHP.ASX_ (although their could be extra name
+company account **ASSET.CAPITAL.SHARES:BHP.ASX** then a dividend paid out by the company should
+be credited to account **INCOME.DIVIDEND:DIV.BHP.ASX** (although their could be extra name
 components at the end of the class name.) Thus
 
 ```

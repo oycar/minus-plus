@@ -1,40 +1,39 @@
 ## Minus-Plus Usage ##
 
-Here a number of examples of that extend the examples in the _example.jrn_
+Here are a number of examples of that extend the examples in the _example.jrn_
 file to demonstrate
 how different financial transactions can be accounted for using _Minus Plus_.
 
 # Handling Rent and Property Expenses #
-This is simple - just create appropriate _INCOME_ and _EXPENSE_ accounts
-These can be as fine grained as required; e.g. a single _EXPENSE_ account
-could be used or they could be broken up into agency expenses, repairs, rates etc.
+This is simple - just create appropriate **INCOME** and **EXPENSE** accounts
+These can be as fine grained as required; e.g. a single **EXPENSE** account or alternatively various accounts broken up into agency expenses, repairs, rates could be used.
 In either case financial statements will be produced using the final component
 of the class name as a sub-header; so so if multiple properties were held
-then these could be collected up in one heading with accounts like _INCOME.FIRST.PROPERTY:FIRST.RENT_
-_INCOME.SECOND.PROPERTY:SECOND.RENT_, and so on; alternatively account names like
-_INCOME.PROPERTY.FIRST_PROPERTY:FIRST.RENT_ would create different sub-headings for each property.
+then these could be collected up in one heading with accounts like **INCOME.FIRST.PROPERTY:FIRST.RENT**,
+**INCOME.PROPERTY.SECOND:SECOND.RENT**, and so on; alternatively account names like
+**INCOME.PROPERTY.FIRST_PROPERTY:FIRST.RENT** would create different sub-headings for each property. (The _PROPERTY_ name component is not required.)
 
 ```
-2008 Aug 08,                       CASH, EXPENSE.PROPERTY:AGENT.EXPENSE,    52.58, # Rent - Agent's Expenses
-2008 Aug 08,  INCOME.PROPERTY:FARM.RENT,                           CASH,   640.00, #
+2008 Aug 08,  CASH, EXPENSE.PROPERTY:AGENT.EXPENSE,    52.58, # Rent - Agent's Expenses
+2008 Aug 08,  INCOME.PROPERTY:FARM.RENT,      CASH,   640.00, #
 ```
 
 # Processing GST #
-If the accounts need to look after GST (or for that matter VAT)
+If  GST (or for that matter VAT) need to be accounted for
 a GST field can be appended to the earlier fields. In the case of a share or managed fund
 transaction GST is only applied to the brokerage and so a purchase of 52 units
 in the _CBAPB_ hybrid trust  might look like
 ```
-2008 Aug 14,  LIABILITY.CURRENT:CREDITOR,  ASSET.CAPITAL.TRUSTS:CBAPB.ASX,   9884.70,   52,  32.95,  GST,  [B], [H], # CBAPB - Perls IV -  52
+2008 Aug 14,  LIABILITY.CURRENT.CREDITOR,  ASSET.CAPITAL.TRUSTS:CBAPB.ASX,   9884.70,   52,  32.95,  GST,  [B], [H], # CBAPB - Perls IV -  52
 ```
 which would apply GST at the rate specified by the variable _GST_Rate_, which is 10% by default.
-Often for super funds a reduced rate of GST applies, which is signified by the _PART_GST_ field
+For Australian super funds a reduced rate of GST often applies, which is signified by the _PART_GST_ field
 
 ```
 2008 Sep 25,    CSR.ASX,   ANZ,   1207.05, -500,  32.95,  PART_GST,  [S], [H], # Disposal of 500 units in CSR.ASX
 ```
 
-A GST refund would look like this, with _TAX.GST_ being a predefined account _LIABILITY.TAX:TAX.GST_
+A GST refund would look like this, with _TAX.GST_ being a predefined account **LIABILITY.TAX:TAX.GST**
 ```
 2008 Oct 17,   TAX.GST,    CASH,   167.00, # ATO GST Refund
 ```
@@ -53,7 +52,7 @@ which would yield a running total of the _TAX.GST_ account.
 
 # Income Tax #
 
-Paying income tax involves other predefined accounts _LIABILITY.TAX:TAX_, _LIABILITY.TAX:TAX.PAYG_ and the
+Paying income tax involves other predefined accounts **LIABILITY.TAX:TAX**, **LIABILITY.TAX:TAX.PAYG** and the
 administrative levy EXPENSE.LEVY:ATO.LEVY_
 
 ```
@@ -66,8 +65,8 @@ administrative levy EXPENSE.LEVY:ATO.LEVY_
 # Managed Fund Distributions #
 
 Distributions from managed funds are taxed on an accrual rather than a cash basis. To deal with this
-record distributions as being paid from a current _ASSET_ account _ASSET.CURRENT.ACCRUED_ (or in fact any
-distinctive final class name component could be used, eg _ASSET.CURRENT.DUE_)
+record distributions as being paid from a current **ASSET** account **ASSET.CURRENT.ACCRUED** (in fact
+the final name component _ACCRUED_ is not required, but if some distinctive final name is not used the end of financial year accounts will not present these entries under a separate sub–heading.)
 
 ```
 2009 Jan 07, ASSET.CURRENT.ACCRUED:UBS_AUS.DUE,    CASH,  707.55,             [D], # UBS Australian Bonds Distribution
@@ -95,8 +94,8 @@ can be paid as capital return from the asset capital account itself;
 ```
 
 Other possible transactions related to end of financial year statements include net
-capital gains recorded in an annual tax statement from account _ASSET.CAPITAL.TRUSTS:LEAF.NAME_
-are recorded to _INCOME.GAINS.NET:GAINS.LEAF.NAME_
+capital gains recorded in an annual tax statement from account **ASSET.CAPITAL.TRUSTS:LEAF.NAME**
+are recorded to **INCOME.GAINS.NET:GAINS.LEAF.NAME**
 The _GAINS.LEAF.NAME_ is a linked account; and sums processed here will be handled
 to produce the appropriate taxable gains in the end of financial year statement; the gains reported
 should be the actual net gains recorded as being paid; not the grossed up gains. The accounts
@@ -112,7 +111,7 @@ is recorded as being paid to the capital asset, increasing the cost basis
 2009 Jun 30,  DIST.HHY.ASX,                     HHY.ASX,     594.00,           [T], # HHY Annual Statement
 ```
 
-Foreign sourced income can be handled with special class _INCOME.FOREIGN_. An optional field here after
+Foreign sourced income can be handled with special class **INCOME.FOREIGN**. An optional field here after
 the amount would indicate foreign tax offsets rather than franking credits
 ```
 # DATE          CREDIT ACCOUNT            DEBIT ACCOUNT      AMOUNT  FOREIGN OFFSET DOCUMENTS   COMMENTS
@@ -121,10 +120,10 @@ the amount would indicate foreign tax offsets rather than franking credits
 ```
 
 Yet another possibility is for exempt income which is not subject to taxes at all;
-this can be classified as being paid to an account in class _INCOME.EXEMPT_,
+this can be classified as being paid to an account in class **INCOME.EXEMPT**,
 the leaf name is not linked (so any unique leaf name could be used)
 ```
-2009 Jun 30,   INCOME.EXEMPT:EXEMPT.LLC.ASX,      LLC.DUE,          53.97,     [T], # LLC Non-Assesable, no impact on cost base
+2009 Jun 30,   INCOME.EXEMPT:EXEMPT.LLC.ASX,      LLC.DUE,          53.97,     [T], # LLC Non Assessable, no impact on cost base
 ```
 
 
@@ -151,9 +150,65 @@ will be mistaken for a franking credit) - this is getting almost as complex as i
 2013 Aug 27,  DIV.AMH.ASX,     AMH.ASX,  400.00,   459.000,    171.43,       357.14      [D],  [H], # AMH 2013 Dividends
 ```
 
+# Cost Elements #
+
+_Minus Plus_ uses the concept of a  [cost element](https://www.ato.gov.au/General/Capital-gains-tax/Working-out-your-capital-gain-or-loss/Cost-base/Elements-of-the-cost-base-and-reduced-cost-base/) in
+keeping track of an asset's account balance. Whenever a unitized asset is bought the cost is recorded as being in the _first cost element I_. Any other cost adjustment, (eg brokerage, a
+capital return), would by default be applied to the _second cost element II_. However this behaviour can be modified by specifying the cost element explicitly;
+
+```
+## DATE                     CREDIT ACCOUNT                DEBIT ACCOUNT      AMOUNT    COST ELEMENT      EFFECTIVE DATE    COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2008 Jun 26,                     CASH,                      FARM.990,      436401.85,       I,            2008 May 05,     # Farm Final Installment
+2008 Jun 26,                     CASH,                      FARM.990,           5.00,       I,            2008 May 05,     # Bank Charges for Bank Cheque
+```
+in this case the adjustments are made to cost element _I_, the purchase cost, directly. Altogether there are five cost elements which make up the
+[cost base](https://www.ato.gov.au/forms/guide-to-capital-gains-tax-2017/?anchor=What_is_cost_base#What_is_cost_base) of a capital gains tax liable asset, **ASSET.CAPITAL**. These are:
+
+<ol type="upper-roman">
+  <li>Money paid or property given for the CGT asset</li>
+  <li>Incidental costs of acquiring the CGT asset or that relate to the CGT event</li>
+  <li>Costs of owning the CGT asset</li>
+  <li>Capital costs to increase or preserve the value of your asset or to install or move it</li>
+  <li>Capital costs of preserving or defending your title or rights to your CGT asset</li>
+</ol>   
+
+_Minus Plus_ uses the Roman Numerals _I_, _II_, _III_, _IV_ or _V_ to indentify these.
+
+Thus
+
+```
+2018 May 31, CASH, ASSET.CAPITAL.SHARES:ABC, 100.0, 100, # Pay $100 for 100 units of ABC, uses the first cost element I
+2018 May 31, CASH,                      ABC,  10.0, II, # Pay $100 into the second cost element II - eg for brokerage, no units
+
+## More arbitrary examples
+2018 Jun 01, CASH, ASSET.CAPITAL:SOMETHING, 5000.0,  1, # Pay $5000 to the first cost element I - one unit bought
+2018 Jun 02, CASH,               SOMETHING,  100.0, IV, # Pay $100 into the fourth cost element IV - no units bought or sold
+2018 Jun 03, CASH,               SOMETHING,  100.0,  V, # Pay $100 into the fifth cost element V - no units bought or sold
+```
+So purchase costs would be cost element _I_, brokerage costs cost element _II_, fees paid to obtain a valuation cost element _III_, and so on.
+
+# Cost Bases #
+
+Cost elements are not the only complication, since each asset also has both a [cost base](https://www.ato.gov.au/forms/guide-to-capital-gains-tax-2017/?anchor=What_is_cost_base#What_is_cost_base),
+generally the cost of purchasing an asset, and a  [reduced cost base](https://www.ato.gov.au/general/capital-gains-tax/working-out-your-capital-gain-or-loss/cost-base/elements-of-the-cost-base-and-reduced-cost-base/). These cost bases are typically identical, but they can diverge in certain circumstances. An example is the payment of _tax-free_ distributions as a [trust non-assessable payment](https://www.ato.gov.au/general/capital-gains-tax/shares,-units-and-similar-investments/non-assessable-payments-in-relation-to-shares-and-units/trust-non-assessable-payments-(cgt-event-e4)/);
+
+A tax-free payment reduces only the _reduced cost base_, this is accomplished by bracketing the cost element symbol,
+here the second cost element _II_, which notes that the _$1000_ cost base reduction is a tax adjustment.
+```
+## Non-assessable payments
+2013 Jun 30,  ASSET.CAPITAL.TRUST:SOME.TRUST, SOME.DUE,  1000.00,       # A tax-deferred payment from SOME.TRUST, reduces both cost bases
+2013 Jun 30, INCOME.EXEMPT:EXEMPT.SOME.TRUST, SOME.DUE,  1000.00,       # A tax-exempt or CGT-concession payment from SOME.TRUST, does not change either cost base
+2013 Jun 30,  ASSET.CAPITAL.TRUST:SOME.TRUST, SOME.DUE,  1000.00, (II), # A tax-free payment from SOME.TRUST, changes reduced cost base only
+
+## Assessable payments
+2013 Jun 30, INCOME.DISTRIBUTION:DIST.SOME.TRUST, SOME.DUE, 1000.00, 100.00,   # An assessable distribution - with franking credits of $100
+2013 Jun 30,       INCOME.FOREIGN:FOR.SOME.TRUST, SOME.DUE, 1000.00,  50.00,   # An assessable foreign sourced distribution - with foreign tax credits of $50
+```
+
 # Depreciation #
 
-Another major issue is depreciation. This can be processed by using assets of class _ASSET.FIXED_
+Another major issue is depreciation. This can be processed by using assets of class **ASSET.FIXED**
 which are (like capital assets) unitised but (unlike capital gains) not subject to capital
 gains and losses. Instead they can be depreciated over a period of time.
 
@@ -164,9 +219,9 @@ gains and losses. Instead they can be depreciated over a period of time.
 2012 Dec 19,    FARM.FENCES,       TAX.GST,            102.96,    I,                    # GST adjustment to Cost Element I
 ```
 
-GST cannot be applied directly to this transaction because normally GST is applied as a cost element II adjustment;
-in this case of a fixed depreciating asset it needs to be applied to  the purchase cost in cost element I directly;
-which it is simple to do using one extra transaction. (Note that
+GST cannot be applied directly to this transaction because normally GST is applied as a _cost element II_ adjustment;
+in this case of a fixed depreciating asset it needs to be applied to  the purchase cost in _cost element I_ directly;
+which it is simple to do by using one extra transaction. (Note that
 no parcel date needs to be specified if the adjustment is made on the same day as the original transaction.)
 
 
@@ -182,7 +237,20 @@ method will stay the same.
 2013 Apr 15,      CASH,          FARM.FENCES,   7115.44, # Farm Fencing (Replacement of old fences)
 ```
 
-If the depreciating
+It is debatable whether a fencing project should be accounted for as a single initial cost followed by extra costs incurred
+later as second element costs or rather as several separate assets purchased on separate dates, if each involved the
+construction of a separate stretch of fence; (versus different types of cost coming due at different times, like fence posts
+first, followed by labour, followed by more materials etc). In the case of several self-contained periods of fence making then each extra
+batch could be treated as a different unit;
+
+```
+#   DATE    CREDIT ACCOUNT      DEBIT ACCOUNT   AMOUNT   UNITS  COMMENTS
+#____________________________________________________________________________________________________________________________________________
+2013 Apr 15,      CASH,          FARM.FENCES,   7115.44,   1,   # Farm Fencing (Replacement of old fences)
+```
+Since lifetime and the method are already defined they do not need to be included here for this extra unit.
+
+
 
 Prime cost, PC, (or straight line) depreciation can also be used
 ```
@@ -192,7 +260,7 @@ Prime cost, PC, (or straight line) depreciation can also be used
 ```
 
 Depreciation can be inserted manually into the accounts (if computed using an external application)
-The amount is paid to the predefined debit account _EXPENSE.DEPRECIATION:DEPRECIATION_
+The amount is paid to the predefined debit account **EXPENSE.DEPRECIATION:DEPRECIATION**
 ```
 #   DATE      CREDIT ACCOUNT   DEBIT ACCOUNT     AMOUNT   COST ELEMENT    COMMENTS
 #____________________________________________________________________________________________________________________________________________
@@ -200,50 +268,28 @@ The amount is paid to the predefined debit account _EXPENSE.DEPRECIATION:DEPRECI
 ```
 
 
-Depreciation is not a standard expense it that it is a tax adjustment;
-tax is already saved on the depreciation even while the asset is being held.
-So if a (capital) asset is purchased for $1000 and it has $500 of
-the capital returned before being sold for $600 then (overall) $100
-of gains were made (reduced cost = 500, tax adjustments = 0, adjusted cost = 500
-sale cost = 600, overall profits sale cost - adjusted cost = 100)
+Depreciation is not a standard expense in that it incurs a tax adjustment;
+as in the case of a tax-free distribution from a trust the
+reduced cost base of the asset decreases, but the cost base stays the same. In both
+cases an immediate tax benefit has occurred; to tax was payable on the tax-free
+payment and tax can be reclaimed on the depreciation expense.
 
-
-Now consider a depreciating asset costing $1000 with $500 of depreciation incurred.
-The reduced cost    =  500
-The tax adjustments = (500)  (since tax has been deducted on $500)
-The adjusted cost   =  500 - (500) = 1000
-Sale cost           =  600
-Sale cost is greater than reduced cost (500) so no taxable losses
-Sale cost is less than adjusted cost  (1000) so no taxable gains
-
-
-The difference is that in the former case $500 of capital returns flowed
-into other assets before the sale; so the overall return was actually $1100
-In the case of the depreciating asset the $500 of depreciation was just
-a tax deduction; no corresponding monies accrued to any fund assets
-the overall return was actually a loss of ($400); but tax deductions
-pertaining to $500 had already been claimed; so no further claims can be made
-If we compare the case of a sale for $1100 instead then the overall
-taxable profits are $100; and as in the above case tax would be payable
-on this $100. (Although in this case as income rather than capital gains.)
-
-To account for this a tax adjustment can be associated with each of the
-cost elements and is indicated by surrounding the cost element in question
-with brackets; for depreciation this is always the first cost element (I).
 
 Depreciation can thus be entered manually by using the cost element (I).
 Alternatively the special symbol (D) can be used which triggers automatic
 depreciation at the date requested; e.g.
 ```
-2013 Jan 01,  FARM.FENCES,    DEPRECIATION,     0.00,      (D),        # Automatic depreciation at an arbitrary date
+2013 Jan 01,  FARM.FENCES,    DEPRECIATION,     0,      (D),        # Automatic depreciation at an arbitrary date
 ```
 
 The amount will be ignored and the internally computed value used; therefore
-and amount of 0 can be used.
+and amount of zero can be used. However it is not necessary to include
+depreciation in the journal files at all; if assets are declared as depreciating
+assets they will be depreciated automatically at the end of  the financial year
+and appropriate entries will be added to the financial statements.
 
-The final depreciation report for the fences might look like the following if
-altogether five separate payments were made to complete the project over a
-period of a few months;
+
+
 
 ```
 Depreciation Schedule for the Period [2012 Jul 01, 2013 Jul 01]
@@ -264,11 +310,12 @@ No second element costs were incurred because each cost corresponded to a new se
 adjustments to earlier work. This could have equally been accounted for as five different assets with different names, but this
 approach is more elegant. If the stages of the project had (for some reason) different lifetimes or were depreciated in a different
 way (eg prime cost rather than diminishing value) then it would be necessary to use separate accounts for those that differed.
-
+0
 
 In Australia depreciating items can be pooled if they are of low value; in this case each member of the
 pool is a separate parcel (so each represents at least one unit). The method name is POOL and the effective
-lifetime is always 5.3333 years.
+lifetime is always 5.3333 years in Australia. (A lifetime of _l_ years means that in one year _1/l_ of
+the balance of the value can be depreciated, or for 5.3333 years _18.75%_.)
 
 To allow the components of the pool to be identified in the financial statements it is convenient
 to give each parcel a label, which would always be the last optional field before
@@ -355,3 +402,67 @@ According to statement deemed tax value was $9.31 per share so $9.03 per share w
 2011 Apr 18,      DISPOSALS,                          CASH,     46.76,                                        [BHP Share Buyback:], # BHP Capital payment (BHP Buyback) - $0.28 per share
 2011 Apr 18,    DIV.BHP.ASX,                          CASH,   6775.19,                2903.65,   2011 Feb 25, [BHP Share Buyback:], # BHP Buyback Dividend
 ```
+
+# Company Share Splits, Merges and Code Changes #
+
+Control records can handle share splits and merges; for example
+```
+2017 Mar 17, [TFC Code Change]
+CHANGE, TFC.ASX, ASSET.CAPITAL.SHARES
+```
+produces the code change
+```
+##
+## Change TFC.ASX => QIN.ASX by factor    1.00
+##   Date => 2017 Mar 17
+##   TFC.ASX Cost            =>  28,718.09
+##   TFC.ASX Units           =>  17000.000
+##   TFC.ASX Qualified Units =>  17000.000
+##   After Change
+##   QIN.ASX Cost            =>  28,718.09
+##   QIN.ASX Units           =>  17000.000
+##   QIN.ASX Qualified Units =>  17000.000
+##
+```
+whilst a share split
+```
+## Note the name change with the split; MLT.AX => MLT.ASX
+2013 Oct 22, [MLT Split]
+SPLIT, MLT.AX, ASSET.CAPITAL.SHARES:MLT.ASX
+```
+also requires a leaf name change and produces
+```
+##
+## Split  MLT.AX => MLT.ASX by factor    5.00
+##   Date => 2013 Oct 22
+##   MLT.AX Cost            =>  47,823.15
+##   MLT.AX Units           =>   2877.000
+##   MLT.AX Qualified Units =>   2093.000
+##   After Split
+##   MLT.ASX Cost            =>  47,823.15
+##   MLT.ASX Units           =>  14385.000
+##   MLT.ASX Qualified Units =>  10465.000
+##
+```
+As with any _control record_ the date is that carried from the previous transaction.
+At the end of the financial year the old asset name will be shown as disposed
+with zero gains; the new asset will be an accurate copy albeit with a possibly
+changed number of units.
+
+
+The *MERGE* and *SPLIT* actions are reciprocals; so
+```
+MERGE, ABC.AX, ASSET.CAPITAL.SHARES:ABC.ASX, 10.0
+```
+is identical to
+```
+SPLIT, ABC.AX, ASSET.CAPITAL.SHARES:ABC.ASX, 0.10
+```
+Similarly *CHANGE* is the same as
+```
+## A Code Change
+SPLIT, ABC.AX, ASSET.CAPITAL.SHARES:ABC.ASX, 1.0
+```
+
+After creating a new asset name any associated dividend names
+will also need redefining when used.

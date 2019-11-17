@@ -2045,7 +2045,7 @@ function split_account(now, a, b, split_factor,
   # Write to tranaction file
   printf "##\n"
   printf "## %s %s => %s by factor %7.2f\n", label, Leaf[a], Leaf[b], ((split_factor < 1)?( 1.0 / split_factor):( split_factor))
-  printf "##   Date => %s\n", get_date(now) > "/dev/stderr"
+  printf "##   Date => %s\n", get_date(now)
   printf "##   %s Cost            => %s\n", Leaf[a], print_cash(get_cost(a, now))
   printf "##   %s Units           => %10.3f\n", Leaf[a], ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
   printf "##   %s Qualified Units => %10.3f\n", Leaf[a], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   now))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[a],    now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))))

@@ -129,6 +129,7 @@ BEGIN {
   make_array(Account_Term)
   make_array(Accounting_Cost)
   make_array(Cost_Basis)
+  make_array(Dividend_Date)
   make_array(Foreign_Offset_Limit)
   make_array(Held_From)
   make_array(Held_Until)
@@ -144,7 +145,6 @@ BEGIN {
   make_array(Parcel_Tag)
   make_array(Parent_Name)
   make_array(Price)
-  make_array(Payment_Date)
   make_array(Qualified_Units)
   make_array(Short_Gains)
   make_array(Short_Losses)
@@ -872,7 +872,7 @@ function parse_transaction(now, a, b, amount,
         # Save the ex-dividend date
         # But note that it must relate to an underlying asset
         #
-        set_entry(Payment_Date[underlying_asset], now, Extra_Timestamp)
+        set_entry(Dividend_Date[underlying_asset], now, Extra_Timestamp)
 
       } else if (Qualification_Window && (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION.CLOSE"))) {
         Extra_Timestamp = get_exdividend_date(underlying_asset, now)

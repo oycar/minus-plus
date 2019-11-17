@@ -28,11 +28,11 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
   # payment date - now since  the
   # payment date must be after the qualifying date
   # search back to find the earlier entries
-  # since Payment_Date[ex_dividend_date] => now-ish
-  if (a in Payment_Date) {
+  # since Dividend_Date[ex_dividend_date] => now-ish
+  if (a in Dividend_Date) {
 
     # Get the most recent payment date
-    value = find_entry(Payment_Date[a], now)
+    value = find_entry(Dividend_Date[a], now)
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
@@ -50,7 +50,7 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     #
     key = found_key
     while (key) {
-      value = find_entry(Payment_Date[a], just_before(key))
+      value = find_entry(Dividend_Date[a], just_before(key))
       if ((now - value) > discrepancy)
         # A worse match
         break
@@ -1757,7 +1757,7 @@ function split_account(now, a, b, split_factor,
   # Write to tranaction file
   printf "##\n"
   printf "## %s %s => %s by factor %7.2f\n", label, Leaf[a], Leaf[b], ternary(split_factor < 1, 1.0 / split_factor, split_factor)
-  printf "##   Date => %s\n", get_date(now) > STDERR
+  printf "##   Date => %s\n", get_date(now)
   printf "##   %s Cost            => %s\n", Leaf[a], print_cash(get_cost(a, now))
   printf "##   %s Units           => %10.3f\n", Leaf[a], get_units(a, now)
   printf "##   %s Qualified Units => %10.3f\n", Leaf[a], get_qualified_units(a, now)
@@ -1812,10 +1812,10 @@ function split_account(now, a, b, split_factor,
       delete Price[a][key]
 
   # Also need exdividend dates
-  for (key in Payment_Date[a])
+  for (key in Dividend_Date[a])
     if (greater_than(key, now)) {
-      Payment_Date[b][key] = Payment_Date[a][key]
-      delete Payment_Date[a][key]
+      Dividend_Date[b][key] = Dividend_Date[a][key]
+      delete Dividend_Date[a][key]
     }
 
   # All done

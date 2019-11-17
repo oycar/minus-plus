@@ -20,10 +20,10 @@
 @define DEVNULL "/dev/null"
 
 # //
-@define SHARED_ARRAYS "Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit\
- Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date\
- Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units\
- Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
+@define SHARED_ARRAYS "Account_Term Accounting_Cost Capital_Losses Cost_Basis Dividend_Date\
+ Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name\
+ Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price\
+ Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
  Total_Units Underlying_Asset Units_Held "
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
