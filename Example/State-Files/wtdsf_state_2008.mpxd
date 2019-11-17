@@ -28992,7 +28992,7 @@ ASSET.CAPITAL.MANAGED:ABSOLUTE.UBS,1372766400,1.035600
 ^,1339675200,0.917000
 ^,946742400,0
 >>
-<<,Payment_Date
+<<,Dividend_Date
 ASSET.CAPITAL.TRUSTS:LLC.ASX,1566561600,1568635200.000000
 ASSET.CAPITAL.TRUSTS:AYF.ASX,1545998400,1547553600.000000
 ^,1538049600,1539604800.000000
@@ -31252,6 +31252,6 @@ ASSET.TERM.DEPOSIT:TERM00.CUA,1205323200,3
 <<,Document_Root,/Users/wilkins/CloudStation/Projects/Accounts/WTDSF Documents/,>>
 <<,Document_Protocol,file://,>>
 <<,MPX_Scalars,MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Date FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function  Balance_Profits_Function Check_Balance_Function ,>>
-<<,MPX_Arrays,Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Payment_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Threshold_Dates Total_Units Underlying_Asset Units_Held  ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ,>>
+<<,MPX_Arrays,Account_Term Accounting_Cost Capital_Losses Cost_Basis Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Dividend_Date Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Threshold_Dates Total_Units Underlying_Asset Units_Held  ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ,>>
 <<,MPX_Version,Version bfcf1,>>
 START_JOURNAL
