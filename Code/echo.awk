@@ -389,11 +389,11 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
   # payment date - now since  the
   # payment date must be after the qualifying date
   # search back to find the earlier entries
-  # since Payment_Date[ex_dividend_date] => now-ish
-  if (a in Payment_Date) {
+  # since Dividend_Date[ex_dividend_date] => now-ish
+  if (a in Dividend_Date) {
 
     # Get the most recent payment date
-    value = ((__MPX_KEY__ = find_key(Payment_Date[a],  now))?( Payment_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Payment_Date[a][0]):( 0))))
+    value = ((__MPX_KEY__ = find_key(Dividend_Date[a],  now))?( Dividend_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Dividend_Date[a][0]):( 0))))
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
@@ -411,7 +411,7 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     #
     key = (__MPX_KEY__)
     while (key) {
-      value = ((__MPX_KEY__ = find_key(Payment_Date[a],  ((key) - 1)))?( Payment_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Payment_Date[a][0]):( 0))))
+      value = ((__MPX_KEY__ = find_key(Dividend_Date[a],  ((key) - 1)))?( Dividend_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Dividend_Date[a][0]):( 0))))
       if ((now - value) > discrepancy)
         # A worse match
         break
@@ -2100,10 +2100,10 @@ function split_account(now, a, b, split_factor,
       delete Price[a][key]
 
   # Also need exdividend dates
-  for (key in Payment_Date[a])
+  for (key in Dividend_Date[a])
     if ((((key) - ( now)) > 0)) {
-      Payment_Date[b][key] = Payment_Date[a][key]
-      delete Payment_Date[a][key]
+      Dividend_Date[b][key] = Dividend_Date[a][key]
+      delete Dividend_Date[a][key]
     }
 
   # All done

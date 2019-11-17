@@ -137,7 +137,4 @@ SET_ENTRY, GST_Rate, 0.10
 
 ## Finally before actual transactions start we need to use START_JOURNAL
 ## It needs to include a start date within the first financial year of the journal
-START_JOURNAL, 2018 Jul 01
-
-## If the comments are not changed we have setup transactions for a SMSF
-## with tax rates set for 2019 in Australia
+START_JOURNAL, 2008 Jul 01
