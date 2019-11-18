@@ -113,6 +113,8 @@ END {
 
 
 
+
+
 # // The stream to write reports to
 
 
@@ -1307,9 +1309,6 @@ function set_special_accounts() {
   #
   # Deferred Gains
   DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
-
-  # Other tax credits, offsets & deductions
-  LIC_DEDUCTION    = initialize_account("SPECIAL.TAX:LIC.DEDUCTION")
 
   # The DEPRECIATION account
   DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
@@ -3224,7 +3223,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3562,7 +3561,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3702,7 +3701,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3835,7 +3834,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3907,7 +3906,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4042,7 +4041,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4439,6 +4438,7 @@ BEGIN {
   ((SUBSEP in Franking_Deficit_Offsets)?((1)):((0)))
   ((SUBSEP in GST_Rate)?((1)):((0)))
   ((SUBSEP in LIC_Allowance)?((1)):((0)))
+  ((SUBSEP in LIC_Deduction)?((1)):((0)))
   ((SUBSEP in Low_Income_Offset)?((1)):((0)))
   ((SUBSEP in Middle_Income_Offset)?((1)):((0)))
   ((SUBSEP in Medicare_Levy)?((1)):((0)))
@@ -4564,7 +4564,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -4701,7 +4701,7 @@ function income_tax_aud(now, past, benefits,
   # LIC deductions 1/3 for SMSF
   #                1/2 for individual
   #                0/3 for company
-  lic_deduction = - ((LIC_Allowance[2])?( (LIC_Allowance[1]/LIC_Allowance[2])):( assert((0), "Division by zero in rational fraction" LIC_Allowance[1] "/" LIC_Allowance[2]))) * (get_cost(LIC_DEDUCTION, now) - get_cost(LIC_DEDUCTION, past))
+  lic_deduction = - ((LIC_Allowance[2])?( (LIC_Allowance[1]/LIC_Allowance[2])):( assert((0), "Division by zero in rational fraction" LIC_Allowance[1] "/" LIC_Allowance[2]))) * (((__MPX_KEY__ = find_key(LIC_Deduction,  now))?( LIC_Deduction[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( LIC_Deduction[0]):( 0)))) - ((__MPX_KEY__ = find_key(LIC_Deduction,  past))?( LIC_Deduction[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( LIC_Deduction[0]):( 0)))))
 
   # Always apply allowance at this point to catch explicit allocations to LIC
   if (!((((lic_deduction) - ( Epsilon)) <= 0) && (((lic_deduction) - ( -Epsilon)) >= 0))) {
@@ -5352,7 +5352,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6318,13 +6318,13 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Deferred_Gains Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Deferred_Gains Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
-      if (!index(("Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Deferred_Gains Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
+      if (!index(("Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Deferred_Gains Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
         assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
@@ -6334,7 +6334,7 @@ function initialize_state(    x) {
   } else {
     # Use default read and write list
     Write_Variables = (0)
-    MPX_Arrays = ("Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Deferred_Gains Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
+    MPX_Arrays = ("Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Deferred_Gains Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
     MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
@@ -6616,67 +6616,24 @@ function parse_transaction(now, a, b, amount,
       adjust_cost(credit_account, - tax_credits, now)
 
       # Adjust franking account when necessary
-      if (((a) ~ ("^" ( "INCOME.FOREIGN") "[.:]"))) {
+      if (((a) ~ ("^" ( "INCOME.FOREIGN") "[.:]")))
         # Foreign Credits
         adjust_cost(NULL, tax_credits, now)
-        print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, tax_credits)
-      } else {
+      else
         # Franking Credits
         adjust_cost(FRANKING, tax_credits, now)
-        print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, tax_credits)
-      }
 
-      # Store the tax credits
+      # Record the tax credits to the listing
       fields[++ number_fields] = tax_credits
 
     } else
       tax_credits = 0
 
-    # # Foreign or franking credits
-    # if (not_zero(tax_credits)) {
-    #   # Keep an account of tax credits
-    #   # We need the underlying asset to
-    #   assert(underlying_asset, sprintf("Income account %s must have an underlying asset to receive tax credits", Leaf[a]))
-    #   if (a in Tax_Credits)
-    #     credit_account = Tax_Credits[a]
-    #   else {
-    #     # Create tax credits account - just in time
-    #     # Type of credits account depends on the underlying asset
-    #     # INCOME.DIVIDEND     => SPECIAL.FRANKING.OFFSET
-    #     # INCOME.DISTRIBUTION => SPECIAL.FRANKING.OFFSET
-    #     # INCOME.FOREIGN      => SPECIAL.FOREIGN.OFFSET
-    #     #
-    #     if (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION"))
-    #       credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
-    #     else if (is_class(a, "INCOME.FOREIGN"))
-    #       credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FOREIGN.OFFSET:C_TAX." Leaf[underlying_asset])
-    #     else
-    #       assert(FALSE, sprintf("Can't link a tax credit account to income account %s", a))
-    #   }
-    #
-    #   # Adjust credit account
-    #   adjust_cost(credit_account, - tax_credits, now)
-    #
-    #   # Adjust franking account when necessary
-    #   if (is_class(a, "INCOME.FOREIGN")) {
-    #     # Foreign Credits
-    #     adjust_cost(NULL, tax_credits, now)
-    #     print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, tax_credits)
-    #   } else {
-    #     # Frannking Credits
-    #     adjust_cost(FRANKING, tax_credits, now)
-    #     print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, tax_credits)
-    #   }
-    # } else
-    #   tax_credits = 0
-
     # Now LIC deduction if any
     if (((((Real_Value[(2)]) - ( Epsilon)) > 0) || (((Real_Value[(2)]) - ( -Epsilon)) < 0))) {
-      # Always treated as positive
-      adjust_cost(LIC_DEDUCTION, - Real_Value[(2)], now)
-      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTION, NULL, Real_Value[(2)])
+      # Record LIC Deduction to the listing
+      sum_entry(LIC_Deduction, - Real_Value[(2)], now)
       fields[++ number_fields] = Real_Value[(2)]
-
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present

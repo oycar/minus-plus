@@ -26,6 +26,7 @@ BEGIN {
   make_array(Franking_Deficit_Offsets)
   make_array(GST_Rate)
   make_array(LIC_Allowance)
+  make_array(LIC_Deduction)
   make_array(Low_Income_Offset)
   make_array(Middle_Income_Offset)
   make_array(Medicare_Levy)
@@ -288,7 +289,7 @@ function income_tax_aud(now, past, benefits,
   # LIC deductions 1/3 for SMSF
   #                1/2 for individual
   #                0/3 for company
-  lic_deduction = - rational_value(LIC_Allowance) * (get_cost(LIC_DEDUCTION, now) - get_cost(LIC_DEDUCTION, past))
+  lic_deduction = - rational_value(LIC_Allowance) * (find_entry(LIC_Deduction, now) - find_entry(LIC_Deduction, past))
 
   # Always apply allowance at this point to catch explicit allocations to LIC
   if (!near_zero(lic_deduction)) {

@@ -956,9 +956,6 @@ function set_special_accounts() {
   # Deferred Gains
   DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
 
-  # Other tax credits, offsets & deductions
-  LIC_DEDUCTION    = initialize_account("SPECIAL.TAX:LIC.DEDUCTION")
-
   # The DEPRECIATION account
   DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
 
