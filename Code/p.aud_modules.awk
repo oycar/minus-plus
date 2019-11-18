@@ -105,7 +105,6 @@ function initialize_tax_aud() {
     Update_Profits_Function  = "update_profits_smsf"
 
     # Special accounts for SMSFs
-    #RESERVE   = initialize_account("LIABILITY.RESERVE:INVESTMENT.RESERVE")
     ALLOCATED = initialize_account("SPECIAL.ACCOUNT:ALLOCATED")
 
     # Reserve rate is variable over time
@@ -636,26 +635,13 @@ function income_tax_aud(now, past, benefits,
   }
 
   #
-  # Tax Residuals
+  # Tax Due
   #
-  # These occur due to mismatches in these accounts and one's actually used
-  # Either due to errors or rounding in the accounts
-  #
-  # Take care that amounts are reset correctly
-  # The residual tax liability is tax computed to be due but not actually paid or refunded
-  # Careful when adjusting cost - a second run will continue to increase it
-  # Either explicitly set the cost or reset it first
-  if (Start_Journal)
-    #set_cost(RESIDUAL, get_cost(RESIDUAL, just_before(now)) + get_cost(TAX, just_before(now)), now)
-    adjust_cost(RESIDUAL, get_cost(TAX, now), now)
-
-  # Adjust Levys
-
-  # Compute tax due
-  tax_paid = get_cost(PAYG, just_before(now)) - get_cost(PAYG, past)
+  # Compute tax paid
+  tax_paid = get_cost(PAYG, just_before(now))
 
   # And tax witheld
-  tax_with = get_cost(WITHOLDING, just_before(now)) - get_cost(WITHOLDING, past)
+  tax_with = get_cost(WITHOLDING, just_before(now))
 
   # If this is SMSF the levy is required
   if (is_smsf)
@@ -681,9 +667,23 @@ function income_tax_aud(now, past, benefits,
 
   # Compute income tax due
   tax_due = tax_owed - (tax_paid + tax_with)
-  set_cost(TAX, - tax_due, now)
   underline(81, 0, write_stream)
   printf "%48s %32s\n\n\n", "AMOUNT DUE OR REFUNDABLE", print_cash(find_entry(ATO_Levy, now) + tax_due) > write_stream
+
+  # Now save quantities -
+  # To avoid tax collecting up errors move unpaid/overpaid tax to the RESIDUAL account
+  if (Start_Journal) {
+    # These should be replaced with adjustments
+    # set_cost(TAX, - tax_due, now)
+    # Residual is last year's tax bill
+    x = get_cost(TAX, past)
+
+    # Overall impact of following adjustments is (- tax_owed)
+    adjust_cost(RESIDUAL, x, now)
+    adjust_cost(TAX,   (tax_paid + tax_with) - (x + tax_owed), now)
+    adjust_cost(PAYG, - tax_paid,            now)
+    adjust_cost(WITHOLDING,      - tax_with, now)
+  }
 
   # Clean up balance sheet - watch out for unbalanced transactions
   # Save contribution tax accounted for
@@ -692,8 +692,11 @@ function income_tax_aud(now, past, benefits,
   # If this is an SMSF this disturbs the member liabilities
   # Adjust cost is OK because ALLOCATED/ADJUSTMENTS were reset at comencement of eofy_actions
   # For a none SMSF this is a synonym for ADJUSTMENTS
-  if (Start_Journal)
+  if (Start_Journal) {
+    # Allocated is really being stored with the wrong sign...
     adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
+    adjust_cost(CONTRIBUTION_TAX, -tax_cont, now)
+  }
 
   # This seems over complex
   # The increased liability is a future liability
@@ -737,45 +740,43 @@ function income_tax_aud(now, past, benefits,
     printf "%48s %32s\n\n", "Franking Deficit Offsets Carried Forward", print_cash(franking_deficit_offsets) > write_stream
   else
     franking_deficit_offsets = 0
-  set_cost(FRANKING_DEFICIT, -franking_deficit_offsets, now)
+  if (Start_Journal)
+    set_cost(FRANKING_DEFICIT, -franking_deficit_offsets, now)
 
   # Update carry forward offsets
   if (!near_zero(carry_offsets))
     printf "\t%40s %32s\n", "Non-Refundable Offsets Carried Forwards", print_cash(carry_offsets) > write_stream
   else
     carry_offsets = 0
-  set_cost(CARRY_OFFSETS, -carry_offsets, now)
+  if (Start_Journal)
+    set_cost(CARRY_OFFSETS, -carry_offsets, now)
 
   # End report
   printf "\n" > write_stream
 
-  # Now we need Deferred Tax - the hypothetical liability that would be due if all
-  # assets were liquidated today
-  deferred_gains = get_cost(DEFERRED_GAINS, now)
+  if (Start_Journal) {
+    # Now we need Deferred Tax - the hypothetical liability that would be due if all
+    # assets were liquidated today
+    deferred_gains = get_cost(DEFERRED_GAINS, now)
 
-  # Gains are negative - losses are positive
-  # Catch negligible gains
-  if (!near_zero(deferred_gains)) {
-    # Deferred tax losses can reduce future tax liability so are a deferred tax asset
-    #deferred_gains *= (1.0 - rational_value(CGT_Discount))
-    deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
-    set_cost(DEFERRED, - deferred_tax, now)
+    # Gains are negative - losses are positive
+    # Catch negligible gains
+    if (!near_zero(deferred_gains)) {
+      # Deferred tax losses can reduce future tax liability so are a deferred tax asset
+      deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
+      set_cost(DEFERRED, - deferred_tax, now)
 
-    # Get the change this FY
-    # If x < 0 EXPENSE
-    # if x > 0 INCOME
-    x = - deferred_tax - get_cost(DEFERRED, past)
-    if (!near_zero(x)) {
-      # Adjust cost/receipts for deferred expense/income
-      # For a none SMSF this is a synonym for ADJUSTMENTS
-      adjust_cost(ALLOCATED, x, now)
+      # Get the change this FY
+      # If x < 0 EXPENSE
+      # if x > 0 INCOME
+      x = - deferred_tax - get_cost(DEFERRED, past)
+      if (!near_zero(x)) {
+        # Adjust cost/receipts for deferred expense/income
+        # For a none SMSF this is a synonym for ADJUSTMENTS
+        adjust_cost(ALLOCATED, x, now)
+      }
     }
   }
-
-  # Set tax values to zero - is this needed?
-  set_cost(PAYG, 0, now)
-  set_cost(WITHOLDING, 0, now)
-  set_cost(CONTRIBUTION_TAX, 0, now)
 }
 
 ## This should become jurisdiction specific

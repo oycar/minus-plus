@@ -112,8 +112,6 @@ END {
 
 
 
-
-
 # // The stream to write reports to
 
 
@@ -1331,7 +1329,6 @@ function set_special_accounts() {
 
   # Franking deficit offset
   # Other offsets stored in unique accounts with same branch name
-  #FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
   FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # Franking tax account - a creditor like account
@@ -2690,12 +2687,10 @@ function eofy_actions(now,      past, allocated_profits,
     # Adjust the market gains and the asset values
     adjust_cost("*ASSET", - unrealized_gains, now)
     adjust_cost(UNREALIZED, unrealized_gains, now)
-  }
 
-  # This seems redundant
-  if (ALLOCATED != ADJUSTMENTS) {
-    allocated_profits = get_cost(ALLOCATED, ((now) - 1))
-    set_cost(ALLOCATED, allocated_profits, now)
+    # This seems redundant
+    if (ALLOCATED != ADJUSTMENTS) 
+      allocated_profits = get_cost(ALLOCATED, ((now) - 1))
   }
 
   # Do we need to check for dividend qualification
@@ -3248,7 +3243,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3586,7 +3581,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3726,7 +3721,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3859,7 +3854,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3931,7 +3926,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4066,7 +4061,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4542,7 +4537,6 @@ function initialize_tax_aud() {
     Update_Profits_Function  = "update_profits_smsf"
 
     # Special accounts for SMSFs
-    #RESERVE   = initialize_account("LIABILITY.RESERVE:INVESTMENT.RESERVE")
     ALLOCATED = initialize_account("SPECIAL.ACCOUNT:ALLOCATED")
 
     # Reserve rate is variable over time
@@ -4590,7 +4584,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5046,26 +5040,13 @@ function income_tax_aud(now, past, benefits,
   }
 
   #
-  # Tax Residuals
+  # Tax Due
   #
-  # These occur due to mismatches in these accounts and one's actually used
-  # Either due to errors or rounding in the accounts
-  #
-  # Take care that amounts are reset correctly
-  # The residual tax liability is tax computed to be due but not actually paid or refunded
-  # Careful when adjusting cost - a second run will continue to increase it
-  # Either explicitly set the cost or reset it first
-  if (Start_Journal)
-    #set_cost(RESIDUAL, get_cost(RESIDUAL, just_before(now)) + get_cost(TAX, just_before(now)), now)
-    adjust_cost(RESIDUAL, get_cost(TAX, now), now)
-
-  # Adjust Levys
-
-  # Compute tax due
-  tax_paid = get_cost(PAYG, ((now) - 1)) - get_cost(PAYG, past)
+  # Compute tax paid
+  tax_paid = get_cost(PAYG, ((now) - 1))
 
   # And tax witheld
-  tax_with = get_cost(WITHOLDING, ((now) - 1)) - get_cost(WITHOLDING, past)
+  tax_with = get_cost(WITHOLDING, ((now) - 1))
 
   # If this is SMSF the levy is required
   if ((Journal_Type ~ /^SMSF$/))
@@ -5091,9 +5072,23 @@ function income_tax_aud(now, past, benefits,
 
   # Compute income tax due
   tax_due = tax_owed - (tax_paid + tax_with)
-  set_cost(TAX, - tax_due, now)
   underline(81, 0, write_stream)
   printf "%48s %32s\n\n\n", "AMOUNT DUE OR REFUNDABLE", print_cash(((__MPX_KEY__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( ATO_Levy[0]):( 0)))) + tax_due) > write_stream
+
+  # Now save quantities -
+  # To avoid tax collecting up errors move unpaid/overpaid tax to the RESIDUAL account
+  if (Start_Journal) {
+    # These should be replaced with adjustments
+    # set_cost(TAX, - tax_due, now)
+    # Residual is last year's tax bill
+    x = get_cost(TAX, past)
+
+    # Overall impact of following adjustments is (- tax_owed)
+    adjust_cost(RESIDUAL, x, now)
+    adjust_cost(TAX,   (tax_paid + tax_with) - (x + tax_owed), now)
+    adjust_cost(PAYG, - tax_paid,            now)
+    adjust_cost(WITHOLDING,      - tax_with, now)
+  }
 
   # Clean up balance sheet - watch out for unbalanced transactions
   # Save contribution tax accounted for
@@ -5102,8 +5097,11 @@ function income_tax_aud(now, past, benefits,
   # If this is an SMSF this disturbs the member liabilities
   # Adjust cost is OK because ALLOCATED/ADJUSTMENTS were reset at comencement of eofy_actions
   # For a none SMSF this is a synonym for ADJUSTMENTS
-  if (Start_Journal)
+  if (Start_Journal) {
+    # Allocated is really being stored with the wrong sign...
     adjust_cost(ALLOCATED, -(tax_cont + tax_owed - get_cost(FRANKING_TAX, now)), now)
+    adjust_cost(CONTRIBUTION_TAX, -tax_cont, now)
+  }
 
   # This seems over complex
   # The increased liability is a future liability
@@ -5147,45 +5145,43 @@ function income_tax_aud(now, past, benefits,
     printf "%48s %32s\n\n", "Franking Deficit Offsets Carried Forward", print_cash(franking_deficit_offsets) > write_stream
   else
     franking_deficit_offsets = 0
-  set_cost(FRANKING_DEFICIT, -franking_deficit_offsets, now)
+  if (Start_Journal)
+    set_cost(FRANKING_DEFICIT, -franking_deficit_offsets, now)
 
   # Update carry forward offsets
   if (!((((carry_offsets) - ( Epsilon)) <= 0) && (((carry_offsets) - ( -Epsilon)) >= 0)))
     printf "\t%40s %32s\n", "Non-Refundable Offsets Carried Forwards", print_cash(carry_offsets) > write_stream
   else
     carry_offsets = 0
-  set_cost(CARRY_OFFSETS, -carry_offsets, now)
+  if (Start_Journal)
+    set_cost(CARRY_OFFSETS, -carry_offsets, now)
 
   # End report
   printf "\n" > write_stream
 
-  # Now we need Deferred Tax - the hypothetical liability that would be due if all
-  # assets were liquidated today
-  deferred_gains = get_cost(DEFERRED_GAINS, now)
+  if (Start_Journal) {
+    # Now we need Deferred Tax - the hypothetical liability that would be due if all
+    # assets were liquidated today
+    deferred_gains = get_cost(DEFERRED_GAINS, now)
 
-  # Gains are negative - losses are positive
-  # Catch negligible gains
-  if (!((((deferred_gains) - ( Epsilon)) <= 0) && (((deferred_gains) - ( -Epsilon)) >= 0))) {
-    # Deferred tax losses can reduce future tax liability so are a deferred tax asset
-    #deferred_gains *= (1.0 - rational_value(CGT_Discount))
-    deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
-    set_cost(DEFERRED, - deferred_tax, now)
+    # Gains are negative - losses are positive
+    # Catch negligible gains
+    if (!((((deferred_gains) - ( Epsilon)) <= 0) && (((deferred_gains) - ( -Epsilon)) >= 0))) {
+      # Deferred tax losses can reduce future tax liability so are a deferred tax asset
+      deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
+      set_cost(DEFERRED, - deferred_tax, now)
 
-    # Get the change this FY
-    # If x < 0 EXPENSE
-    # if x > 0 INCOME
-    x = - deferred_tax - get_cost(DEFERRED, past)
-    if (!((((x) - ( Epsilon)) <= 0) && (((x) - ( -Epsilon)) >= 0))) {
-      # Adjust cost/receipts for deferred expense/income
-      # For a none SMSF this is a synonym for ADJUSTMENTS
-      adjust_cost(ALLOCATED, x, now)
+      # Get the change this FY
+      # If x < 0 EXPENSE
+      # if x > 0 INCOME
+      x = - deferred_tax - get_cost(DEFERRED, past)
+      if (!((((x) - ( Epsilon)) <= 0) && (((x) - ( -Epsilon)) >= 0))) {
+        # Adjust cost/receipts for deferred expense/income
+        # For a none SMSF this is a synonym for ADJUSTMENTS
+        adjust_cost(ALLOCATED, x, now)
+      }
     }
   }
-
-  # Set tax values to zero - is this needed?
-  set_cost(PAYG, 0, now)
-  set_cost(WITHOLDING, 0, now)
-  set_cost(CONTRIBUTION_TAX, 0, now)
 }
 
 ## This should become jurisdiction specific
@@ -5376,7 +5372,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

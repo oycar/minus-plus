@@ -977,7 +977,6 @@ function set_special_accounts() {
 
   # Franking deficit offset
   # Other offsets stored in unique accounts with same branch name
-  #FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
   FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
 
   # Franking tax account - a creditor like account

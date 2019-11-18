@@ -44,12 +44,10 @@ function eofy_actions(now,      past, allocated_profits,
     # Adjust the market gains and the asset values
     adjust_cost("*ASSET", - unrealized_gains, now)
     adjust_cost(UNREALIZED, unrealized_gains, now)
-  }
 
-  # This seems redundant
-  if (ALLOCATED != ADJUSTMENTS) {
-    allocated_profits = get_cost(ALLOCATED, just_before(now))
-    set_cost(ALLOCATED, allocated_profits, now)
+    # This seems redundant
+    if (ALLOCATED != ADJUSTMENTS) 
+      allocated_profits = get_cost(ALLOCATED, just_before(now))
   }
 
   # Do we need to check for dividend qualification
