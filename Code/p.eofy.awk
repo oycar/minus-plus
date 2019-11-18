@@ -45,8 +45,8 @@ function eofy_actions(now,      past, allocated_profits,
     adjust_cost("*ASSET", - unrealized_gains, now)
     adjust_cost(UNREALIZED, unrealized_gains, now)
 
-    # This seems redundant
-    if (ALLOCATED != ADJUSTMENTS) 
+    This seems redundant
+    if (ALLOCATED != ADJUSTMENTS)
       allocated_profits = get_cost(ALLOCATED, just_before(now))
   }
 
@@ -76,6 +76,7 @@ function eofy_actions(now,      past, allocated_profits,
   # A Super fund must allocate assets to members - this requires account balancing
   if (Start_Journal)
     @Balance_Profits_Function(now, past, allocated_profits)
+    #@Balance_Profits_Function(now, past, get_cost(ALLOCATED, now))
 
   # Print the balance sheet
   print_balance_sheet(now, past, 1)
@@ -1776,7 +1777,7 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
       }
 
       # This generates a change in the total income tax - the tax refund
-      tax_refund = get_tax(now, Tax_Bands, get_cost(TAXABLE_INCOME, now) + gains_written_back) - get_cost(INCOME_TAX, now)
+      tax_refund = get_tax(now, Tax_Bands, find_entry(Taxable_Income, now) + gains_written_back) - find_entry(Income_Tax, now)
 
       # Update taxable gains
       set_cost(WRITTEN_BACK, - gains_written_back, now)

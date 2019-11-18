@@ -41,9 +41,6 @@
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
 #   Accumulated profits should not include unrealized losses/gains which are classified as capital
-#   ***In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
-#   ***Share splits could be considered using a similar mechanism to currencies - with a weighting formula
-#   ***Clean up Cost Element and Units logic
 #
 #   ***Fix up wiki files
 #   other tax_statement calculations (eg UK, US, NZ etc...)
@@ -133,6 +130,7 @@ BEGIN {
   make_array(Foreign_Offset_Limit)
   make_array(Held_From)
   make_array(Held_Until)
+  make_array(Income_Tax)
   make_array(Leaf)
   make_array(Lifetime)
   make_array(Long_Gains)
@@ -151,6 +149,7 @@ BEGIN {
   make_array(Tax_Adjustments)
   make_array(Tax_Bands)
   make_array(Tax_Credits)
+  make_array(Taxable_Income)
   make_array(Total_Units)
   make_array(Underlying_Asset)
   make_array(Units_Held)
@@ -857,7 +856,8 @@ function parse_transaction(now, a, b, amount,
     if (not_zero(Real_Value[LIC_DEDUCTION_KEY])) {
       # Always treated as positive
       adjust_cost(LIC_DEDUCTION, - Real_Value[LIC_DEDUCTION_KEY], now)
-      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTION, NULL, Real_Value[LIC_DEDUCTION_KEY])
+      #print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTION, NULL, Real_Value[LIC_DEDUCTION_KEY])
+      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), "LIC.DEDUCTION", NULL, Real_Value[LIC_DEDUCTION_KEY])
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present

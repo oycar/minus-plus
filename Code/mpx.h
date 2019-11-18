@@ -21,10 +21,10 @@
 
 # //
 @define SHARED_ARRAYS "Account_Term Accounting_Cost Capital_Losses Cost_Basis Dividend_Date\
- Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name\
+ Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name\
  Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price\
  Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
- Total_Units Underlying_Asset Units_Held "
+ Taxable_Income Total_Units Underlying_Asset Units_Held "
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
  Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time\

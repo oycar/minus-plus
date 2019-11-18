@@ -1286,67 +1286,22 @@ function set_special_accounts() {
   # A NULL account
   NULL = initialize_account("SPECIAL.ACCOUNT:NULL")
 
-  # The DEPRECIATION account
-  DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
-
-  # When a depreciating asset is sold any profit or loss is booked as income/expense to these accounts
-  SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
-  SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
-
   # Balancing - to simplify processing of transactions at EOFY
   # These are income/expense items not needed in the operating statement
   ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
   FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
 
-  # Keeping a record of taxable income, gains, losses
-  TAXABLE_INCOME   = initialize_account("SPECIAL.TAX:TAXABLE.INCOME")
-  INCOME_TAX       = initialize_account("SPECIAL.TAX:INCOME.TAX")
-
-  # Built in TAX accounts - debtor like
-  WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
-  PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
-
-  # Built in TAX accounts - creditor like
-  DEFERRED     = initialize_account("LIABILITY.TAX:DEFERRED.TAX")
-  TAX          = initialize_account("LIABILITY.TAX:TAX")
-  RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
-  GST          = initialize_account("LIABILITY.TAX:TAX.GST")
-
   # Offsets
   NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
   CARRY_OFFSETS      = initialize_account("SPECIAL.OFFSET.CARRY:CARRY.OFFSETS")
   REFUNDABLE_OFFSETS = initialize_account("SPECIAL.OFFSET.REFUNDABLE:REFUNDABLE.OFFSETS")
-
-  # Franking Credits - strictly speaking should be AUD accounts
-  ##FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
-  ##FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
+  FRANKING_DEFICIT   = initialize_account("SPECIAL.OFFSET.FRANKING:FRANKING.DEFICIT")
 
   ## Franking Credits
   #
   FRANKING          = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
   FRANKING_PAID     = initialize_account("SPECIAL.FRANKING:FRANKING.PAID") # Disbursed
   FRANKING_STAMPED  = initialize_account("SPECIAL.FRANKING:FRANKING.STAMPED") # Received through net tax paid
-
-  # Franking deficit offset
-  # Other offsets stored in unique accounts with same branch name
-  FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
-
-  # Franking tax account - a creditor like account
-  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
-
-  # Other tax credits, offsets & deductions
-  LIC_DEDUCTION    = initialize_account("SPECIAL.TAX:LIC.DEDUCTION")
-
-  # Accounting capital gains accounts
-  REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
-  REALIZED_LOSSES = initialize_account("EXPENSE.LOSSES.REALIZED:LOSSES")
-  UNREALIZED  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
-
-  # Extra capital gains accounts which can be manipulated independently of asset revaluations
-  INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")
-  INCOME_SHORT       = initialize_account("INCOME.GAINS.SHORT:INCOME.SHORT")
-  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES.LONG:EXPENSE.LONG")
-  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
 
   # Taxable capital gains are in special accounts
   # Make sure the parent accounts exist
@@ -1359,6 +1314,38 @@ function set_special_accounts() {
   # Deferred Gains & Losses too (all long...)
   DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
   DEFERRED_LOSSES = initialize_account("SPECIAL.DEFERRED:DEFERRED.LOSSES")
+
+  # Other tax credits, offsets & deductions
+  LIC_DEDUCTION    = initialize_account("SPECIAL.TAX:LIC.DEDUCTION")
+
+  # The DEPRECIATION account
+  DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
+
+  # When a depreciating asset is sold any profit or loss is booked as income/expense to these accounts
+  SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
+  SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
+
+  # Built in TAX accounts - debtor like
+  WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
+  PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
+
+  # Built in TAX accounts - creditor like
+  DEFERRED     = initialize_account("LIABILITY.TAX:DEFERRED.TAX")
+  TAX          = initialize_account("LIABILITY.TAX:TAX")
+  RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
+  GST          = initialize_account("LIABILITY.TAX:TAX.GST")
+  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
+
+  # Accounting capital gains accounts
+  REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
+  REALIZED_LOSSES = initialize_account("EXPENSE.LOSSES.REALIZED:LOSSES")
+  UNREALIZED  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
+
+  # Extra capital gains accounts which can be manipulated independently of asset revaluations
+  INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")
+  INCOME_SHORT       = initialize_account("INCOME.GAINS.SHORT:INCOME.SHORT")
+  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES.LONG:EXPENSE.LONG")
+  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
 }
 
 # Get date
@@ -1889,8 +1876,8 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
   print string ", " comments
 } # End of printing a transaction
 
-function initialize_account(account_name,     class_name, array, p, n,
-                                              leaf_name, linked_name) {
+function initialize_account(account_name,    class_name, array, p, n,
+                                                         leaf_name, linked_name) {
   # We need to add code to recognize an account
   # On first use it will have to be initialized
   # This involves a long name which must have a first name component (class) which is one of:
@@ -1965,27 +1952,6 @@ function initialize_account(account_name,     class_name, array, p, n,
   if (Show_Account == leaf_name)
     Show_Account = account_name
 
-  # refer  to the parent item eg parent[A.B.C] => *A.B (long_name minus short_name with a distinguishing prefix)
-  p = Parent_Name[account_name] = "*" array[1]
-
-  # How many components in the name "p"
-  n = split(p, array, ".")
-
-  # Initialize the cost bases for this account's parents
-  while (p && !(p in Parent_Name)) {
-    # a new meta-account - needs a cost-basis
-    Cost_Basis[p][Epoch] = 0
-
-    # Get p's parent - lose the last name component
-    if (n > 1)
-      Parent_Name[p] = get_name_component(p, 1, --n, array)
-    else
-      Parent_Name[p] = ""
-
-    # Update p
-    p = Parent_Name[p]
-  }
-
   # Set extra items needed for ASSET or EQUITY class accounts
   if (((account_name) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) { # This could include EQUITY too
     # Each parcel's adjusted and reduced cost
@@ -2030,6 +1996,27 @@ function initialize_account(account_name,     class_name, array, p, n,
 
   # Initialize account with common entries
   Cost_Basis[account_name][SUBSEP]; delete Cost_Basis[account_name][SUBSEP]
+
+  # refer  to the parent item eg parent[A.B.C] => *A.B (long_name minus short_name with a distinguishing prefix)
+  p = Parent_Name[account_name] = "*" array[1]
+
+  # How many components in the name "p"
+  n = split(p, array, ".")
+
+  # Initialize the cost bases for this account's parents
+  while (p && !(p in Parent_Name)) {
+    # a new meta-account - needs a cost-basis
+    Cost_Basis[p][Epoch] = 0
+
+    # Get p's parent - lose the last name component
+    if (n > 1)
+      Parent_Name[p] = get_name_component(p, 1, --n, array)
+    else
+      Parent_Name[p] = ""
+
+    # Update p
+    p = Parent_Name[p]
+  }
 
   # the account name is the long name
   return account_name
@@ -2688,8 +2675,8 @@ function eofy_actions(now,      past, allocated_profits,
     adjust_cost("*ASSET", - unrealized_gains, now)
     adjust_cost(UNREALIZED, unrealized_gains, now)
 
-    # This seems redundant
-    if (ALLOCATED != ADJUSTMENTS) 
+    This seems redundant
+    if (ALLOCATED != ADJUSTMENTS)
       allocated_profits = get_cost(ALLOCATED, ((now) - 1))
   }
 
@@ -2719,6 +2706,7 @@ function eofy_actions(now,      past, allocated_profits,
   # A Super fund must allocate assets to members - this requires account balancing
   if (Start_Journal)
     @Balance_Profits_Function(now, past, allocated_profits)
+    #@Balance_Profits_Function(now, past, get_cost(ALLOCATED, now))
 
   # Print the balance sheet
   print_balance_sheet(now, past, 1)
@@ -4402,7 +4390,7 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
       }
 
       # This generates a change in the total income tax - the tax refund
-      tax_refund = get_tax(now, Tax_Bands, get_cost(TAXABLE_INCOME, now) + gains_written_back) - get_cost(INCOME_TAX, now)
+      tax_refund = get_tax(now, Tax_Bands, ((__MPX_KEY__ = find_key(Taxable_Income,  now))?( Taxable_Income[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Taxable_Income[0]):( 0)))) + gains_written_back) - ((__MPX_KEY__ = find_key(Income_Tax,  now))?( Income_Tax[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Income_Tax[0]):( 0))))
 
       # Update taxable gains
       set_cost(WRITTEN_BACK, - gains_written_back, now)
@@ -4743,14 +4731,14 @@ function income_tax_aud(now, past, benefits,
   printf "%48s %32s\n\n", "TAXABLE INCOME OR LOSS", print_cash(taxable_income) > write_stream
 
   # Record this quantity
-  set_cost(TAXABLE_INCOME, taxable_income, now)
+  (Taxable_Income[ now] = ( taxable_income))
 
   # Keep the income tax on the taxable income - the actual amount owed may change due to tax offsets etc
   income_tax = tax_owed = get_tax(now, Tax_Bands, taxable_income) # Just need total tax
   printf "%48s %32s\n", "Income Tax on Taxable Income or Loss ", print_cash(tax_owed) > write_stream
 
   # Record this quantity
-  set_cost(INCOME_TAX, income_tax, now)
+  (Income_Tax[ now] = ( income_tax))
 
   # Also is a medicare levy payable?
   if ((Journal_Type ~ /^IND$/))
@@ -5852,9 +5840,6 @@ function process_member_benefits_smsf(now, array, amount,
 #
 #   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
 #   Accumulated profits should not include unrealized losses/gains which are classified as capital
-#   ***In a State file the distinction between CURRENT and TERM is lost completely when  the asset is redefined - this is a bug
-#   ***Share splits could be considered using a similar mechanism to currencies - with a weighting formula
-#   ***Clean up Cost Element and Units logic
 #
 #   ***Fix up wiki files
 #   other tax_statement calculations (eg UK, US, NZ etc...)
@@ -5944,6 +5929,7 @@ BEGIN {
   ((SUBSEP in Foreign_Offset_Limit)?((1)):((0)))
   ((SUBSEP in Held_From)?((1)):((0)))
   ((SUBSEP in Held_Until)?((1)):((0)))
+  ((SUBSEP in Income_Tax)?((1)):((0)))
   ((SUBSEP in Leaf)?((1)):((0)))
   ((SUBSEP in Lifetime)?((1)):((0)))
   ((SUBSEP in Long_Gains)?((1)):((0)))
@@ -5962,6 +5948,7 @@ BEGIN {
   ((SUBSEP in Tax_Adjustments)?((1)):((0)))
   ((SUBSEP in Tax_Bands)?((1)):((0)))
   ((SUBSEP in Tax_Credits)?((1)):((0)))
+  ((SUBSEP in Taxable_Income)?((1)):((0)))
   ((SUBSEP in Total_Units)?((1)):((0)))
   ((SUBSEP in Underlying_Asset)?((1)):((0)))
   ((SUBSEP in Units_Held)?((1)):((0)))
@@ -6337,13 +6324,13 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
-      if (!index(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
+      if (!index(("Account_Term Accounting_Cost Capital_Losses Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
         assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
@@ -6353,7 +6340,7 @@ function initialize_state(    x) {
   } else {
     # Use default read and write list
     Write_Variables = (0)
-    MPX_Arrays = ("Account_Term Accounting_Cost Capital_Losses Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
+    MPX_Arrays = ("Account_Term Accounting_Cost Capital_Losses Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount GST_Rate LIC_Allowance Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
     MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
@@ -6651,7 +6638,8 @@ function parse_transaction(now, a, b, amount,
     if (((((Real_Value[(2)]) - ( Epsilon)) > 0) || (((Real_Value[(2)]) - ( -Epsilon)) < 0))) {
       # Always treated as positive
       adjust_cost(LIC_DEDUCTION, - Real_Value[(2)], now)
-      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTION, NULL, Real_Value[(2)])
+      #print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTION, NULL, Real_Value[LIC_DEDUCTION_KEY])
+      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), "LIC.DEDUCTION", NULL, Real_Value[(2)])
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present

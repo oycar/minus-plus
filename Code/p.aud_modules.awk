@@ -311,14 +311,14 @@ function income_tax_aud(now, past, benefits,
   printf "%48s %32s\n\n", "TAXABLE INCOME OR LOSS", print_cash(taxable_income) > write_stream
 
   # Record this quantity
-  set_cost(TAXABLE_INCOME, taxable_income, now)
+  set_entry(Taxable_Income, taxable_income, now)
 
   # Keep the income tax on the taxable income - the actual amount owed may change due to tax offsets etc
   income_tax = tax_owed = get_tax(now, Tax_Bands, taxable_income) # Just need total tax
   printf "%48s %32s\n", "Income Tax on Taxable Income or Loss ", print_cash(tax_owed) > write_stream
 
   # Record this quantity
-  set_cost(INCOME_TAX, income_tax, now)
+  set_entry(Income_Tax, income_tax, now)
 
   # Also is a medicare levy payable?
   if (is_individual)

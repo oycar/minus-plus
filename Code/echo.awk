@@ -1267,67 +1267,22 @@ function set_special_accounts() {
   # A NULL account
   NULL = initialize_account("SPECIAL.ACCOUNT:NULL")
 
-  # The DEPRECIATION account
-  DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
-
-  # When a depreciating asset is sold any profit or loss is booked as income/expense to these accounts
-  SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
-  SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
-
   # Balancing - to simplify processing of transactions at EOFY
   # These are income/expense items not needed in the operating statement
   ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
   FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
 
-  # Keeping a record of taxable income, gains, losses
-  TAXABLE_INCOME   = initialize_account("SPECIAL.TAX:TAXABLE.INCOME")
-  INCOME_TAX       = initialize_account("SPECIAL.TAX:INCOME.TAX")
-
-  # Built in TAX accounts - debtor like
-  WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
-  PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
-
-  # Built in TAX accounts - creditor like
-  DEFERRED     = initialize_account("LIABILITY.TAX:DEFERRED.TAX")
-  TAX          = initialize_account("LIABILITY.TAX:TAX")
-  RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
-  GST          = initialize_account("LIABILITY.TAX:TAX.GST")
-
   # Offsets
   NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
   CARRY_OFFSETS      = initialize_account("SPECIAL.OFFSET.CARRY:CARRY.OFFSETS")
   REFUNDABLE_OFFSETS = initialize_account("SPECIAL.OFFSET.REFUNDABLE:REFUNDABLE.OFFSETS")
-
-  # Franking Credits - strictly speaking should be AUD accounts
-  ##FRANKING        = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
-  ##FRANKING_PAID   = initialize_account("SPECIAL.FRANKING:FRANKING.PAID")
+  FRANKING_DEFICIT   = initialize_account("SPECIAL.OFFSET.FRANKING:FRANKING.DEFICIT")
 
   ## Franking Credits
   #
   FRANKING          = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
   FRANKING_PAID     = initialize_account("SPECIAL.FRANKING:FRANKING.PAID") # Disbursed
   FRANKING_STAMPED  = initialize_account("SPECIAL.FRANKING:FRANKING.STAMPED") # Received through net tax paid
-
-  # Franking deficit offset
-  # Other offsets stored in unique accounts with same branch name
-  FRANKING_DEFICIT   = initialize_account("SPECIAL.FRANKING.OFFSET:FRANKING.DEFICIT")
-
-  # Franking tax account - a creditor like account
-  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
-
-  # Other tax credits, offsets & deductions
-  LIC_DEDUCTION    = initialize_account("SPECIAL.TAX:LIC.DEDUCTION")
-
-  # Accounting capital gains accounts
-  REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
-  REALIZED_LOSSES = initialize_account("EXPENSE.LOSSES.REALIZED:LOSSES")
-  UNREALIZED  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
-
-  # Extra capital gains accounts which can be manipulated independently of asset revaluations
-  INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")
-  INCOME_SHORT       = initialize_account("INCOME.GAINS.SHORT:INCOME.SHORT")
-  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES.LONG:EXPENSE.LONG")
-  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
 
   # Taxable capital gains are in special accounts
   # Make sure the parent accounts exist
@@ -1340,6 +1295,38 @@ function set_special_accounts() {
   # Deferred Gains & Losses too (all long...)
   DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
   DEFERRED_LOSSES = initialize_account("SPECIAL.DEFERRED:DEFERRED.LOSSES")
+
+  # Other tax credits, offsets & deductions
+  LIC_DEDUCTION    = initialize_account("SPECIAL.TAX:LIC.DEDUCTION")
+
+  # The DEPRECIATION account
+  DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
+
+  # When a depreciating asset is sold any profit or loss is booked as income/expense to these accounts
+  SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
+  SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
+
+  # Built in TAX accounts - debtor like
+  WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
+  PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
+
+  # Built in TAX accounts - creditor like
+  DEFERRED     = initialize_account("LIABILITY.TAX:DEFERRED.TAX")
+  TAX          = initialize_account("LIABILITY.TAX:TAX")
+  RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
+  GST          = initialize_account("LIABILITY.TAX:TAX.GST")
+  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
+
+  # Accounting capital gains accounts
+  REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
+  REALIZED_LOSSES = initialize_account("EXPENSE.LOSSES.REALIZED:LOSSES")
+  UNREALIZED  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
+
+  # Extra capital gains accounts which can be manipulated independently of asset revaluations
+  INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")
+  INCOME_SHORT       = initialize_account("INCOME.GAINS.SHORT:INCOME.SHORT")
+  EXPENSE_LONG       = initialize_account("EXPENSE.LOSSES.LONG:EXPENSE.LONG")
+  EXPENSE_SHORT      = initialize_account("EXPENSE.LOSSES.SHORT:EXPENSE.SHORT")
 }
 
 # Get date
@@ -1870,8 +1857,8 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
   print string ", " comments
 } # End of printing a transaction
 
-function initialize_account(account_name,     class_name, array, p, n,
-                                              leaf_name, linked_name) {
+function initialize_account(account_name,    class_name, array, p, n,
+                                                         leaf_name, linked_name) {
   # We need to add code to recognize an account
   # On first use it will have to be initialized
   # This involves a long name which must have a first name component (class) which is one of:
@@ -1946,27 +1933,6 @@ function initialize_account(account_name,     class_name, array, p, n,
   if (Show_Account == leaf_name)
     Show_Account = account_name
 
-  # refer  to the parent item eg parent[A.B.C] => *A.B (long_name minus short_name with a distinguishing prefix)
-  p = Parent_Name[account_name] = "*" array[1]
-
-  # How many components in the name "p"
-  n = split(p, array, ".")
-
-  # Initialize the cost bases for this account's parents
-  while (p && !(p in Parent_Name)) {
-    # a new meta-account - needs a cost-basis
-    Cost_Basis[p][Epoch] = 0
-
-    # Get p's parent - lose the last name component
-    if (n > 1)
-      Parent_Name[p] = get_name_component(p, 1, --n, array)
-    else
-      Parent_Name[p] = ""
-
-    # Update p
-    p = Parent_Name[p]
-  }
-
   # Set extra items needed for ASSET or EQUITY class accounts
   if (((account_name) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) { # This could include EQUITY too
     # Each parcel's adjusted and reduced cost
@@ -2011,6 +1977,27 @@ function initialize_account(account_name,     class_name, array, p, n,
 
   # Initialize account with common entries
   Cost_Basis[account_name][SUBSEP]; delete Cost_Basis[account_name][SUBSEP]
+
+  # refer  to the parent item eg parent[A.B.C] => *A.B (long_name minus short_name with a distinguishing prefix)
+  p = Parent_Name[account_name] = "*" array[1]
+
+  # How many components in the name "p"
+  n = split(p, array, ".")
+
+  # Initialize the cost bases for this account's parents
+  while (p && !(p in Parent_Name)) {
+    # a new meta-account - needs a cost-basis
+    Cost_Basis[p][Epoch] = 0
+
+    # Get p's parent - lose the last name component
+    if (n > 1)
+      Parent_Name[p] = get_name_component(p, 1, --n, array)
+    else
+      Parent_Name[p] = ""
+
+    # Update p
+    p = Parent_Name[p]
+  }
 
   # the account name is the long name
   return account_name

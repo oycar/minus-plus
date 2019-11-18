@@ -192,7 +192,7 @@ function income_tax_usd(now, past, benefits,
   printf "%48s %32s\n\n", "TAXABLE INCOME OR LOSS", print_cash(taxable_income) > reports_stream
 
   # Record this quantity
-  set_cost(TAXABLE_INCOME, taxable_income, now)
+  set_entry(Taxable_Income, taxable_income, now)
 
   # Keep the income tax on the taxable income - the actual amount owed may change due to tax offsets etc
   income_tax = get_tax(now, Tax_Bands, taxable_income)  # The straight forward computation
