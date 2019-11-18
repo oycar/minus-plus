@@ -20,11 +20,12 @@
 @define DEVNULL "/dev/null"
 
 # //
-@define SHARED_ARRAYS "Account_Term Accounting_Cost Capital_Losses Cost_Basis Dividend_Date\
+@define SHARED_ARRAYS "Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Deferred_Gains Dividend_Date\
  Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name\
- Maturity_Date Method_Name Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price\
- Qualified_Units Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
+ Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price\
+ Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
  Taxable_Income Total_Units Underlying_Asset Units_Held "
+
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
  Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time\
@@ -172,7 +173,6 @@
 @define is_no_carry(a)   ((a) ~ /^SPECIAL\.OFFSET\.NO_CARRY[.:]/)
 @define is_carry(a)      ((a) ~ /^SPECIAL\.OFFSET\.CARRY[.:]/)
 @define is_refund(a)     ((a) ~ /^SPECIAL\.OFFSET\.REFUNDABLE[.:]/)
-@define is_franking_deficit(a) ((a) ~ /^SPECIAL\.OFFSET\.FRANKING_DEFICIT[.:]/)
 
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR|GAINS).LEAF => LEAF

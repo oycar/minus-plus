@@ -43,6 +43,7 @@ END {
 
 
 
+
 # // Some constants
 
 
@@ -175,7 +176,6 @@ END {
 
 
 # // Reserved Tax Offset Classes
-
 
 
 
@@ -1272,12 +1272,6 @@ function set_special_accounts() {
   ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
   FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
 
-  # Offsets
-  NO_CARRY_OFFSETS   = initialize_account("SPECIAL.OFFSET.NO_CARRY:NO_CARRY.OFFSETS")
-  CARRY_OFFSETS      = initialize_account("SPECIAL.OFFSET.CARRY:CARRY.OFFSETS")
-  REFUNDABLE_OFFSETS = initialize_account("SPECIAL.OFFSET.REFUNDABLE:REFUNDABLE.OFFSETS")
-  FRANKING_DEFICIT   = initialize_account("SPECIAL.OFFSET.FRANKING:FRANKING.DEFICIT")
-
   ## Franking Credits
   #
   FRANKING          = initialize_account("SPECIAL.FRANKING:FRANKING") # The Franking account balance
@@ -1292,9 +1286,8 @@ function set_special_accounts() {
   WRITTEN_BACK   =   initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SHORT.LOSSES")
 
   #
-  # Deferred Gains & Losses too (all long...)
+  # Deferred Gains
   DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
-  DEFERRED_LOSSES = initialize_account("SPECIAL.DEFERRED:DEFERRED.LOSSES")
 
   # Other tax credits, offsets & deductions
   LIC_DEDUCTION    = initialize_account("SPECIAL.TAX:LIC.DEDUCTION")
@@ -1320,7 +1313,7 @@ function set_special_accounts() {
   # Accounting capital gains accounts
   REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
   REALIZED_LOSSES = initialize_account("EXPENSE.LOSSES.REALIZED:LOSSES")
-  UNREALIZED  = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
+  UNREALIZED      = initialize_account("EXPENSE.UNREALIZED:MARKET.CHANGES")
 
   # Extra capital gains accounts which can be manipulated independently of asset revaluations
   INCOME_LONG        = initialize_account("INCOME.GAINS.LONG.SUM:INCOME.LONG")

@@ -1784,13 +1784,13 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
 
       # The refund is a simple refundable offset at the future time
       if (below_zero(tax_refund))
-        adjust_cost(REFUNDABLE_OFFSETS, tax_refund, future_time)
+        sum_entry(Refundable_Offsets, tax_refund, future_time)
 
       # Record This
       printf "\t%27s => %14s\n", "Rewritten Gains", print_cash(- taxable_gains) > reports_stream
       printf "\t%27s => %14s\n", "New Available Losses", print_cash(available_losses) > reports_stream
       printf "\t%27s => %14s\n", "Tax Refund", print_cash(- tax_refund) > reports_stream
-      printf "\t%27s => %14s\n", "Total Refundable Offset", print_cash(get_cost(REFUNDABLE_OFFSETS, future_time)) > reports_stream
+      printf "\t%27s => %14s\n", "Total Refundable Offset", print_cash(find_entry(Refundable_Offsets, future_time)) > reports_stream
     }
   }
 

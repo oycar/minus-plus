@@ -39,7 +39,6 @@
 # To Do =>
 #   ***in progress
 #
-#   SPECIAL.OFFSET ordering varies between FRANKING and others... confusing
 #   Accumulated profits should not include unrealized losses/gains which are classified as capital
 #
 #   ***Fix up wiki files
@@ -125,6 +124,7 @@ BEGIN {
   # Initialize arrays
   make_array(Account_Term)
   make_array(Accounting_Cost)
+  make_array(Carry_Offsets)
   make_array(Cost_Basis)
   make_array(Dividend_Date)
   make_array(Foreign_Offset_Limit)
@@ -138,12 +138,14 @@ BEGIN {
   make_array(Long_Name)
   make_array(Maturity_Date)
   make_array(Method_Name)
+  make_array(No_Carry_Offsets)
   make_array(Number_Parcels)
   make_array(Parcel_Proceeds)
   make_array(Parcel_Tag)
   make_array(Parent_Name)
   make_array(Price)
   make_array(Qualified_Units)
+  make_array(Refundable_Offsets)
   make_array(Short_Gains)
   make_array(Short_Losses)
   make_array(Tax_Adjustments)
@@ -831,7 +833,7 @@ function parse_transaction(now, a, b, amount,
         if (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION"))
           credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
         else if (is_class(a, "INCOME.FOREIGN"))
-          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.OFFSET.FOREIGN:C_TAX." Leaf[underlying_asset])
+          credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FOREIGN.OFFSET:C_TAX." Leaf[underlying_asset])
         else
           assert(FALSE, sprintf("Can't link a tax credit account to income account %s", a))
       }
@@ -845,26 +847,69 @@ function parse_transaction(now, a, b, amount,
         adjust_cost(NULL, tax_credits, now)
         print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, tax_credits)
       } else {
-        # Frannking Credits
+        # Franking Credits
         adjust_cost(FRANKING, tax_credits, now)
         print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, tax_credits)
       }
+
+      # Store the tax credits
+      fields[++ number_fields] = tax_credits
+
     } else
       tax_credits = 0
+
+    # # Foreign or franking credits
+    # if (not_zero(tax_credits)) {
+    #   # Keep an account of tax credits
+    #   # We need the underlying asset to
+    #   assert(underlying_asset, sprintf("Income account %s must have an underlying asset to receive tax credits", Leaf[a]))
+    #   if (a in Tax_Credits)
+    #     credit_account = Tax_Credits[a]
+    #   else {
+    #     # Create tax credits account - just in time
+    #     # Type of credits account depends on the underlying asset
+    #     # INCOME.DIVIDEND     => SPECIAL.FRANKING.OFFSET
+    #     # INCOME.DISTRIBUTION => SPECIAL.FRANKING.OFFSET
+    #     # INCOME.FOREIGN      => SPECIAL.FOREIGN.OFFSET
+    #     #
+    #     if (is_class(a, "INCOME.DIVIDEND") || is_class(a, "INCOME.DISTRIBUTION"))
+    #       credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FRANKING.OFFSET:I_TAX." Leaf[underlying_asset])
+    #     else if (is_class(a, "INCOME.FOREIGN"))
+    #       credit_account = Tax_Credits[a] = initialize_account("SPECIAL.FOREIGN.OFFSET:C_TAX." Leaf[underlying_asset])
+    #     else
+    #       assert(FALSE, sprintf("Can't link a tax credit account to income account %s", a))
+    #   }
+    #
+    #   # Adjust credit account
+    #   adjust_cost(credit_account, - tax_credits, now)
+    #
+    #   # Adjust franking account when necessary
+    #   if (is_class(a, "INCOME.FOREIGN")) {
+    #     # Foreign Credits
+    #     adjust_cost(NULL, tax_credits, now)
+    #     print_transaction(now, ("# " Leaf[underlying_asset] " Foreign Credits"), credit_account, NULL, tax_credits)
+    #   } else {
+    #     # Frannking Credits
+    #     adjust_cost(FRANKING, tax_credits, now)
+    #     print_transaction(now, ("# " Leaf[underlying_asset] " Franking Credits"), credit_account, FRANKING, tax_credits)
+    #   }
+    # } else
+    #   tax_credits = 0
 
     # Now LIC deduction if any
     if (not_zero(Real_Value[LIC_DEDUCTION_KEY])) {
       # Always treated as positive
       adjust_cost(LIC_DEDUCTION, - Real_Value[LIC_DEDUCTION_KEY], now)
-      #print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTION, NULL, Real_Value[LIC_DEDUCTION_KEY])
-      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), "LIC.DEDUCTION", NULL, Real_Value[LIC_DEDUCTION_KEY])
+      print_transaction(now, ("# " Leaf[a] " LIC Deduction"), LIC_DEDUCTION, NULL, Real_Value[LIC_DEDUCTION_KEY])
+      fields[++ number_fields] = Real_Value[LIC_DEDUCTION_KEY]
+
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present
     if (underlying_asset) {
       if (Extra_Timestamp > Epoch) {
         # Save this for reporting
-        fields[number_fields = 1] = get_date(Extra_Timestamp)
+        fields[++ number_fields] = get_date(Extra_Timestamp)
 
         # Assert that the ex-dividend date must not be later than the payment date
         assert(Extra_Timestamp <= now, "The ex-dividend date <" fields[1] "> must be before the payment date <" get_date(now) ">")
@@ -883,7 +928,7 @@ function parse_transaction(now, a, b, amount,
         if (!Extra_Timestamp)
           printf "Warning: No exdividend information for %s\n", Leaf[a] > STDERR
         else
-          fields[number_fields = 1] = get_date(Extra_Timestamp)
+          fields[++ number_fields] = get_date(Extra_Timestamp)
       }
 
       # Clear the timestamp
@@ -916,6 +961,8 @@ function parse_transaction(now, a, b, amount,
       adjust_cost(FRANKING_PAID,  tax_credits, now)
 
       print_transaction(now, ("# " Leaf[a] " Franking Credits Distributed"), FRANKING, FRANKING_PAID, tax_credits)
+      fields[++ number_fields] = tax_credits
+
     } else
       tax_credits = 0
   }

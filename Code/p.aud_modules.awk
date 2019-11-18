@@ -1,6 +1,6 @@
 #!/usr/local/bin/gawk -f
 # p.aud_modules.awk
-# Copyright (C) 2018  Robert Whitehurst
+# Copyright (C) 2018, 2019  Robert Whitehurst
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@ BEGIN {
   # // Extras for AUD
   make_array(ATO_Levy)
   make_array(CGT_Discount)
+  make_array(Franking_Deficit_Offsets)
   make_array(GST_Rate)
   make_array(LIC_Allowance)
   make_array(Low_Income_Offset)
@@ -64,8 +65,6 @@ BEGIN {
   Low_Income_Offset[Epoch][0] = 0.00
   Middle_Income_Offset[Epoch][0] = 0.00
 
-  # # Other special accounts
-  # FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
 
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
@@ -356,7 +355,7 @@ function income_tax_aud(now, past, benefits,
     franking_balance = get_cost(FRANKING, now)
 
     # The franking deficit offsets
-    franking_deficit_offsets = - get_cost(FRANKING_DEFICIT, now)
+    franking_deficit_offsets = - find_entry(Franking_Deficit_Offsets, now)
 @ifeq LOG income_tax
     if (!near_zero(franking_deficit_offsets))
       printf "%48s %32s\n\n", "Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
@@ -413,7 +412,7 @@ function income_tax_aud(now, past, benefits,
 
   # Foreign offsets
   # Are no-refund-no-carry
-  foreign_offsets = - (get_cost("*SPECIAL.OFFSET.FOREIGN", now) - get_cost("*SPECIAL.OFFSET.FOREIGN", past))
+  foreign_offsets = - (get_cost("*SPECIAL.FOREIGN.OFFSET", now) - get_cost("*SPECIAL.FOREIGN.OFFSET", past))
   if (!near_zero(foreign_offsets)) {
     # Foreign offsets have complex rules too :( sigh ):
     #
@@ -469,10 +468,10 @@ function income_tax_aud(now, past, benefits,
 
     # Set the no_carry offsets
     no_carry_offsets = low_income_offset + middle_income_offset
-    no_carry_offsets -= (get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
+    no_carry_offsets -= (find_entry(No_Carry_Offsets, now) - find_entry(No_Carry_Offsets, past))
   } else
     # Just get the total change in the offset
-    no_carry_offsets = -(get_cost(NO_CARRY_OFFSETS, now) - get_cost(NO_CARRY_OFFSETS, past))
+    no_carry_offsets = -(find_entry(No_Carry_Offsets, now) - find_entry(No_Carry_Offsets, past))
 
   # Foreign offsets are no-carry offsets
   no_carry_offsets += foreign_offsets
@@ -485,14 +484,14 @@ function income_tax_aud(now, past, benefits,
 
   # Other offsets
   # The carry offset (Class D)
-  carry_offsets = -(get_cost(CARRY_OFFSETS, now) - get_cost(CARRY_OFFSETS, past))
+  carry_offsets = -(find_entry(Carry_Offsets, now) - find_entry(Carry_Offsets, past))
   if (!near_zero(carry_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
   }
 
   # The refundable offset (Class E)
-  refundable_offsets = - (get_cost(REFUNDABLE_OFFSETS, now) - get_cost(REFUNDABLE_OFFSETS, past))
+  refundable_offsets = - (find_entry(Refundable_Offsets, now) - find_entry(Refundable_Offsets, past))
   if (!near_zero(refundable_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
     header = ""
@@ -741,7 +740,7 @@ function income_tax_aud(now, past, benefits,
   else
     franking_deficit_offsets = 0
   if (Start_Journal)
-    set_cost(FRANKING_DEFICIT, -franking_deficit_offsets, now)
+    set_entry(Franking_Deficit_Offsets, -franking_deficit_offsets, now)
 
   # Update carry forward offsets
   if (!near_zero(carry_offsets))
@@ -749,7 +748,7 @@ function income_tax_aud(now, past, benefits,
   else
     carry_offsets = 0
   if (Start_Journal)
-    set_cost(CARRY_OFFSETS, -carry_offsets, now)
+    set_entry(Carry_Offsets, -carry_offsets, now)
 
   # End report
   printf "\n" > write_stream
