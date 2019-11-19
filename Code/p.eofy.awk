@@ -499,6 +499,11 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       printf "\t%27s => %14s\n", "Market Losses",
                                  print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
+
+
+
+
+
       # Only deferred gains count
       if (below_zero(get_cost(UNREALIZED, now)))
         printf "\t%27s => %14s\n", "Deferred Gains (Adjusted)",

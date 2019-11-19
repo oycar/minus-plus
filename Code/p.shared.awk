@@ -1183,10 +1183,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
         printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > STDERR
 @endif # LOG
         # Also record the parents cost
-        # If this is a tax adjustment then only negative costs are significant
-        if (!tax_adjustment || below_zero(x))
-          update_cost(a, x, now)
-
+        update_cost(a, x, now)
         return # Only one parcel is adjusted - it must be unsold if only just purchased
       }
     }

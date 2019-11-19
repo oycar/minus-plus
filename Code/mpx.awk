@@ -113,6 +113,8 @@ END {
 
 
 
+
+
 # // The stream to write reports to
 
 
@@ -1525,10 +1527,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
 
         # Also record the parents cost
-        # If this is a tax adjustment then only negative costs are significant
-        if (!tax_adjustment || (((x) - ( -Epsilon)) < 0))
-          update_cost(a, x, now)
-
+        update_cost(a, x, now)
         return # Only one parcel is adjusted - it must be unsold if only just purchased
       }
     }
@@ -3240,7 +3239,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("CMOTB" ~ /[cC]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3578,7 +3577,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("CMOTB" ~ /[oO]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3718,7 +3717,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("CMOTB" ~ /[bB]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3851,7 +3850,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("CMOTB" ~ /[mM]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3923,7 +3922,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("CMOTB" ~ /[dD]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4058,7 +4057,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("CMOTB" ~ /[qQ]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4581,7 +4580,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("CMOTB" ~ /[tT]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5162,7 +5161,6 @@ function income_tax_aud(now, past, benefits,
     deferred_gains = get_cost(UNREALIZED, now)
 
     # Gains are negative - losses are positive
-    # Catch negligible gains
     if ((((deferred_gains) - ( -Epsilon)) < 0)) {
       # Deferred tax losses can reduce future tax liability so are a deferred tax asset
       deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
@@ -5252,9 +5250,9 @@ function get_taxable_gains_aud(now, losses,
 function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
          a,
          extra_share, total_share,
-         gains_now, gains,
+         gains,
          extra_gains,
-         x, fraction) {
+         fraction) {
 
   # No short gains by default
   short_gains = ((short_gains)?( short_gains):( 0))
@@ -5276,8 +5274,7 @@ function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
       if (select_class(a, "INCOME.GAINS.NET")) {
         # These are the income gains classes
         # Each account needs the income gains increased in proportion to its share of the total gains
-        gains_now = get_cost(a, ((now) - 1))
-        gains     = gains_now - get_cost(a, past)
+        gains     = get_cost(a, now) - get_cost(a, past)
 
         # Skip negligible gains
         if (!(((gains) - ( -Epsilon)) < 0))
@@ -5372,7 +5369,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("CMOTB" ~ /[iI]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

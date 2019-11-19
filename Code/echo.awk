@@ -1506,10 +1506,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
 
         # Also record the parents cost
-        # If this is a tax adjustment then only negative costs are significant
-        if (!tax_adjustment || (((x) - ( -Epsilon)) < 0))
-          update_cost(a, x, now)
-
+        update_cost(a, x, now)
         return # Only one parcel is adjusted - it must be unsold if only just purchased
       }
     }

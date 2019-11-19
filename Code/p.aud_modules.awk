@@ -868,9 +868,9 @@ function get_taxable_gains_aud(now, losses,
 function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
          a,
          extra_share, total_share,
-         gains_now, gains,
+         gains,
          extra_gains,
-         x, fraction) {
+         fraction) {
 
   # No short gains by default
   short_gains = ternary(short_gains, short_gains, 0)
@@ -892,8 +892,7 @@ function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
       if (select_class(a, "INCOME.GAINS.NET")) {
         # These are the income gains classes
         # Each account needs the income gains increased in proportion to its share of the total gains
-        gains_now = get_cost(a, just_before(now))
-        gains     = gains_now - get_cost(a, past)
+        gains     = get_cost(a, now) - get_cost(a, past)
 
         # Skip negligible gains
         if (!below_zero(gains))
