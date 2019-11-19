@@ -952,10 +952,6 @@ function set_special_accounts() {
   initialize_account(SHORT_GAINS ":SHORT.GAINS")
   WRITTEN_BACK   =   initialize_account(SHORT_LOSSES ":SHORT.LOSSES")
 
-  #
-  # Deferred Gains
-  DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
-
   # The DEPRECIATION account
   DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
 
@@ -1224,16 +1220,12 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 @ifeq LOG adjust_cost
     printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > STDERR
 @endif # LOG
-
-    # Balance costs
-    if (!tax_adjustment || below_zero(x))
-      update_cost(a, x, now)
-  } else if (!tax_adjustment || above_zero(x)) { # This is the corresponding account - only significant if not a tax adjustment or if it is positive
+  } else
+    # This is the corresponding account
     sum_entry(Cost_Basis[a], x, now)
 
-    # Also record the parents cost
-    update_cost(a, x, now)
-  }
+  # Balance costs
+  update_cost(a, x, now)
 }
 
 # Update the cost of the parent account
@@ -1437,7 +1429,7 @@ function get_unrealized_gains(a, now,
     return 0 # No unrealized gains
 
   if (is_capital(a))
-    gains = get_cost(a, now) - find_entry(Price[a], now) * get_units(a, now)
+    gains = get_adjusted_cost(a, now) - find_entry(Price[a], now) * get_units(a, now)
   else
     gains = 0
 
@@ -2036,7 +2028,7 @@ function depreciate_now(a, now,       p, delta, sum_delta,
   } # End of each parcel
 
 @ifeq LOG depreciate_now
-  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "depreciate_now", get_short_name(a), get_date(now), get_reduced_cost(a, now) > STDERR
+  printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "depreciate_now", get_short_name(a), get_date(now), get_cost(a, now) > STDERR
 @endif # LOG
 
   # Return the depreciation

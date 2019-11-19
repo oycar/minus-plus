@@ -226,7 +226,7 @@
 @define is_sold(a, p, now) (Held_Until[a][p] <= (now))
 @define is_unsold(a, p, now) (Held_Until[a][p] > (now))
 @define get_short_name(name) (Leaf[name])
-@define get_reduced_cost(a, now) (get_cost(a, now))
+@define get_adjusted_cost(a, now) (get_cost(a, now) - get_cost_adjustment(a, now))
 @define get_element_cost(a, p, e, now) (find_entry(Accounting_Cost[a][p][e], (now)))
 @define get_parcel_proceeds(a, p) (Parcel_Proceeds[a][p])
 @define set_parcel_proceeds(a, p, x) (Parcel_Proceeds[a][p] = (x))

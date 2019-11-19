@@ -29,7 +29,43 @@ function eofy_actions(now,      past, allocated_profits,
   # past is one year earlier
   past = last_year(now)
 
-  # Are these actions already processed in the accounts?
+  # # Are these actions already processed in the accounts?
+  # if (Start_Journal) {
+  #   # No this is the first time through
+  #   # Depreciate everything - at EOFY
+  #   depreciate_all(now)
+  #
+  #   # Save unrealized gains; notice that the asset class must be updated too for balancing
+  #   unrealized_gains = get_asset_gains("get_unrealized_gains", now)
+  #
+  #   # Get the change since previous transaction
+  #   unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
+  #
+  #   # Adjust the market gains and the asset values
+  #   adjust_cost("*ASSET", - unrealized_gains, now)
+  #   adjust_cost(UNREALIZED, unrealized_gains, now)
+  #
+  #   This seems redundant
+  #   if (ALLOCATED != ADJUSTMENTS)
+  #     allocated_profits = get_cost(ALLOCATED, just_before(now))
+  # }
+
+  # Do we need to check for dividend qualification
+  if (Qualification_Window)
+    print_dividend_qualification(now, past, 1)
+
+  # Print Imputation report
+  @Imputation_Report_Function(now, past, Show_Extra)
+
+  # Realized gains report
+  get_capital_gains(now, past, Show_Extra)
+
+  # The following actions are only needed once;
+  # Market (Unrealized) gains and losses should
+  # be calulated after capital gains because
+  # distributed gains can change the market gains
+  # Also unrealized gains are *tax adjusted*
+  # becaause otherwise they would effect the deferred tax calculation
   if (Start_Journal) {
     # No this is the first time through
     # Depreciate everything - at EOFY
@@ -50,16 +86,6 @@ function eofy_actions(now,      past, allocated_profits,
       allocated_profits = get_cost(ALLOCATED, just_before(now))
   }
 
-  # Do we need to check for dividend qualification
-  if (Qualification_Window)
-    print_dividend_qualification(now, past, 1)
-
-  # Print Imputation report
-  @Imputation_Report_Function(now, past, Show_Extra)
-
-  # Realized gains report
-  get_capital_gains(now, past, Show_Extra)
-
   # Print Market Gains
   get_market_gains(now, past, Show_Extra)
 
@@ -76,7 +102,6 @@ function eofy_actions(now,      past, allocated_profits,
   # A Super fund must allocate assets to members - this requires account balancing
   if (Start_Journal)
     @Balance_Profits_Function(now, past, allocated_profits)
-    #@Balance_Profits_Function(now, past, get_cost(ALLOCATED, now))
 
   # Print the balance sheet
   print_balance_sheet(now, past, 1)
@@ -474,8 +499,10 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       printf "\t%27s => %14s\n", "Market Losses",
                                  print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
-      # Get the deferred taxable gains
-      apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
+      # Only deferred gains count
+      if (below_zero(get_cost(UNREALIZED, now)))
+        printf "\t%27s => %14s\n", "Deferred Gains (Adjusted)",
+                                   print_cash(- get_cost(UNREALIZED, now)) > reports_stream
 
        # All done
        underline(44, 8, reports_stream)
@@ -1287,7 +1314,7 @@ function allocate_second_element_costs(now,       a, p, second_element) {
       } # End of each parcel
 
 @ifeq LOG allocate_second_element_costs
-      printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "allocate_second_element_costs", get_short_name(a), get_date(now), get_reduced_cost(a, now) > STDERR
+      printf "%s: %s New Reduced Cost[%s] => %11.2f\n", "allocate_second_element_costs", get_short_name(a), get_date(now), get_cost(a, now) > STDERR
 @endif # LOG
     } # End of each fixed asset a
 }

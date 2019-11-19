@@ -1285,10 +1285,6 @@ function set_special_accounts() {
   initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SHORT.GAINS")
   WRITTEN_BACK   =   initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SHORT.LOSSES")
 
-  #
-  # Deferred Gains
-  DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
-
   # The DEPRECIATION account
   DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
 
@@ -1541,16 +1537,12 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # Debugging
 
-
-    # Balance costs
-    if (!tax_adjustment || (((x) - ( -Epsilon)) < 0))
-      update_cost(a, x, now)
-  } else if (!tax_adjustment || (((x) - ( Epsilon)) > 0)) { # This is the corresponding account - only significant if not a tax adjustment or if it is positive
+  } else
+    # This is the corresponding account
     sum_entry(Cost_Basis[a], x, now)
 
-    # Also record the parents cost
-    update_cost(a, x, now)
-  }
+  # Balance costs
+  update_cost(a, x, now)
 }
 
 # Update the cost of the parent account
@@ -1731,7 +1723,7 @@ function get_unrealized_gains(a, now,
     return 0 # No unrealized gains
 
   if (((a) ~ /^ASSET\.CAPITAL[.:]/))
-    gains = get_cost(a, now) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
+    gains = (get_cost(a,  now) - get_cost_adjustment(a,  now)) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
   else
     gains = 0
 

@@ -113,8 +113,6 @@ END {
 
 
 
-
-
 # // The stream to write reports to
 
 
@@ -1306,10 +1304,6 @@ function set_special_accounts() {
   initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SHORT.GAINS")
   WRITTEN_BACK   =   initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SHORT.LOSSES")
 
-  #
-  # Deferred Gains
-  DEFERRED_GAINS  = initialize_account("SPECIAL.DEFERRED:DEFERRED.GAINS")
-
   # The DEPRECIATION account
   DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION")
 
@@ -1562,16 +1556,12 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # Debugging
 
-
-    # Balance costs
-    if (!tax_adjustment || (((x) - ( -Epsilon)) < 0))
-      update_cost(a, x, now)
-  } else if (!tax_adjustment || (((x) - ( Epsilon)) > 0)) { # This is the corresponding account - only significant if not a tax adjustment or if it is positive
+  } else
+    # This is the corresponding account
     sum_entry(Cost_Basis[a], x, now)
 
-    # Also record the parents cost
-    update_cost(a, x, now)
-  }
+  # Balance costs
+  update_cost(a, x, now)
 }
 
 # Update the cost of the parent account
@@ -1752,7 +1742,7 @@ function get_unrealized_gains(a, now,
     return 0 # No unrealized gains
 
   if (((a) ~ /^ASSET\.CAPITAL[.:]/))
-    gains = get_cost(a, now) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
+    gains = (get_cost(a,  now) - get_cost_adjustment(a,  now)) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
   else
     gains = 0
 
@@ -2651,7 +2641,43 @@ function eofy_actions(now,      past, allocated_profits,
   # past is one year earlier
   past = ((now) - one_year(now, -1))
 
-  # Are these actions already processed in the accounts?
+  # # Are these actions already processed in the accounts?
+  # if (Start_Journal) {
+  #   # No this is the first time through
+  #   # Depreciate everything - at EOFY
+  #   depreciate_all(now)
+  #
+  #   # Save unrealized gains; notice that the asset class must be updated too for balancing
+  #   unrealized_gains = get_asset_gains("get_unrealized_gains", now)
+  #
+  #   # Get the change since previous transaction
+  #   unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
+  #
+  #   # Adjust the market gains and the asset values
+  #   adjust_cost("*ASSET", - unrealized_gains, now)
+  #   adjust_cost(UNREALIZED, unrealized_gains, now)
+  #
+  #   This seems redundant
+  #   if (ALLOCATED != ADJUSTMENTS)
+  #     allocated_profits = get_cost(ALLOCATED, just_before(now))
+  # }
+
+  # Do we need to check for dividend qualification
+  if (Qualification_Window)
+    print_dividend_qualification(now, past, 1)
+
+  # Print Imputation report
+  @Imputation_Report_Function(now, past, Show_Extra)
+
+  # Realized gains report
+  get_capital_gains(now, past, Show_Extra)
+
+  # The following actions are only needed once;
+  # Market (Unrealized) gains and losses should
+  # be calulated after capital gains because
+  # distributed gains can change the market gains
+  # Also unrealized gains are *tax adjusted*
+  # becaause otherwise they would effect the deferred tax calculation
   if (Start_Journal) {
     # No this is the first time through
     # Depreciate everything - at EOFY
@@ -2672,16 +2698,6 @@ function eofy_actions(now,      past, allocated_profits,
       allocated_profits = get_cost(ALLOCATED, ((now) - 1))
   }
 
-  # Do we need to check for dividend qualification
-  if (Qualification_Window)
-    print_dividend_qualification(now, past, 1)
-
-  # Print Imputation report
-  @Imputation_Report_Function(now, past, Show_Extra)
-
-  # Realized gains report
-  get_capital_gains(now, past, Show_Extra)
-
   # Print Market Gains
   get_market_gains(now, past, Show_Extra)
 
@@ -2698,7 +2714,6 @@ function eofy_actions(now,      past, allocated_profits,
   # A Super fund must allocate assets to members - this requires account balancing
   if (Start_Journal)
     @Balance_Profits_Function(now, past, allocated_profits)
-    #@Balance_Profits_Function(now, past, get_cost(ALLOCATED, now))
 
   # Print the balance sheet
   print_balance_sheet(now, past, 1)
@@ -3096,8 +3111,10 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       printf "\t%27s => %14s\n", "Market Losses",
                                  print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
-      # Get the deferred taxable gains
-      apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, DEFERRED_GAINS)
+      # Only deferred gains count
+      if ((((get_cost(UNREALIZED, now)) - ( -Epsilon)) < 0))
+        printf "\t%27s => %14s\n", "Deferred Gains (Adjusted)",
+                                   print_cash(- get_cost(UNREALIZED, now)) > reports_stream
 
        # All done
        underline(44, 8, reports_stream)
@@ -3223,7 +3240,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("CMOTB" ~ /[cC]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3561,7 +3578,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CMOTB" ~ /[oO]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3701,7 +3718,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CMOTB" ~ /[bB]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3834,7 +3851,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("CMOTB" ~ /[mM]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3906,7 +3923,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CMOTB" ~ /[dD]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4041,7 +4058,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CMOTB" ~ /[qQ]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4564,7 +4581,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("CMOTB" ~ /[tT]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5142,11 +5159,11 @@ function income_tax_aud(now, past, benefits,
   if (Start_Journal) {
     # Now we need Deferred Tax - the hypothetical liability that would be due if all
     # assets were liquidated today
-    deferred_gains = get_cost(DEFERRED_GAINS, now)
+    deferred_gains = get_cost(UNREALIZED, now)
 
     # Gains are negative - losses are positive
     # Catch negligible gains
-    if (!((((deferred_gains) - ( Epsilon)) <= 0) && (((deferred_gains) - ( -Epsilon)) >= 0))) {
+    if ((((deferred_gains) - ( -Epsilon)) < 0)) {
       # Deferred tax losses can reduce future tax liability so are a deferred tax asset
       deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
       set_cost(DEFERRED, - deferred_tax, now)
@@ -5160,7 +5177,9 @@ function income_tax_aud(now, past, benefits,
         # For a none SMSF this is a synonym for ADJUSTMENTS
         adjust_cost(ALLOCATED, x, now)
       }
-    }
+    } else # No deferred gains
+      set_cost(DEFERRED, 0, now)
+
   }
 }
 
@@ -5231,7 +5250,7 @@ function get_taxable_gains_aud(now, losses,
 
 # Balance the grossed up gains with underlying assets' cost bases
 function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
-         a, underlying_asset,
+         a,
          extra_share, total_share,
          gains_now, gains,
          extra_gains,
@@ -5251,41 +5270,42 @@ function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
   extra_gains = ((CGT_Discount[2])?( (CGT_Discount[1]/CGT_Discount[2])):( assert((0), "Division by zero in rational fraction" CGT_Discount[1] "/" CGT_Discount[2]))) * fraction * total_gains / (1.0 - ((CGT_Discount[2])?( (CGT_Discount[1]/CGT_Discount[2])):( assert((0), "Division by zero in rational fraction" CGT_Discount[1] "/" CGT_Discount[2]))))
 
   # Track total share of extra gains remaining
-  total_share = 1
-  for (a in Leaf)
-    if (select_class(a, "INCOME.GAINS.NET")) {
-      # These are the income gains classes
-      # Each account needs the income gains increased in proportion to its share of the total gains
-      gains_now = get_cost(a, ((now) - 1))
-      gains     = gains_now - get_cost(a, past)
+  if (Start_Journal) {
+    total_share = 1
+    for (a in Leaf)
+      if (select_class(a, "INCOME.GAINS.NET")) {
+        # These are the income gains classes
+        # Each account needs the income gains increased in proportion to its share of the total gains
+        gains_now = get_cost(a, ((now) - 1))
+        gains     = gains_now - get_cost(a, past)
 
-      # Skip negligible gains
-      if (!(((gains) - ( -Epsilon)) < 0))
-        continue
+        # Skip negligible gains
+        if (!(((gains) - ( -Epsilon)) < 0))
+          continue
 
-      # What share of the gains is this
-      fraction = gains / long_gains
+        # What share of the gains is this
+        fraction = gains / long_gains
 
-      # set new costs - don't use adjust because this is EOFY processing
-      extra_share = fraction * extra_gains
+        # set new costs
+        extra_share = fraction * extra_gains
 
-      # Adjusting totals will allow swifter exit
-      total_share -= fraction
+        # Adjusting totals will allow swifter exit
+        total_share -= fraction
 
-      # Get underlying account
-      assert(a in Underlying_Asset, "No underlying asset account to balance extra capital gains <" a ">")
-      underlying_asset = Underlying_Asset[a]
-
-      # Get balance of underlying asset
-      x = get_cost(underlying_asset, ((now) - 1))
-      set_cost(a, gains_now + extra_share, now)
-      set_cost(underlying_asset, x - extra_share, now)
+        # Get underlying account and adjust its cost base
+        assert(a in Underlying_Asset, "No underlying asset account to balance extra capital gains <" a ">")
 
 
-      # Are we done?
-      if (!(((total_share) - ( Epsilon)) > 0))
-        break
-    }
+
+        # Because this is a tax adjustment it will not impact the market gains
+        adjust_cost(a,                       extra_share, now) # This is the extra taxable gain
+        adjust_cost(Underlying_Asset[a],   - extra_share, now, (1)) # This is a tax adjustment because this is tax paid
+
+        # Are we done?
+        if (!(((total_share) - ( Epsilon)) > 0))
+          break
+      }
+  }
 
   # Compute the difference between the grossed up and net income long gains
   long_gains += extra_gains
@@ -5352,7 +5372,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CMOTB" ~ /[iI]|[aA]/ && "CMOTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

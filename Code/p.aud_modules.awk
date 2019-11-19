@@ -757,11 +757,10 @@ function income_tax_aud(now, past, benefits,
   if (Start_Journal) {
     # Now we need Deferred Tax - the hypothetical liability that would be due if all
     # assets were liquidated today
-    deferred_gains = get_cost(DEFERRED_GAINS, now)
+    deferred_gains = get_cost(UNREALIZED, now)
 
     # Gains are negative - losses are positive
-    # Catch negligible gains
-    if (!near_zero(deferred_gains)) {
+    if (below_zero(deferred_gains)) {
       # Deferred tax losses can reduce future tax liability so are a deferred tax asset
       deferred_tax = get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
       set_cost(DEFERRED, - deferred_tax, now)
@@ -775,7 +774,9 @@ function income_tax_aud(now, past, benefits,
         # For a none SMSF this is a synonym for ADJUSTMENTS
         adjust_cost(ALLOCATED, x, now)
       }
-    }
+    } else # No deferred gains
+      set_cost(DEFERRED, 0, now)
+
   }
 }
 
@@ -865,7 +866,7 @@ function get_taxable_gains_aud(now, losses,
 
 # Balance the grossed up gains with underlying assets' cost bases
 function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
-         a, underlying_asset,
+         a,
          extra_share, total_share,
          gains_now, gains,
          extra_gains,
@@ -885,43 +886,48 @@ function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
   extra_gains = rational_value(CGT_Discount) * fraction * total_gains / (1.0 - rational_value(CGT_Discount))
 
   # Track total share of extra gains remaining
-  total_share = 1
-  for (a in Leaf)
-    if (select_class(a, "INCOME.GAINS.NET")) {
-      # These are the income gains classes
-      # Each account needs the income gains increased in proportion to its share of the total gains
-      gains_now = get_cost(a, just_before(now))
-      gains     = gains_now - get_cost(a, past)
+  if (Start_Journal) {
+    total_share = 1
+    for (a in Leaf)
+      if (select_class(a, "INCOME.GAINS.NET")) {
+        # These are the income gains classes
+        # Each account needs the income gains increased in proportion to its share of the total gains
+        gains_now = get_cost(a, just_before(now))
+        gains     = gains_now - get_cost(a, past)
 
-      # Skip negligible gains
-      if (!below_zero(gains))
-        continue
+        # Skip negligible gains
+        if (!below_zero(gains))
+          continue
 
-      # What share of the gains is this
-      fraction = gains / long_gains
+        # What share of the gains is this
+        fraction = gains / long_gains
 
-      # set new costs - don't use adjust because this is EOFY processing
-      extra_share = fraction * extra_gains
+        # set new costs
+        extra_share = fraction * extra_gains
 
-      # Adjusting totals will allow swifter exit
-      total_share -= fraction
+        # Adjusting totals will allow swifter exit
+        total_share -= fraction
 
-      # Get underlying account
-      assert(a in Underlying_Asset, "No underlying asset account to balance extra capital gains <" a ">")
-      underlying_asset = Underlying_Asset[a]
+        # Get underlying account and adjust its cost base
+        assert(a in Underlying_Asset, "No underlying asset account to balance extra capital gains <" a ">")
 
-      # Get balance of underlying asset
-      x = get_cost(underlying_asset, just_before(now))
-      set_cost(a, gains_now + extra_share, now)
-      set_cost(underlying_asset, x - extra_share, now)
 @ifeq LOG get_gains
-      printf "\t\tCost Base Increase %27s => %s\n", Leaf[underlying_asset], print_cash(- (gains + extra_share)) > STDERR
+        printf "\t\t%27s\n", Leaf[Underlying_Asset[a]] > STDERR
+        printf "\t\t%27s\n", Leaf[a] > STDERR
+        printf "\t\t\tGains => %s\n", print_cash(- gains) > STDERR
+        printf "\t\t\tExtra => %s\n", print_cash(- extra_share) > STDERR
+        printf "\t\t\tTotal => %s\n", print_cash(- (gains + extra_share)) > STDERR
 @endif
 
-      # Are we done?
-      if (!above_zero(total_share))
-        break
-    }
+        # Because this is a tax adjustment it will not impact the market gains
+        adjust_cost(a,                       extra_share, now) # This is the extra taxable gain
+        adjust_cost(Underlying_Asset[a],   - extra_share, now, TRUE) # This is a tax adjustment because this is tax paid
+
+        # Are we done?
+        if (!above_zero(total_share))
+          break
+      }
+  }
 
   # Compute the difference between the grossed up and net income long gains
   long_gains += extra_gains
