@@ -1689,14 +1689,14 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
   return sum_adjustments
 }
 
-# set the cost to a specified value (new_cost)
-function set_cost(a, new_cost, now,     initial_cost) {
-  # The current cost
-  initial_cost = get_cost(a, now)
-
-  # The required change in the cost is therefore (new_cost - initial_cost)
-  adjust_cost(a, new_cost - initial_cost, now, (0))
-}
+# # set the cost to a specified value (new_cost)
+# function set_cost(a, new_cost, now,     initial_cost) {
+#   # The current cost
+#   initial_cost = get_cost(a, now)
+#
+#   # The required change in the cost is therefore (new_cost - initial_cost)
+#   adjust_cost(a, new_cost - initial_cost, now, FALSE)
+# }
 
 # Get unrealized or realized gains
 function get_asset_gains(gains_function, now,   sum, a) {

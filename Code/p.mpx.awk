@@ -1276,15 +1276,6 @@ function checkset(now, a, account, units, amount, is_check,
         set_entry(Price[account], amount, now)
       break
 
-      case "COST" :
-        # Override the account cost -> this can cause the accounts not to balance!
-        set_cost(account, amount, now)
-@ifeq LOG checkset
-        printf "%% SET %s[%11s] => %14s\n", account, get_date(now), print_cash(get_cost(account, now)) > STDERR
-        printf "%% SET %s[%11s] => %14s\n", Parent_Name[account], get_date(now), print_cash(get_cost(Parent_Name[account], now)) > STDERR
-@endif
-      break
-
       default : assert(FALSE, sprintf("SET: I don't know how to set <%s> for account %s\n",
                                       action, get_short_name(account)))
     }
@@ -1993,17 +1984,18 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
     printf "\tDate => %s\n", get_date(now) > output_stream
     printf "\tAssets      => %20.2f\n", sum_assets > output_stream
     printf "\tIncome      => %20.2f\n", sum_income > output_stream
-    printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
+    #printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
 
     printf "\tExpenses    => %20.2f\n", sum_expenses > output_stream
-    printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
-    printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
+    ##printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
+    ##printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
 
 
     printf "\tLiabilities => %20.2f\n", sum_liabilities > output_stream
     printf "\tEquities    => %20.2f\n", sum_equities > output_stream
     if (not_zero(sum_adjustments))
       printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
+    printf "\tSpecial    => %20.2f\n", - get_cost("*SPECIAL", now) > output_stream
     printf "\tBalance     => %20.2f\n", balance > output_stream
     assert(near_zero(balance), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }

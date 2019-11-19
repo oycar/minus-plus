@@ -1706,14 +1706,14 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
   return sum_adjustments
 }
 
-# set the cost to a specified value (new_cost)
-function set_cost(a, new_cost, now,     initial_cost) {
-  # The current cost
-  initial_cost = get_cost(a, now)
-
-  # The required change in the cost is therefore (new_cost - initial_cost)
-  adjust_cost(a, new_cost - initial_cost, now, (0))
-}
+# # set the cost to a specified value (new_cost)
+# function set_cost(a, new_cost, now,     initial_cost) {
+#   # The current cost
+#   initial_cost = get_cost(a, now)
+#
+#   # The required change in the cost is therefore (new_cost - initial_cost)
+#   adjust_cost(a, new_cost - initial_cost, now, FALSE)
+# }
 
 # Get unrealized or realized gains
 function get_asset_gains(gains_function, now,   sum, a) {
@@ -3072,13 +3072,12 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       printf "\t%27s => %14s\n", "Market Losses",
                                  print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
-
       # Get the deferred taxable gains
-      apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, UNREALIZED)
+      cost = apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, "*ASSET", UNREALIZED)
 
       # Need to balance the market gains
-      cost = get_cost(UNREALIZED, now)
-      adjust_cost("*ASSET", get_cost(UNREALIZED, ((now) - 1)) - cost, now)
+      #cost = get_cost(UNREALIZED, now)
+      #adjust_cost("*ASSET", get_cost(UNREALIZED, just_before(now)) - cost, now)
 
       # Only deferred gains count
       if ((((cost) - ( -Epsilon)) < 0))
@@ -3208,7 +3207,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3338,8 +3337,8 @@ function get_capital_gains(now, past, is_detailed,
     # This is not strictly necessary in all cases but useful
     # Save net gains or losses
     # What happens when you manipulate a parent account?
-    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  ((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( ("*" (("SPECIAL.TAXABLE.GAINS.LONG"))))),  ((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( ("*" (("SPECIAL.TAXABLE.LOSSES.LONG"))))))
-    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, ((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( ("*" (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( ("*" (("SPECIAL.TAXABLE.LOSSES.SHORT"))))))
+    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( ("*" (("SPECIAL.TAXABLE.GAINS.LONG"))))),  ((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( ("*" (("SPECIAL.TAXABLE.LOSSES.LONG"))))))
+    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( ("*" (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( ("*" (("SPECIAL.TAXABLE.LOSSES.SHORT"))))))
 
     # Overall gains, losses and taxable gains
     underline(44, 8, reports_stream)
@@ -3428,7 +3427,7 @@ function gross_up_gains_def(now, past, total_gains, long_gains, short_gains) {
 
 # Shared code for applying losses to taxable gains
 function apply_losses(now, reports_stream, label,
-                           gains, losses, save_gains, save_losses) {
+                           gains, losses, balancing_account, save_gains, save_losses, x) {
   # It works for partioned long & short gains
 
   # Summarize starting point
@@ -3454,19 +3453,28 @@ function apply_losses(now, reports_stream, label,
 
   # Save  gains
   # these could be deferred gains or taxable gains
-  # this could be rewritten with fewer flags/options
+  # Only needed on first pass
   if (save_gains) {
-    set_cost(save_gains, gains, now)
+    if (Start_Journal) {
+      x = get_cost(save_gains, now)
+      adjust_cost(save_gains,          gains - x,  now)
+      adjust_cost(balancing_account, -(gains - x), now)
+    }
     printf "\t%27s => %14s\n", (label " Gains"), print_cash(- get_cost(save_gains, now)) > reports_stream
   }
 
   # Remaining options could only be for taxable gains
   if (save_losses) {
-    set_cost(save_losses, losses, now)
+    if (Start_Journal) {
+      x = get_cost(save_losses, now)
+      adjust_cost(save_losses,         losses - x,  now)
+      adjust_cost(balancing_account, -(losses - x), now)
+    }
     printf "\t%27s => %14s\n", (label " Losses"), print_cash(get_cost(save_losses, now)) > reports_stream
   }
 
-  # Cannot have a net gain and a net loss so return which
+  # Cannot have both a net gain and a net loss simultaneously
+  # So return whichever is appropriate
   if (((((losses) - ( Epsilon)) <= 0) && (((losses) - ( -Epsilon)) >= 0)))
     # A (possibly zero) net gain
     return gains
@@ -3546,7 +3554,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3686,7 +3694,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3819,7 +3827,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3891,7 +3899,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4026,7 +4034,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4371,7 +4379,9 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
       tax_refund = get_tax(now, Tax_Bands, ((__MPX_KEY__ = find_key(Taxable_Income,  now))?( Taxable_Income[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Taxable_Income[0]):( 0)))) + gains_written_back) - ((__MPX_KEY__ = find_key(Income_Tax,  now))?( Income_Tax[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Income_Tax[0]):( 0))))
 
       # Update taxable gains
-      set_cost(WRITTEN_BACK, - gains_written_back, now)
+      adjust_cost(WRITTEN_BACK, - gains_written_back, now)
+      adjust_cost("*SPECIAL",   + gains_written_back, now)
+
 
       # The refund is a simple refundable offset at the future time
       if ((((tax_refund) - ( -Epsilon)) < 0))
@@ -4551,7 +4561,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -4757,9 +4767,6 @@ function income_tax_aud(now, past, benefits,
     # The franking deficit offsets
     franking_deficit_offsets = ((__MPX_KEY__ = find_key(Franking_Deficit_Offsets,  now))?( Franking_Deficit_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Franking_Deficit_Offsets[0]):( 0))))
 
-    if (!((((franking_deficit_offsets) - ( Epsilon)) <= 0) && (((franking_deficit_offsets) - ( -Epsilon)) >= 0)))
-      printf "%48s %32s\n\n", "Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
-
 
     # Need to check for franking deficit tax here
     if ((((franking_balance) - ( -Epsilon)) < 0)) {
@@ -4797,10 +4804,12 @@ function income_tax_aud(now, past, benefits,
 
       printf "%48s %32s\n\n", "Tax Owed After Using Non-Refundable Offsets", print_cash(tax_owed) > write_stream
 
-
       # And reset franking balance
-      if (Start_Journal)
+      # This is effectively a payment of stamped franking credits into the account
+      if (Start_Journal) {
         adjust_cost(FRANKING, - franking_balance, now)
+        adjust_cost(FRANKING_STAMPED, franking_balance, now)
+      }
     }
   }
 
@@ -4841,10 +4850,6 @@ function income_tax_aud(now, past, benefits,
     printf "%s\t%40s %32s\n\n", header, "Foreign Offsets", print_cash(foreign_offsets) > write_stream
     header = ""
 
-    printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(((__MPX_KEY__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Foreign_Offset_Limit[0]):( 0))))) > write_stream
-    if ((((extra_tax) - ( Epsilon)) > 0))
-      printf "\t%40s %32s\n\n", "Extra Tax Paid on Foreign Earnings", print_cash(extra_tax) > write_stream
-
   } else
     foreign_offsets = 0
 
@@ -4855,15 +4860,6 @@ function income_tax_aud(now, past, benefits,
     middle_income_offset = get_tax(now, Middle_Income_Offset, taxable_income)
 
     # This is an Australian no-carry offset computed from the taxable income
-
-    if (((((low_income_offset) - ( Epsilon)) > 0) || (((low_income_offset) - ( -Epsilon)) < 0))) {
-      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(low_income_offset) > write_stream
-      header = ""
-    }
-    if (((((middle_income_offset) - ( Epsilon)) > 0) || (((middle_income_offset) - ( -Epsilon)) < 0))) {
-      printf "%s\t%40s %32s\n", header, "Middle Income Tax Offset", print_cash(middle_income_offset) > write_stream
-      header = ""
-    }
 
 
     # Set the no_carry offsets
@@ -5376,7 +5372,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5516,9 +5512,9 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
   balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 
-  # No default printing
-  show_balance = (0)
-  output_stream = "/dev/stderr"
+  # Verbose balance printing
+  show_balance = (1)
+  output_stream = "/dev/stdout"
 
 
   # Is there an error?
@@ -5536,13 +5532,16 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
     if (((((sum_adjustments) - ( Epsilon)) > 0) || (((sum_adjustments) - ( -Epsilon)) < 0))) {
       printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
       printf "\tIncome      => %20.2f\n",  get_cost("*INCOME", now) > output_stream
-      printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
-      printf "\t**<Contribution => %20.2f>\n", get_cost("*INCOME.CONTRIBUTION", now) > output_stream
+      #printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
+      #printf "\t**<Contribution => %20.2f>\n", get_cost("*INCOME.CONTRIBUTION", now) > output_stream
       printf "\tExpenses    => %20.2f\n", get_cost("*EXPENSE", now) > output_stream
-      printf "\t**<Benefits => %20.2f>\n", get_cost("*EXPENSE.BENEFIT", now) > output_stream
-      printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
-      printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
+      #printf "\t**<Benefits => %20.2f>\n", get_cost("*EXPENSE.BENEFIT", now) > output_stream
+      #printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
+      #printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
       printf "\t**<Allocated=> %20.2f>\n", get_cost(ALLOCATED, now) > output_stream
+      printf "\tSpecial    => %20.2f\n", - get_cost("*SPECIAL", now) > output_stream
+      printf "\tBalancing  => %20.2f\n", - get_cost("*SPECIAL.BALANCING", now) > output_stream
+
     }
 
     if (((((sum_future) - ( Epsilon)) > 0) || (((sum_future) - ( -Epsilon)) < 0)))
@@ -7074,12 +7073,6 @@ function checkset(now, a, account, units, amount, is_check,
         (Price[account][ now] = ( amount))
       break
 
-      case "COST" :
-        # Override the account cost -> this can cause the accounts not to balance!
-        set_cost(account, amount, now)
-
-      break
-
       default : assert((0), sprintf("SET: I don't know how to set <%s> for account %s\n",
                                       action, (Leaf[account])))
     }
@@ -7659,9 +7652,9 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
 
 
-  # No default printing
-  show_balance = (0)
-  output_stream = "/dev/stderr"
+  # Verbose balance printing
+  show_balance = (1)
+  output_stream = "/dev/stdout"
 
 
   # Is there an error?
@@ -7676,17 +7669,18 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
     printf "\tDate => %s\n", get_date(now) > output_stream
     printf "\tAssets      => %20.2f\n", sum_assets > output_stream
     printf "\tIncome      => %20.2f\n", sum_income > output_stream
-    printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
+    #printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
 
     printf "\tExpenses    => %20.2f\n", sum_expenses > output_stream
-    printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
-    printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
+    ##printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
+    ##printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
 
 
     printf "\tLiabilities => %20.2f\n", sum_liabilities > output_stream
     printf "\tEquities    => %20.2f\n", sum_equities > output_stream
     if (((((sum_adjustments) - ( Epsilon)) > 0) || (((sum_adjustments) - ( -Epsilon)) < 0)))
       printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
+    printf "\tSpecial    => %20.2f\n", - get_cost("*SPECIAL", now) > output_stream
     printf "\tBalance     => %20.2f\n", balance > output_stream
     assert(((((balance) - ( Epsilon)) <= 0) && (((balance) - ( -Epsilon)) >= 0)), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }

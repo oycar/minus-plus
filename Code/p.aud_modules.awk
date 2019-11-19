@@ -399,10 +399,12 @@ function income_tax_aud(now, past, benefits,
 
       printf "%48s %32s\n\n", "Tax Owed After Using Non-Refundable Offsets", print_cash(tax_owed) > write_stream
 
-
       # And reset franking balance
-      if (Start_Journal)
+      # This is effectively a payment of stamped franking credits into the account
+      if (Start_Journal) {
         adjust_cost(FRANKING, - franking_balance, now)
+        adjust_cost(FRANKING_STAMPED, franking_balance, now)
+      }
     }
   }
 

@@ -466,13 +466,12 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
       printf "\t%27s => %14s\n", "Market Losses",
                                  print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
-
       # Get the deferred taxable gains
-      apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, UNREALIZED)
+      cost = apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, "*ASSET", UNREALIZED)
 
       # Need to balance the market gains
-      cost = get_cost(UNREALIZED, now)
-      adjust_cost("*ASSET", get_cost(UNREALIZED, just_before(now)) - cost, now)
+      #cost = get_cost(UNREALIZED, now)
+      #adjust_cost("*ASSET", get_cost(UNREALIZED, just_before(now)) - cost, now)
 
       # Only deferred gains count
       if (below_zero(cost))
@@ -735,8 +734,8 @@ function get_capital_gains(now, past, is_detailed,
     # This is not strictly necessary in all cases but useful
     # Save net gains or losses
     # What happens when you manipulate a parent account?
-    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  star(LONG_GAINS),  star(LONG_LOSSES))
-    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, star(SHORT_GAINS), star(SHORT_LOSSES))
+    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  "*SPECIAL", star(LONG_GAINS),  star(LONG_LOSSES))
+    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, "*SPECIAL", star(SHORT_GAINS), star(SHORT_LOSSES))
 
     # Overall gains, losses and taxable gains
     underline(44, 8, reports_stream)
@@ -825,7 +824,7 @@ function gross_up_gains_def(now, past, total_gains, long_gains, short_gains) {
 
 # Shared code for applying losses to taxable gains
 function apply_losses(now, reports_stream, label,
-                           gains, losses, save_gains, save_losses) {
+                           gains, losses, balancing_account, save_gains, save_losses, x) {
   # It works for partioned long & short gains
 
   # Summarize starting point
@@ -851,19 +850,28 @@ function apply_losses(now, reports_stream, label,
 
   # Save  gains
   # these could be deferred gains or taxable gains
-  # this could be rewritten with fewer flags/options
+  # Only needed on first pass
   if (save_gains) {
-    set_cost(save_gains, gains, now)
+    if (Start_Journal) {
+      x = get_cost(save_gains, now)
+      adjust_cost(save_gains,          gains - x,  now)
+      adjust_cost(balancing_account, -(gains - x), now)
+    }
     printf "\t%27s => %14s\n", (label " Gains"), print_cash(- get_cost(save_gains, now)) > reports_stream
   }
 
   # Remaining options could only be for taxable gains
   if (save_losses) {
-    set_cost(save_losses, losses, now)
+    if (Start_Journal) {
+      x = get_cost(save_losses, now)
+      adjust_cost(save_losses,         losses - x,  now)
+      adjust_cost(balancing_account, -(losses - x), now)
+    }
     printf "\t%27s => %14s\n", (label " Losses"), print_cash(get_cost(save_losses, now)) > reports_stream
   }
 
-  # Cannot have a net gain and a net loss so return which
+  # Cannot have both a net gain and a net loss simultaneously
+  # So return whichever is appropriate
   if (near_zero(losses))
     # A (possibly zero) net gain
     return gains
@@ -1782,7 +1790,9 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
       tax_refund = get_tax(now, Tax_Bands, find_entry(Taxable_Income, now) + gains_written_back) - find_entry(Income_Tax, now)
 
       # Update taxable gains
-      set_cost(WRITTEN_BACK, - gains_written_back, now)
+      adjust_cost(WRITTEN_BACK, - gains_written_back, now)
+      adjust_cost("*SPECIAL",   + gains_written_back, now)
+
 
       # The refund is a simple refundable offset at the future time
       if (below_zero(tax_refund))
