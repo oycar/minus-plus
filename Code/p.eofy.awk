@@ -76,7 +76,8 @@ function eofy_actions(now,      past, allocated_profits,
   print_balance_sheet(now, past, 1)
 
   # Allocate second element costs associated with fixed assets - at SOFY
-  allocate_second_element_costs(just_after(now))
+  if (Start_Journal)
+    allocate_second_element_costs(just_after(now))
 }
 
 # Default balance journal is a no-op
@@ -1523,7 +1524,8 @@ function print_dividend_qualification(now, past, is_detailed,
         qualified_payment += qualified_fraction * payment
 
         # Make the appropriate changes for the current tax jurisdiction
-        @Dividend_Qualification_Function(a, key, 1.0 - qualified_fraction)
+        if (Start_Journal)
+          @Dividend_Qualification_Function(a, key, 1.0 - qualified_fraction)
 
         # Get the next key
         key = next_key

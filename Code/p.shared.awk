@@ -968,7 +968,6 @@ function set_special_accounts() {
   TAX          = initialize_account("LIABILITY.TAX:TAX")
   RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
   GST          = initialize_account("LIABILITY.TAX:TAX.GST")
-  FRANKING_TAX = initialize_account("LIABILITY.TAX:FRANKING.TAX")
 
   # Accounting capital gains accounts
   REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
