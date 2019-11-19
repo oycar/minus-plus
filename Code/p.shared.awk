@@ -1417,7 +1417,7 @@ function get_asset_gains(gains_function, now,   sum, a) {
   return sum
 }
 
-# Get unrealized gains at the account level
+# Get unrealized gains at the account level - these are reduced gains
 function get_unrealized_gains(a, now,
                               gains) {
 
@@ -1426,7 +1426,7 @@ function get_unrealized_gains(a, now,
     return 0 # No unrealized gains
 
   if (is_capital(a))
-    gains = get_adjusted_cost(a, now) - find_entry(Price[a], now) * get_units(a, now)
+    gains = get_cost(a, now) - find_entry(Price[a], now) * get_units(a, now)
   else
     gains = 0
 

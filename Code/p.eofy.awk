@@ -20,7 +20,7 @@
 
 # Handle EOFY processing for mpx
 function eofy_actions(now,      past, allocated_profits,
-                                benefits, unrealized_gains) {
+                                benefits) {
 @ifeq LOG eofy_actions
   # EOFY actions
   printf "EOFY Actions\n\tDate => %s\n", get_date(now) > STDERR
@@ -28,27 +28,6 @@ function eofy_actions(now,      past, allocated_profits,
 
   # past is one year earlier
   past = last_year(now)
-
-  # # Are these actions already processed in the accounts?
-  # if (Start_Journal) {
-  #   # No this is the first time through
-  #   # Depreciate everything - at EOFY
-  #   depreciate_all(now)
-  #
-  #   # Save unrealized gains; notice that the asset class must be updated too for balancing
-  #   unrealized_gains = get_asset_gains("get_unrealized_gains", now)
-  #
-  #   # Get the change since previous transaction
-  #   unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
-  #
-  #   # Adjust the market gains and the asset values
-  #   adjust_cost("*ASSET", - unrealized_gains, now)
-  #   adjust_cost(UNREALIZED, unrealized_gains, now)
-  #
-  #   This seems redundant
-  #   if (ALLOCATED != ADJUSTMENTS)
-  #     allocated_profits = get_cost(ALLOCATED, just_before(now))
-  # }
 
   # Do we need to check for dividend qualification
   if (Qualification_Window)
@@ -71,17 +50,7 @@ function eofy_actions(now,      past, allocated_profits,
     # Depreciate everything - at EOFY
     depreciate_all(now)
 
-    # Save unrealized gains; notice that the asset class must be updated too for balancing
-    unrealized_gains = get_asset_gains("get_unrealized_gains", now)
-
-    # Get the change since previous transaction
-    unrealized_gains -= get_cost(UNREALIZED, get_previous_transaction(UNREALIZED, just_before(now)))
-
-    # Adjust the market gains and the asset values
-    adjust_cost("*ASSET", - unrealized_gains, now)
-    adjust_cost(UNREALIZED, unrealized_gains, now)
-
-    This seems redundant
+    # Allocated can change in the tax computations
     if (ALLOCATED != ADJUSTMENTS)
       allocated_profits = get_cost(ALLOCATED, just_before(now))
   }
@@ -148,9 +117,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                                                             sum_short_gains, sum_short_losses) {
 
   # # Print the gains report
-  # print Journal_Title > reports_stream
-  # printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
-
   # Are we printing out a detailed schedule?
   is_detailed = ternary(is_detailed, is_detailed, FALSE)
 
@@ -500,14 +466,16 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
                                  print_cash(sum_long_losses + sum_short_losses) > reports_stream
 
 
+      # Get the deferred taxable gains
+      apply_losses(now, reports_stream, "Deferred", sum_long_gains + sum_short_gains, sum_long_losses + sum_short_losses, UNREALIZED)
 
-
-
+      # Need to balance the market gains
+      cost = get_cost(UNREALIZED, now)
+      adjust_cost("*ASSET", get_cost(UNREALIZED, just_before(now)) - cost, now)
 
       # Only deferred gains count
-      if (below_zero(get_cost(UNREALIZED, now)))
-        printf "\t%27s => %14s\n", "Deferred Gains (Adjusted)",
-                                   print_cash(- get_cost(UNREALIZED, now)) > reports_stream
+      if (below_zero(cost))
+         printf "\t%27s => %14s\n", "Deferred Gains", print_cash(- cost) > reports_stream
 
        # All done
        underline(44, 8, reports_stream)
