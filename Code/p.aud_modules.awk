@@ -105,7 +105,7 @@ function initialize_tax_aud() {
     Update_Profits_Function  = "update_profits_smsf"
 
     # Special accounts for SMSFs
-    ALLOCATED = initialize_account("SPECIAL.ACCOUNT:ALLOCATED")
+    ALLOCATED = initialize_account("BALANCING:ALLOCATED")
 
     # Reserve rate is variable over time
     set_key(Reserve_Rate, Epoch, 0.0) # Default reserve allocation

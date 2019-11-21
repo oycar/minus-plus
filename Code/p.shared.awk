@@ -931,13 +931,10 @@ function set_special_accounts() {
   initialize_account("SPECIAL.CONTROL:VALUE")
   initialize_account("SPECIAL.CONTROL:PRICE")
 
-  # A NULL account
-  NULL = initialize_account("SPECIAL.ACCOUNT:NULL")
-
   # Balancing - to simplify processing of transactions at EOFY
   # These are income/expense items not needed in the operating statement
-  ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
-  FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
+  ADJUSTMENTS      = initialize_account("BALANCING:ADJUSTMENTS")
+  FUTURE_PAYMENT   = initialize_account("BALANCING:FUTURE.PAYMENT")
 
   ## Franking Credits
   #
@@ -1332,6 +1329,9 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
             Short_Gains[a] = initialize_account(SHORT_GAINS ":SG." Leaf[a])
           adjust_cost(Short_Gains[a], parcel_cost, now)
         }
+
+        # Balance taxable gains
+        adjust_cost("*SPECIAL", - parcel_cost, now)
       }
     }
   }

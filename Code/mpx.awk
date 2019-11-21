@@ -111,6 +111,8 @@ END {
 
 
 
+
+
 # // The stream to write reports to
 
 
@@ -1281,13 +1283,10 @@ function set_special_accounts() {
   initialize_account("SPECIAL.CONTROL:VALUE")
   initialize_account("SPECIAL.CONTROL:PRICE")
 
-  # A NULL account
-  NULL = initialize_account("SPECIAL.ACCOUNT:NULL")
-
   # Balancing - to simplify processing of transactions at EOFY
   # These are income/expense items not needed in the operating statement
-  ADJUSTMENTS      = initialize_account("SPECIAL.BALANCING:ADJUSTMENTS")
-  FUTURE_PAYMENT   = initialize_account("SPECIAL.BALANCING:FUTURE.PAYMENT")
+  ADJUSTMENTS      = initialize_account("BALANCING:ADJUSTMENTS")
+  FUTURE_PAYMENT   = initialize_account("BALANCING:FUTURE.PAYMENT")
 
   ## Franking Credits
   #
@@ -1649,6 +1648,9 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
             Short_Gains[a] = initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SG." Leaf[a])
           adjust_cost(Short_Gains[a], parcel_cost, now)
         }
+
+        # Balance taxable gains
+        adjust_cost("*SPECIAL", - parcel_cost, now)
       }
     }
   }
@@ -1894,7 +1896,7 @@ function initialize_account(account_name,    class_name, array, p, n,
 
   # Still need to check the account name is in a recognized class
   class_name = get_name_component(account_name, (1))
-  assert(class_name ~ /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL/, "<" account_name "> is not a member of a recognized class")
+  assert(class_name ~ /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/, "<" account_name "> is not a member of a recognized class")
 
   # Initialize this account
   # Now split the account name into a branch and a leaf
@@ -3207,7 +3209,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3371,9 +3373,9 @@ function get_capital_gains(now, past, is_detailed,
 
     # If the total capital losses are non zero at the EOFY they must be carried losses
     carried_losses = get_carried_losses(now, Capital_Losses, adjusted_gains, 0, reports_stream)
-    if ((((carried_losses) - ( Epsilon)) > 0))
+    if ((((carried_losses) - ( Epsilon)) > 0)) {
       printf "\t%27s => %14s\n", "Losses Carried Forward", print_cash(carried_losses) > reports_stream
-    else {
+    } else {
       assert(((((carried_losses) - ( Epsilon)) <= 0) && (((carried_losses) - ( -Epsilon)) >= 0)), sprintf("Cannot carry taxable capital gains forward [%s] Gains => %14s", get_date(past), print_cash(- carried_losses, 6)))
       carried_losses = 0
     }
@@ -3554,7 +3556,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3694,7 +3696,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3827,7 +3829,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3899,7 +3901,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4034,7 +4036,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4513,7 +4515,7 @@ function initialize_tax_aud() {
     Update_Profits_Function  = "update_profits_smsf"
 
     # Special accounts for SMSFs
-    ALLOCATED = initialize_account("SPECIAL.ACCOUNT:ALLOCATED")
+    ALLOCATED = initialize_account("BALANCING:ALLOCATED")
 
     # Reserve rate is variable over time
     (( Epoch in Reserve_Rate)?( 0.0):(Reserve_Rate[ Epoch] = ( 0.0))) # Default reserve allocation
@@ -4561,7 +4563,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5372,7 +5374,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6640,8 +6642,8 @@ function parse_transaction(now, a, b, amount,
 
       # Adjust franking account when necessary
       if (((a) ~ ("^" ( "INCOME.FOREIGN") "[.:]")))
-        # Foreign Credits
-        adjust_cost(NULL, tax_credits, now)
+        # Foreign Credits - adjust top level
+        adjust_cost("*SPECIAL", tax_credits, now)
       else
         # Franking Credits
         adjust_cost(FRANKING, tax_credits, now)
@@ -7523,6 +7525,9 @@ function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
         Short_Losses[a] = initialize_account(("SPECIAL.TAXABLE.LOSSES.SHORT") ":SL." Leaf[a])
       adjust_cost(Short_Losses[a], gains, now)
     }
+
+    # Balance taxable losses
+    adjust_cost("*SPECIAL", -gains, now)
   } else if ((((gains) - ( -Epsilon)) < 0))
     adjust_cost(REALIZED_GAINS, gains, now)
 
@@ -7543,6 +7548,9 @@ function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
         Short_Gains[a] = initialize_account(("SPECIAL.TAXABLE.GAINS.SHORT") ":SG." Leaf[a])
       adjust_cost(Short_Gains[a], tax_gains, now)
     }
+
+    # Balance taxable gains
+    adjust_cost("*SPECIAL", -tax_gains, now)
   }
 
   # Return gains
@@ -7646,7 +7654,7 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   sum_equities    = - get_cost("*EQUITY", now)
   sum_expenses    = - get_cost("*EXPENSE", now)
   sum_income      = - get_cost("*INCOME", now)
-  sum_adjustments =   get_cost("*SPECIAL.BALANCING", now)
+  sum_adjustments =   get_cost("*BALANCING", now)
 
   # The balance should be zero
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)

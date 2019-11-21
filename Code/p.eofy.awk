@@ -768,9 +768,9 @@ function get_capital_gains(now, past, is_detailed,
 
     # If the total capital losses are non zero at the EOFY they must be carried losses
     carried_losses = get_carried_losses(now, Capital_Losses, adjusted_gains, CARRY_FORWARD_CAPITAL_LIMIT, reports_stream)
-    if (above_zero(carried_losses))
+    if (above_zero(carried_losses)) {
       printf "\t%27s => %14s\n", "Losses Carried Forward", print_cash(carried_losses) > reports_stream
-    else {
+    } else {
       assert(near_zero(carried_losses), sprintf("Cannot carry taxable capital gains forward [%s] Gains => %14s", get_date(past), print_cash(- carried_losses, 6)))
       carried_losses = 0
     }

@@ -119,7 +119,7 @@
 @define FY_DATE        ("Jul-01")
 
 # // Reserved Classes
-@define RESERVED_CLASSES  /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL/
+@define RESERVED_CLASSES  /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/
 
 # // Useful inline functions - this may be overdoing it
 @define make_array(array)  ternary(SUBSEP in array,TRUE,FALSE)

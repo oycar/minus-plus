@@ -843,8 +843,8 @@ function parse_transaction(now, a, b, amount,
 
       # Adjust franking account when necessary
       if (is_class(a, "INCOME.FOREIGN"))
-        # Foreign Credits
-        adjust_cost(NULL, tax_credits, now)
+        # Foreign Credits - adjust top level
+        adjust_cost("*SPECIAL", tax_credits, now)
       else
         # Franking Credits
         adjust_cost(FRANKING, tax_credits, now)
@@ -1834,6 +1834,9 @@ function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
         Short_Losses[a] = initialize_account(SHORT_LOSSES ":SL." Leaf[a])
       adjust_cost(Short_Losses[a], gains, now)
     }
+
+    # Balance taxable losses
+    adjust_cost("*SPECIAL", -gains, now)
   } else if (below_zero(gains))
     adjust_cost(REALIZED_GAINS, gains, now)
 
@@ -1854,6 +1857,9 @@ function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
         Short_Gains[a] = initialize_account(SHORT_GAINS ":SG." Leaf[a])
       adjust_cost(Short_Gains[a], tax_gains, now)
     }
+
+    # Balance taxable gains
+    adjust_cost("*SPECIAL", -tax_gains, now)
   }
 
   # Return gains
@@ -1957,7 +1963,7 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   sum_equities    = - get_cost("*EQUITY", now)
   sum_expenses    = - get_cost("*EXPENSE", now)
   sum_income      = - get_cost("*INCOME", now)
-  sum_adjustments =   get_cost("*SPECIAL.BALANCING", now)
+  sum_adjustments =   get_cost("*BALANCING", now)
 
   # The balance should be zero
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
