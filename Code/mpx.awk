@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Logic conventions
 
 
@@ -99,8 +101,6 @@ END {
 
 
 # // Default Reports
-
-
 
 
 
@@ -704,11 +704,8 @@ function sum_entry(array, x, now,   key, delta) {
     array[key] += x
   }
 
-  # Finished
-  # if (key in array)
-  #   array[now] = x + array[key]
-  # else
-    array[now] = x + array[key]
+  # All done
+  array[now] = x + array[key]
 }
 
 # Remove the oldest entries from the reverse ordered array
@@ -1530,8 +1527,8 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
     if (flag = ((a) ~ /^ASSET\.FIXED[.:]/))
       adjustment = x / get_cost(a, now)
     else {
-      assert(((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))), "Asset <" Leaf[a] "> has zero units - ensure this transaction occurs before it was sold")
-      adjustment = x / ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
+      assert(((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0)), "Asset <" Leaf[a] "> has zero units - ensure this transaction occurs before it was sold")
+      adjustment = x / ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))
     }
 
     # Debugging
@@ -1684,7 +1681,7 @@ function get_cost(a, now,     i, sum_cost) {
 
 # One liner function
 function get_value(a, now) {
-  return ((((a) ~ /^ASSET\.CAPITAL[.:]/))?( ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( get_cost(a, now)))
+  return ((((a) ~ /^ASSET\.CAPITAL[.:]/))?( ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))):( get_cost(a, now)))
 }
 
 
@@ -1738,7 +1735,7 @@ function get_unrealized_gains(a, now,
     return 0 # No unrealized gains
 
   if (((a) ~ /^ASSET\.CAPITAL[.:]/))
-    gains = get_cost(a, now) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
+    gains = get_cost(a, now) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))
   else
     gains = 0
 
@@ -1896,11 +1893,15 @@ function initialize_account(account_name,    class_name, array, p, n,
 
   # Still need to check the account name is in a recognized class
   class_name = get_name_component(account_name, (1))
-  assert(class_name ~ /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/, "<" account_name "> is not a member of a recognized class")
+  #assert(class_name ~ RESERVED_CLASSES, "<" account_name "> is not a member of a recognized class")
 
   # Initialize this account
   # Now split the account name into a branch and a leaf
-  assert(2 == split(account_name, array, ":"), sprintf("<%s> Account name %s is not in branch_name:leaf_name format", $0, account_name))
+  if (class_name ~ /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/) {
+    assert(2 == split(account_name, array, ":"), sprintf("<%s> Account name %s is not in branch_name:leaf_name format", $0, account_name))
+    leaf_name = array[2]
+  } else
+    leaf_name = account_name
 
   # Finally an uninitialized long name
   # BUT there is another trap;
@@ -1911,7 +1912,10 @@ function initialize_account(account_name,    class_name, array, p, n,
   #
   # Actually let's allow this - but only in very restricted casee of the account never having been used
   # This might be possible some day...
-  leaf_name = array[2]
+  # if (class_name ~ RESERVED_CLASSES)
+  #   leaf_name = array[2]
+  # else
+  #   leaf_name = account_name
   if ((leaf_name in Long_Name)) {
     if (Leaf[Long_Name[leaf_name]] == leaf_name) {
       # If the existing account is new (unused) it can be deleted
@@ -1949,7 +1953,6 @@ function initialize_account(account_name,    class_name, array, p, n,
 
     # Keep track of units
     Total_Units[account_name][Epoch]     = Qualified_Units[account_name][Epoch] = 0
-    #Qualified_Units[account_name][SUBSEP]; delete Qualified_Units[account_name][SUBSEP]
 
     # Each account also has a number of parcels
     (( account_name in Number_Parcels)?( 0):(Number_Parcels[ account_name] = ( 0)))
@@ -2030,8 +2033,8 @@ function split_account(now, a, b, split_factor,
   printf "## %s %s => %s by factor %7.2f\n", label, Leaf[a], Leaf[b], ((split_factor < 1)?( 1.0 / split_factor):( split_factor))
   printf "##   Date => %s\n", get_date(now)
   printf "##   %s Cost            => %s\n", Leaf[a], print_cash(get_cost(a, now))
-  printf "##   %s Units           => %10.3f\n", Leaf[a], ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
-  printf "##   %s Qualified Units => %10.3f\n", Leaf[a], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   now))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[a],    now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))))
+  printf "##   %s Units           => %10.3f\n", Leaf[a], ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))
+  printf "##   %s Qualified Units => %10.3f\n", Leaf[a], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   now))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],    now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))))
 
   # Copy parcels
   Number_Parcels[b] = Number_Parcels[a]
@@ -2092,8 +2095,8 @@ function split_account(now, a, b, split_factor,
   # All done
   printf "##   After %s\n", label
   printf "##   %s Cost            => %s\n", Leaf[b], print_cash(get_cost(b, now))
-  printf "##   %s Units           => %10.3f\n", Leaf[b], ((__MPX_KEY__ = find_key(Total_Units[b],   now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))
-  printf "##   %s Qualified Units => %10.3f\n", Leaf[b], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[b],   now))?( Qualified_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[b][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[b],    now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))))
+  printf "##   %s Units           => %10.3f\n", Leaf[b], ((b in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[b],   now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))):( 0))
+  printf "##   %s Qualified Units => %10.3f\n", Leaf[b], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[b],   now))?( Qualified_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[b][0]):( 0))))):( ((b in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[b],    now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))):( 0))))
   printf "##\n"
 }
 
@@ -3209,7 +3212,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3556,7 +3559,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3696,7 +3699,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3829,7 +3832,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3901,7 +3904,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4036,7 +4039,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4091,10 +4094,10 @@ function print_dividend_qualification(now, past, is_detailed,
         # Catch  the case that no qualification date was recorded
         if (qualifying_date) {
           # These are the units that were qualified on the qualifying date
-          qualified_units = ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[underlying_asset],   qualifying_date))?( Qualified_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[underlying_asset][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[underlying_asset],    qualifying_date))?( Total_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[underlying_asset][0]):( 0))))))
+          qualified_units = ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[underlying_asset],   qualifying_date))?( Qualified_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[underlying_asset][0]):( 0))))):( ((underlying_asset in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[underlying_asset],    qualifying_date))?( Total_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[underlying_asset][0]):( 0))))):( 0))))
 
           # Now get the total units
-          total_units = ((__MPX_KEY__ = find_key(Total_Units[underlying_asset],   qualifying_date))?( Total_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[underlying_asset][0]):( 0))))
+          total_units = ((underlying_asset in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[underlying_asset],   qualifying_date))?( Total_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[underlying_asset][0]):( 0))))):( 0))
 
           # If not all units are qualified need to check the second half of the Qualification Window
           if (!((((total_units - qualified_units) - ( Epsilon)) <= 0) && (((total_units - qualified_units) - ( -Epsilon)) >= 0))) {
@@ -4113,7 +4116,7 @@ function print_dividend_qualification(now, past, is_detailed,
                   get_date(key), qualified_units, 100.0 * qualified_fraction, print_cash(payment) > reports_stream
         } else {
           # No qualification date
-          qualified_units    = total_units = ((__MPX_KEY__ = find_key(Total_Units[underlying_asset],   now))?( Total_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[underlying_asset][0]):( 0))))
+          qualified_units    = total_units = ((underlying_asset in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[underlying_asset],   now))?( Total_Units[underlying_asset][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[underlying_asset][0]):( 0))))):( 0))
           qualified_fraction = 1.0
 
           printf "%13s %12s %12.3f %16s %14.3f %12.2f %16s\n", Leaf[underlying_asset], "No Date", total_units,
@@ -4563,7 +4566,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5374,7 +5377,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5514,9 +5517,9 @@ function check_balance_smsf(now,        sum_assets, sum_liabilities, sum_adjustm
   balance = sum_assets - (sum_liabilities + sum_adjustments + sum_future)
 
 
-  # Verbose balance printing
-  show_balance = (1)
-  output_stream = "/dev/stdout"
+  # No default printing
+  show_balance = (0)
+  output_stream = "/dev/stderr"
 
 
   # Is there an error?
@@ -6316,7 +6319,7 @@ function set_financial_year(now,   new_fy) {
 #  MERGE
 #  CHANGE
 #
-$1 ~  /^([[:space:]])*(CHECK|SET|SPLIT|MERGE|CHANGE)/  {
+$1 ~  /^([[:space:]])*(CHECK|SET|SHOW|SPLIT|MERGE|CHANGE)/  {
  # Use a function so we can control scope of variables
  read_control_record()
  next
@@ -6381,6 +6384,9 @@ function read_control_record(       now, i, x, p, is_check){
   switch (x) {
     case "CHECK" :
       is_check = (1)
+    case "SHOW" :
+      if (!is_check)
+        is_check = -1
     case "SET" :
       # Syntax for check and set is
       # CHECKSET, ACCOUNT, WHAT, X, # Comment
@@ -7040,34 +7046,36 @@ function checkset(now, a, account, units, amount, is_check,
     # Check the action just after now
     switch(action) {
       case "VALUE" :
-        assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[account])))
         quantity = get_value(account, now); break
       case "PRICE" :
-        assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", (Leaf[account])))
+        assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK: Only assets or equities have a PRICE: not %s\n", (Leaf[account])))
         quantity = ((__MPX_KEY__ = find_key(Price[account],  now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))); break
 
       case "COST" : quantity = get_cost(account, now); break
 
-      case "UNITS" : quantity = ((__MPX_KEY__ = find_key(Total_Units[account],   now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0)))); break
-      default : assert((0), sprintf("%s => I don't know how to check %s\n",
+      case "UNITS" : quantity = ((account in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[account],   now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0))))):( 0)); break
+      default : assert((0), sprintf("%s => I don't know how to act on %s\n",
                                       (Leaf[account]), action))
     }
 
     # Is this a checkpoint?
-    assert(((((amount - quantity) - ( Epsilon)) <= 0) && (((amount - quantity) - ( -Epsilon)) >= 0)), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
+    if ((1) == is_check)
+      assert(((((amount - quantity) - ( Epsilon)) <= 0) && (((amount - quantity) - ( -Epsilon)) >= 0)), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
                                                  (Leaf[account]), action, get_date(now, LONG_FORMAT), quantity, amount))
-
+    else
+      # Show this
+      printf "%s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
   } else {
     # is a setter
     switch(action) {
       case "VALUE" :
         # Valuations are  per  unit price
         # Was the number of units given?
-        if (amount > Epsilon)
+        if ((((units) - ( Epsilon)) > 0))
           amount /= units
         else # Just use the current cost if zero or negative units specified
           # If you want to set a zero value use PRICE instead
-          amount = get_cost(account, now) / ((__MPX_KEY__ = find_key(Total_Units[account],   now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0))))
+          amount = get_cost(account, now) / ((account in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[account],   now))?( Total_Units[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[account][0]):( 0))))):( 0))
 
       case "PRICE" :
         # This is a single unit
@@ -7168,7 +7176,7 @@ function sell_qualified_units(a, u, now, half_window,      du, dq, key, next_key
 
 
     # How many provisionally qualified units are at the key entry?
-    dq = ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   key))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[a],    key))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))))) - ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   next_key))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[a],    next_key))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))))
+    dq = ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   key))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],    key))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0)))) - ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   next_key))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],    next_key))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))))
 
     # Assert all parcels must be positive
     assert((((dq) - ( Epsilon)) > 0), sprintf("Found a non-positive provisional parcel of units %s[%s] => %.3f",
@@ -7236,7 +7244,7 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
   last_parcel = new_parcel(a, u, x, now, parcel_tag)
 
   # Update units
-  sum_entry(Total_Units[a],  u,  now)
+  ((a in Total_Units)?( sum_entry(Total_Units[a],  u,  now)):( 0))
 
   # Also update qualified units - buying is easy
   if (((a) ~ /^ASSET\.CAPITAL[.:]/) && Qualification_Window) {
@@ -7307,7 +7315,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
 
 
   # Try adjusting units now...
-  sum_entry(Total_Units[ac],  -u,  now)
+  ((ac in Total_Units)?( sum_entry(Total_Units[ac],  -u,  now)):( 0))
 
   # For a depreciating asset with multiple parcels (apart from a pooled asset) then
   # the proportion of the asset being sold depends on the
@@ -7660,9 +7668,9 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
   balance = sum_assets - (sum_liabilities + sum_equities + sum_income + sum_expenses + sum_adjustments)
 
 
-  # Verbose balance printing
-  show_balance = (1)
-  output_stream = "/dev/stdout"
+  # No default printing
+  show_balance = (0)
+  output_stream = "/dev/stderr"
 
 
   # Is there an error?

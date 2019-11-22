@@ -238,8 +238,8 @@
 @define get_previous_transaction(a, now) (find_key(Cost_Basis[a], just_before(now)))
 
 # // Units
-@define get_units(a, now) find_entry(Total_Units[a], now)
-@define adjust_units(a, du, now) sum_entry(Total_Units[a], du, now)
+@define get_units(a, now) ternary(a in Total_Units, find_entry(Total_Units[a], now), 0)
+@define adjust_units(a, du, now) ternary(a in Total_Units, sum_entry(Total_Units[a], du, now), 0)
 
 # // Qualified units - reading is simple - no window qualified units equal all units
 @define get_qualified_units(a, now) ternary(Qualification_Window,  find_entry(Qualified_Units[a], now), get_units(a, now))

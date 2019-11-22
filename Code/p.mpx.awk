@@ -509,7 +509,7 @@ function set_financial_year(now,   new_fy) {
 #  MERGE
 #  CHANGE
 #
-$1 ~  /^([[:space:]])*(CHECK|SET|SPLIT|MERGE|CHANGE)/  {
+$1 ~  /^([[:space:]])*(CHECK|SET|SHOW|SPLIT|MERGE|CHANGE)/  {
  # Use a function so we can control scope of variables
  read_control_record()
  next
@@ -574,6 +574,9 @@ function read_control_record(       now, i, x, p, is_check){
   switch (x) {
     case "CHECK" :
       is_check = TRUE
+    case "SHOW" :
+      if (!is_check)
+        is_check = -1
     case "SET" :
       # Syntax for check and set is
       # CHECKSET, ACCOUNT, WHAT, X, # Comment
@@ -1241,30 +1244,32 @@ function checkset(now, a, account, units, amount, is_check,
     # Check the action just after now
     switch(action) {
       case "VALUE" :
-        assert(is_unitized(account), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", get_short_name(account)))
         quantity = get_value(account, now); break
       case "PRICE" :
-        assert(is_unitized(account), sprintf("CHECK: Only assets or equities have a VALUE or PRICE: not %s\n", get_short_name(account)))
+        assert(is_unitized(account), sprintf("CHECK: Only assets or equities have a PRICE: not %s\n", get_short_name(account)))
         quantity = find_entry(Price[account], now); break
 
       case "COST" : quantity = get_cost(account, now); break
 
       case "UNITS" : quantity = get_units(account, now); break
-      default : assert(FALSE, sprintf("%s => I don't know how to check %s\n",
+      default : assert(FALSE, sprintf("%s => I don't know how to act on %s\n",
                                       get_short_name(account), action))
     }
 
     # Is this a checkpoint?
-    assert(near_zero(amount - quantity), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
+    if (TRUE == is_check)
+      assert(near_zero(amount - quantity), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
                                                  get_short_name(account), action, get_date(now, LONG_FORMAT), quantity, amount))
-
+    else
+      # Show this
+      printf "%s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
   } else {
     # is a setter
     switch(action) {
       case "VALUE" :
         # Valuations are  per  unit price
         # Was the number of units given?
-        if (amount > Epsilon)
+        if (above_zero(units))
           amount /= units
         else # Just use the current cost if zero or negative units specified
           # If you want to set a zero value use PRICE instead

@@ -685,11 +685,8 @@ function sum_entry(array, x, now,   key, delta) {
     array[key] += x
   }
 
-  # Finished
-  # if (key in array)
-  #   array[now] = x + array[key]
-  # else
-    array[now] = x + array[key]
+  # All done
+  array[now] = x + array[key]
 }
 
 # Remove the oldest entries from the reverse ordered array
@@ -1511,8 +1508,8 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
     if (flag = ((a) ~ /^ASSET\.FIXED[.:]/))
       adjustment = x / get_cost(a, now)
     else {
-      assert(((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0)))), "Asset <" Leaf[a] "> has zero units - ensure this transaction occurs before it was sold")
-      adjustment = x / ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
+      assert(((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0)), "Asset <" Leaf[a] "> has zero units - ensure this transaction occurs before it was sold")
+      adjustment = x / ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))
     }
 
     # Debugging
@@ -1665,7 +1662,7 @@ function get_cost(a, now,     i, sum_cost) {
 
 # One liner function
 function get_value(a, now) {
-  return ((((a) ~ /^ASSET\.CAPITAL[.:]/))?( ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( get_cost(a, now)))
+  return ((((a) ~ /^ASSET\.CAPITAL[.:]/))?( ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))):( get_cost(a, now)))
 }
 
 
@@ -1719,7 +1716,7 @@ function get_unrealized_gains(a, now,
     return 0 # No unrealized gains
 
   if (((a) ~ /^ASSET\.CAPITAL[.:]/))
-    gains = get_cost(a, now) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
+    gains = get_cost(a, now) - ((__MPX_KEY__ = find_key(Price[a],  now))?( Price[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[a][0]):( 0)))) * ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))
   else
     gains = 0
 
@@ -1877,11 +1874,15 @@ function initialize_account(account_name,    class_name, array, p, n,
 
   # Still need to check the account name is in a recognized class
   class_name = get_name_component(account_name, (1))
-  assert(class_name ~ /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/, "<" account_name "> is not a member of a recognized class")
+  #assert(class_name ~ RESERVED_CLASSES, "<" account_name "> is not a member of a recognized class")
 
   # Initialize this account
   # Now split the account name into a branch and a leaf
-  assert(2 == split(account_name, array, ":"), sprintf("<%s> Account name %s is not in branch_name:leaf_name format", $0, account_name))
+  if (class_name ~ /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/) {
+    assert(2 == split(account_name, array, ":"), sprintf("<%s> Account name %s is not in branch_name:leaf_name format", $0, account_name))
+    leaf_name = array[2]
+  } else
+    leaf_name = account_name
 
   # Finally an uninitialized long name
   # BUT there is another trap;
@@ -1892,7 +1893,10 @@ function initialize_account(account_name,    class_name, array, p, n,
   #
   # Actually let's allow this - but only in very restricted casee of the account never having been used
   # This might be possible some day...
-  leaf_name = array[2]
+  # if (class_name ~ RESERVED_CLASSES)
+  #   leaf_name = array[2]
+  # else
+  #   leaf_name = account_name
   if ((leaf_name in Long_Name)) {
     if (Leaf[Long_Name[leaf_name]] == leaf_name) {
       # If the existing account is new (unused) it can be deleted
@@ -1930,7 +1934,6 @@ function initialize_account(account_name,    class_name, array, p, n,
 
     # Keep track of units
     Total_Units[account_name][Epoch]     = Qualified_Units[account_name][Epoch] = 0
-    #Qualified_Units[account_name][SUBSEP]; delete Qualified_Units[account_name][SUBSEP]
 
     # Each account also has a number of parcels
     (( account_name in Number_Parcels)?( 0):(Number_Parcels[ account_name] = ( 0)))
@@ -2011,8 +2014,8 @@ function split_account(now, a, b, split_factor,
   printf "## %s %s => %s by factor %7.2f\n", label, Leaf[a], Leaf[b], ((split_factor < 1)?( 1.0 / split_factor):( split_factor))
   printf "##   Date => %s\n", get_date(now)
   printf "##   %s Cost            => %s\n", Leaf[a], print_cash(get_cost(a, now))
-  printf "##   %s Units           => %10.3f\n", Leaf[a], ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))
-  printf "##   %s Qualified Units => %10.3f\n", Leaf[a], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   now))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[a],    now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))))
+  printf "##   %s Units           => %10.3f\n", Leaf[a], ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))
+  printf "##   %s Qualified Units => %10.3f\n", Leaf[a], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[a],   now))?( Qualified_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[a][0]):( 0))))):( ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],    now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0))))
 
   # Copy parcels
   Number_Parcels[b] = Number_Parcels[a]
@@ -2073,8 +2076,8 @@ function split_account(now, a, b, split_factor,
   # All done
   printf "##   After %s\n", label
   printf "##   %s Cost            => %s\n", Leaf[b], print_cash(get_cost(b, now))
-  printf "##   %s Units           => %10.3f\n", Leaf[b], ((__MPX_KEY__ = find_key(Total_Units[b],   now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))
-  printf "##   %s Qualified Units => %10.3f\n", Leaf[b], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[b],   now))?( Qualified_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[b][0]):( 0))))):( ((__MPX_KEY__ = find_key(Total_Units[b],    now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))))
+  printf "##   %s Units           => %10.3f\n", Leaf[b], ((b in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[b],   now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))):( 0))
+  printf "##   %s Qualified Units => %10.3f\n", Leaf[b], ((Qualification_Window)?(  ((__MPX_KEY__ = find_key(Qualified_Units[b],   now))?( Qualified_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Qualified_Units[b][0]):( 0))))):( ((b in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[b],    now))?( Total_Units[b][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[b][0]):( 0))))):( 0))))
   printf "##\n"
 }
 
