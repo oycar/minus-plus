@@ -127,7 +127,6 @@ END {
 # // Day Number For Feb 29
 
 
-
 # // Reserved Classes
 
 
@@ -1257,6 +1256,7 @@ function set_special_accounts() {
   #
   # Check & Set use special accounts to trigger actions
   #
+  initialize_account("SPECIAL.CONTROL:BALANCE")
   initialize_account("SPECIAL.CONTROL:COST")
   initialize_account("SPECIAL.CONTROL:UNITS")
   initialize_account("SPECIAL.CONTROL:VALUE")

@@ -117,7 +117,6 @@
 @define CGT_PERIOD  @eval (366 * ONE_DAY)
 # // Day Number For Feb 29
 @define FEB29                (60)
-@define FY_DATE        ("Jul-01")
 
 # // Reserved Classes
 @define RESERVED_CLASSES  /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/

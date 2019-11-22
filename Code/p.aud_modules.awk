@@ -38,10 +38,6 @@ BEGIN {
   if ("" == Epoch)
     set_epoch()
 
-  # Start of FY
-  if ("" == FY_Date)
-    FY_Date = "Jul 01"
-
   # Depreciation
   First_Year_Factor           = 0.5
   Depreciation_Method["PC"]   = "Prime Cost"

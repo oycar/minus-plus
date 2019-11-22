@@ -103,9 +103,6 @@ BEGIN {
   if ("" == Epoch)
     set_epoch()
 
-  # Default FY date
-  FY_Date = FY_DATE
-
   # The allowed cost elements
   I   = "I"
   II  = "II"
@@ -394,8 +391,8 @@ function import_csv_data(array, symbol, name,
   if (Start_Journal)
     next
   else if (NF > 1)
-    # Interpret the date
-    Start_Record = read_date($2)
+    # Interpret the date at midnight
+    Start_Record = read_date($2, 0)
   else
     assert(FALSE, "START_JOURNAL, Date: Date is required on first call of start journal")
 
@@ -482,13 +479,13 @@ function set_financial_year(now,   new_fy) {
   # Which Calendar year is this?
   FY_Year = get_year_number(now)
 
-  # The timestamp at the end of the year
-  # This assumes FY_Date is the date of the
-  # first day of a financial year
-  new_fy = read_date(FY_Year "-" FY_Date, 0)
-  assert(new_fy > just_before(FY_Time), "Cannot regress financial year: Current FY => " get_date(FY_Time) " New FY => " get_date(new_fy))
-  FY_Time = new_fy
-  Last_FY = last_year(FY_Time)
+  # The financial year
+  Last_FY = now
+  assert(now > just_before(FY_Time), "Cannot regress financial year: Current FY => " get_date(FY_Time) " New FY => " get_date(now))
+  FY_Time = next_year(now)
+
+  # Get the FY_Date - just the date, no year
+  FY_Date = get_date(now, "%b-%d")
 
   # Get the day number for the FY_Date
   FY_Day = get_day_number(FY_Time)
@@ -509,7 +506,7 @@ function set_financial_year(now,   new_fy) {
 #  MERGE
 #  CHANGE
 #
-$1 ~  /^([[:space:]])*(CHECK|SET|SHOW|SPLIT|MERGE|CHANGE)/  {
+$1 ~  /^([[:space:]])*(ADJUST|CHECK|SET|SHOW|SPLIT|MERGE|CHANGE)/  {
  # Use a function so we can control scope of variables
  read_control_record()
  next
@@ -569,15 +566,16 @@ function read_control_record(       now, i, x, p, is_check){
   now = ternary(-1 != Last_Record, Last_Record, Epoch)
 
   # The control records - must be exact match
-  is_check = FALSE
+  is_check = 0
   x = trim($1)
   switch (x) {
     case "CHECK" :
-      is_check = TRUE
+      is_check = 1
     case "SHOW" :
       if (!is_check)
         is_check = -1
     case "SET" :
+    case "ADJUST" :
       # Syntax for check and set is
       # CHECKSET, ACCOUNT, WHAT, X, # Comment
       # We need to rebuild the line into something more standard
@@ -629,9 +627,6 @@ function read_control_record(       now, i, x, p, is_check){
       # Set banded thresholds
       i = trim($2)
       assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
-@ifeq LOG checkset
-      printf "%%%%, %s[%s]", i, get_date(now) > STDERR
-@endif
       set_array_bands(now, SYMTAB[i], NF)
       break
 
@@ -640,9 +635,6 @@ function read_control_record(       now, i, x, p, is_check){
       i = trim($2)
       assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
       p = strtonum($3)
-@ifeq LOG checkset
-      printf "%%%%, %s[%s] => %11.2f\n", i, get_date(now), p > STDERR
-@endif
       set_entry(SYMTAB[i], p, now)
       break
 
@@ -1244,13 +1236,14 @@ function checkset(now, a, account, units, amount, is_check,
       case "VALUE" :
         quantity = get_value(account, now); break
       case "PRICE" :
-        assert(is_unitized(account), sprintf("CHECK: Only assets or equities have a PRICE: not %s\n", get_short_name(account)))
+        assert(is_unitized(account), sprintf("CHECK/SHOW: Only assets or equities have a PRICE: not %s\n", get_short_name(account)))
         quantity = find_entry(Price[account], now); break
 
+      case "BALANCE" :
       case "COST" : quantity = get_cost(account, now); break
 
       case "UNITS" : quantity = get_units(account, now); break
-      default : assert(FALSE, sprintf("%s => I don't know how to act on %s\n",
+      default : assert(FALSE, sprintf("CHECK/SHOW: %s => Unkown action %s\n",
                                       get_short_name(account), action))
     }
 
@@ -1260,7 +1253,7 @@ function checkset(now, a, account, units, amount, is_check,
                                                  get_short_name(account), action, get_date(now, LONG_FORMAT), quantity, amount))
     else
       # Show this
-      printf "%s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
+      printf "## %s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
   } else {
     # is a setter
     switch(action) {
@@ -1279,14 +1272,21 @@ function checkset(now, a, account, units, amount, is_check,
         set_entry(Price[account], amount, now)
       break
 
-      default : assert(FALSE, sprintf("SET: I don't know how to set <%s> for account %s\n",
-                                      action, get_short_name(account)))
+      case "BALANCE" :
+      case "COST" :
+        adjust_cost(account, amount, now)
+
+        # top level class
+        adjust_cost(star(get_name_component(account, 1)), - amount, now)
+        break
+
+      default : assert(FALSE, sprintf("ADJUST/SET: %s => Unkown action %s\n",
+                                      get_short_name(account), action))
     }
 
-    # All Done
-    return
+    # Show this
+    printf "## %s %s %s => %s\n", get_date(now), account, action,  format_value(get_cost(account, now))
   }
-
 }
 
 # Final processing
