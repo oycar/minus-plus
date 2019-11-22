@@ -1134,10 +1134,8 @@ function parse_transaction(now, a, b, amount,
       adjust_cost(a, -amount, now)
 
       # This will not balance when re-read from the state file unless balancing entries made
-      # The reference to the future is confusing because
-      # it means that the payment came "from" the future
-      adjust_cost(FUTURE_PAYMENT, -amount, Extra_Timestamp)
-      adjust_cost(FUTURE_PAYMENT,  amount, now)
+      adjust_cost(ADJUSTMENTS, -amount, Extra_Timestamp)
+      adjust_cost(ADJUSTMENTS,  amount, now)
 
     } else if (is_term(b) || is_current(b)) {
       # This is a term deposit or similar (eg a mortgage or loan issued by the fund)
@@ -1995,18 +1993,10 @@ function check_balance(now,        sum_assets, sum_liabilities, sum_equities, su
     printf "\tDate => %s\n", get_date(now) > output_stream
     printf "\tAssets      => %20.2f\n", sum_assets > output_stream
     printf "\tIncome      => %20.2f\n", sum_income > output_stream
-    #printf "\t**<Realized => %20.2f>\n", get_cost("*INCOME.GAINS", now) > output_stream
-
     printf "\tExpenses    => %20.2f\n", sum_expenses > output_stream
-    ##printf "\t**<Realized => %20.2f>\n", get_cost("*EXPENSE.LOSSES", now) > output_stream
-    ##printf "\t**<Market   => %20.2f>\n", get_cost("*EXPENSE.UNREALIZED", now) > output_stream
-
-
     printf "\tLiabilities => %20.2f\n", sum_liabilities > output_stream
     printf "\tEquities    => %20.2f\n", sum_equities > output_stream
-    if (not_zero(sum_adjustments))
-      printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
-    printf "\tSpecial    => %20.2f\n", - get_cost("*SPECIAL", now) > output_stream
+    printf "\tAdjustments => %20.2f\n", sum_adjustments > output_stream
     printf "\tBalance     => %20.2f\n", balance > output_stream
     assert(near_zero(balance), sprintf("check_balance(%s): Ledger not in balance => %10.2f", get_date(now), balance))
   }

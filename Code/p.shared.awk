@@ -931,7 +931,6 @@ function set_special_accounts() {
   # Balancing - to simplify processing of transactions at EOFY
   # These are income/expense items not needed in the operating statement
   ADJUSTMENTS      = initialize_account("BALANCING:ADJUSTMENTS")
-  FUTURE_PAYMENT   = initialize_account("BALANCING:FUTURE.PAYMENT")
 
   ## Franking Credits
   #
@@ -1582,7 +1581,6 @@ function initialize_account(account_name,    class_name, array, p, n,
 
   # Still need to check the account name is in a recognized class
   class_name = get_name_component(account_name, CLASS_INDEX)
-  #assert(class_name ~ RESERVED_CLASSES, "<" account_name "> is not a member of a recognized class")
 
   # Initialize this account
   # Now split the account name into a branch and a leaf

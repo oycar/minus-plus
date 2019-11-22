@@ -100,8 +100,9 @@
 @define LONG_LOSSES   ("SPECIAL.TAXABLE.LOSSES.LONG")
 @define SHORT_GAINS   ("SPECIAL.TAXABLE.GAINS.SHORT")
 @define SHORT_LOSSES  ("SPECIAL.TAXABLE.LOSSES.SHORT")
-@define star(s)       ternary(is_star(s), (s), ("*" (s)))
-@define is_star(a)    ((a) ~ /^\*/)
+@define STAR          ("*")
+@define star(s)       ternary(is_star(s), (s), (STAR (s)))
+@define is_star(a)    @eval ((a) ~ /^\*/)
 
 
 # // The Epoch and minimum time difference
