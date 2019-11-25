@@ -1494,13 +1494,15 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
       if ((((Held_From[a][i]) - ( now)) > 0)) # All further transactions occured after (now)
         break # All done
       if (Held_From[a][i] == now) {
-        # The adjustment is pooled explicitly with this parcel
-        adjust_parcel_cost(a, i, now, x, Cost_Element, tax_adjustment)
+        if (!(( a in Parcel_Tag) && ( i in Parcel_Tag[ a])) || (Parcel_Name == Parcel_Tag[a][i])) {
+          # The adjustment is pooled explicitly with this parcel
+          adjust_parcel_cost(a, i, now, x, Cost_Element, tax_adjustment)
 
 
-        # Also record the parents cost
-        update_cost(a, x, now)
-        return # Only one parcel is adjusted - it must be unsold if only just purchased
+          # Also record the parents cost
+          update_cost(a, x, now)
+          return # Only one parcel is adjusted - it must be unsold if only just purchased
+        }
       }
     }
 
@@ -2041,10 +2043,14 @@ function split_account(now, a, b, split_factor,
   }
 
   # Total units
-  for (key in Total_Units[a])
+  for (key in Total_Units[a]) {
       Total_Units[b][key] = split_factor * Total_Units[a][key]
-  for (key in Qualified_Units[a])
+      Total_Units[a][key] = 0
+  }
+  for (key in Qualified_Units[a]) {
       Qualified_Units[b][key] = split_factor * Qualified_Units[a][key]
+      Qualified_Units[a][key] = 0
+  }
 
   # Is this a fixed account?
   if (((a) ~ /^ASSET\.FIXED[.:]/)) {
@@ -2055,22 +2061,25 @@ function split_account(now, a, b, split_factor,
   }
 
   # Price records
-  for (key in Price[a])
-    if ((((key) - ( now)) <= 0))
-      # These prices are for pre-split
-      # They are needed after scaling
-      Price[b][key] = Price[a][key] / split_factor
-    else # These prices are for pre-split asset post split date
-      # No way to know if accurate or not
-      # So delete them - [b] prices must be added explicitly
-      delete Price[a][key]
+  if (a in Price) {
+    for (key in Price[a])
+      if ((((key) - ( now)) <= 0))
+        # These prices are for pre-split
+        # They are needed after scaling
+        Price[b][key] = Price[a][key] / split_factor
+      else # These prices are for pre-split asset post split date
+        # No way to know if accurate or not
+        # So delete them - [b] prices must be added explicitly
+        delete Price[a][key]
+  }
 
   # Also need exdividend dates
-  for (key in Dividend_Date[a])
-    if ((((key) - ( now)) > 0)) {
-      Dividend_Date[b][key] = Dividend_Date[a][key]
-      delete Dividend_Date[a][key]
-    }
+  if (key in Dividend_Date)
+    for (key in Dividend_Date[a])
+      if ((((key) - ( now)) > 0)) {
+        Dividend_Date[b][key] = Dividend_Date[a][key]
+        delete Dividend_Date[a][key]
+      }
 
   # All done
   printf "##   After %s\n", label
