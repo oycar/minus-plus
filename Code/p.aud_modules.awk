@@ -681,28 +681,17 @@ function income_tax_aud(now, past, benefits,
   underline(81, 0, write_stream)
   printf "%48s %32s\n\n\n", "AMOUNT DUE OR REFUNDABLE", print_cash(find_entry(ATO_Levy, now) + tax_due) > write_stream
 
-  # Now save quantities -
-  # To avoid tax collecting up errors move unpaid/overpaid tax to the RESIDUAL account
-  if (Start_Journal) {
-    # These should be replaced with adjustments
-    # Residual is last year's tax bill
-    x = get_cost(TAX, past)
-
-    # Overall impact of following adjustments is (- tax_owed)
-    adjust_cost(RESIDUAL, x, now)
-    adjust_cost(TAX,   (tax_paid + tax_with) - (x + tax_owed), now)
-    adjust_cost(PAYG, - tax_paid,            now)
-    adjust_cost(WITHOLDING,      - tax_with, now)
-  }
-
   # Clean up balance sheet - watch out for unbalanced transactions
   # Save contribution tax accounted for
   tax_cont = get_cost(CONTRIBUTION_TAX, just_before(now))
 
-  # If this is an SMSF this disturbs the member liabilities
-  # Adjust cost is OK because ALLOCATED/ADJUSTMENTS were reset at comencement of eofy_actions
-  # For a none SMSF this is a synonym for ADJUSTMENTS
+  # Now save quantities -
   if (Start_Journal) {
+    # Overall impact of following adjustments is (- tax_owed)
+    adjust_cost(TAX,   (tax_paid + tax_with) - (tax_owed), now)
+    adjust_cost(PAYG, - tax_paid,            now)
+    adjust_cost(WITHOLDING,      - tax_with, now)
+
     # Allocated is really being stored with the wrong sign...
     adjust_cost(ALLOCATED, -(tax_cont + tax_owed), now)
     adjust_cost(CONTRIBUTION_TAX, -tax_cont, now)

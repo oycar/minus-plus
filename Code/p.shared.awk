@@ -958,10 +958,12 @@ function set_special_accounts() {
   PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
 
   # Built in TAX accounts - creditor like
-  DEFERRED     = initialize_account("LIABILITY.TAX:DEFERRED.TAX")
   TAX          = initialize_account("LIABILITY.TAX:TAX")
-  RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
+  #RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
   GST          = initialize_account("LIABILITY.TAX:TAX.GST")
+
+  # Not a Current Account
+  DEFERRED     = initialize_account("LIABILITY.DEFERRED:DEFERRED.TAX")
 
   # Accounting capital gains accounts
   REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
