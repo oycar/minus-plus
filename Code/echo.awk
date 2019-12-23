@@ -241,6 +241,7 @@ END {
 
 
 
+
 # // Get a single transaction from the account
 
 
@@ -1291,10 +1292,11 @@ function set_special_accounts() {
   PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
 
   # Built in TAX accounts - creditor like
-  DEFERRED     = initialize_account("LIABILITY.TAX:DEFERRED.TAX")
   TAX          = initialize_account("LIABILITY.TAX:TAX")
-  RESIDUAL     = initialize_account("LIABILITY.TAX:RESIDUAL")
   GST          = initialize_account("LIABILITY.TAX:TAX.GST")
+
+  # Not a Current Account
+  DEFERRED     = initialize_account("LIABILITY.DEFERRED:DEFERRED.TAX")
 
   # Accounting capital gains accounts
   REALIZED_GAINS  = initialize_account("INCOME.GAINS.REALIZED:GAINS")
@@ -2034,6 +2036,10 @@ function split_account(now, a, b, split_factor,
     # Adjust units in q if split_factor is not unity
     if (1 != split_factor)
       Units_Held[b][p] *= split_factor
+
+    # if accounts a and b are different record this
+    if (a != b)
+      Account_Closed[a] = now
 
     # Close down pre-split account - at cost so no gains
     if ((Held_Until[a][ p] > ( now))) {

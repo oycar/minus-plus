@@ -119,6 +119,7 @@ BEGIN {
   url_init()
 
   # Initialize arrays
+  make_array(Account_Closed)
   make_array(Account_Term)
   make_array(Accounting_Cost)
   make_array(Carry_Offsets)

@@ -387,7 +387,7 @@ function income_tax_usd(now, past, benefits,
   # The residual tax liability is tax computed to be due but not actually paid or refunded
   # Careful when adjusting cost - a second run will continue to increase it
   # Either explicitly set the cost or reset it first
-  set_cost(RESIDUAL, get_cost(RESIDUAL, just_before(now)) + get_cost(TAX, just_before(now)), now)
+  #set_cost(RESIDUAL, get_cost(RESIDUAL, just_before(now)) + get_cost(TAX, just_before(now)), now)
 
   # Compute tax due
   tax_paid = get_cost(PAYG, just_before(now)) - get_cost(PAYG, past)

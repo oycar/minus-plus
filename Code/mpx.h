@@ -20,7 +20,7 @@
 @define DEVNULL "/dev/null"
 
 # //
-@define SHARED_ARRAYS "Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date\
+@define SHARED_ARRAYS "Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date\
  Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name\
  Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price\
  Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
@@ -220,6 +220,7 @@
 @define greater_than_or_equal(x, y) (((x) - (y)) >= 0)
 @define less_than_or_equal(x, y)    (((x) - (y)) <= 0)
 
+@define account_closed(x, now) ((x) in Account_Closed && less_than(Account_Closed[x], (now)))
 @define is_closed(a, now) (!is_open((a), (now)))
 @define is_new(a) ("" == first_key(Cost_Basis[a]))
 @define ever_held(a) (Held_From[a][0] > Epoch)

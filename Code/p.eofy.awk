@@ -540,7 +540,6 @@ function print_income_gains(now, past, is_detailed, reports_stream,
             printf "%*s\n",
                  asset_width + 15, "Distributed" > reports_stream
             printf "%*s\n", 11 + asset_width, "Gains" > reports_stream
-
           }
 
           # print Name
@@ -1614,8 +1613,12 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
         account_income[now] = sign * (@income_function(x, now) - @income_function(x, now_past))
         account_sum[now] += account_income[now]
       }
+
+      # This is more complicated still because
+      # an account can be closed due to a code change;
+      # if this has occurred before "now" then do not record these gains/losses
       if (past) {
-        if ("get_unrealized_gains" == income_function && is_closed(x, past))
+        if ("get_unrealized_gains" == income_function && (is_closed(x, past) || account_closed(x, now)))
           account_income[past] = 0
         else {
           account_income[past] = sign * (@income_function(x, past) - @income_function(x, past_past))
