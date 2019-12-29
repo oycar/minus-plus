@@ -2044,7 +2044,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
   return sum_delta
 }
 
-
 # get_tax payable on total income
 # can be used to get other banded quantities such as the low income tax offset & the medicare levy
 function get_tax(now, bands, total_income,
