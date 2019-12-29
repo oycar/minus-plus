@@ -464,13 +464,12 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
 }
 
 # read csv records
-function read_csv_records() {
-  # This is a CSV file
-  if (Use_CSV)
+function read_csv_records(use_csv) {
+  # Set the separator
+  if (use_csv)
     FPAT = "([^,]*)|(\"[^\"]+\")"
   else
     FPAT = "([^[:space:]]+)|(\"[^\"]+\")|([[](.)*])|(#(.)*)"
-
 }
 
 # Abstract read value out
@@ -556,7 +555,7 @@ function write_state(array_names, scalar_names,    name) {
   # Keep track of keys written out
   for (name in array_names) {
     ((SUBSEP in Key_Index)?((1)):((0)))
-    printf "<<,%s\n", array_names[name] > Write_State
+    printf "<<%s%s\n", OFS, array_names[name] > Write_State
     walk_array(SYMTAB[array_names[name]], 1, Write_State)
     printf ">>\n" > Write_State
     delete Key_Index
@@ -594,13 +593,13 @@ function walk_array(arr, level, stream,    key, last_key, i) {
       # Finished at the base level
       # The output string
       for (i = 1; i < level; i++) {
-        printf "%s,", Key_Index[i] > stream
+        printf "%s%s", Key_Index[i], OFS > stream
         if (("^"))
           Key_Index[i] = ("^")
       }
 
       # Complete the output - use special key for deepest level
-      printf "%s,%s\n", last_key, format_value(arr[key]) > stream
+      printf "%s%s%s\n", last_key, OFS, format_value(arr[key]) > stream
     }
   }
 }
@@ -4493,6 +4492,9 @@ BEGIN {
   if (!(Epoch in Foreign_Offset_Limit))
     Foreign_Offset_Limit[Epoch] = 1000.00
 
+  # Initially no LIC Deduction
+  LIC_Deduction[Epoch] = 0.0
+
   # The default tax band
   Tax_Bands[Epoch][0] = 0.15
 
@@ -4502,7 +4504,6 @@ BEGIN {
   # The default low and middle income offsets
   Low_Income_Offset[Epoch][0] = 0.00
   Middle_Income_Offset[Epoch][0] = 0.00
-
 
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
@@ -5899,7 +5900,8 @@ BEGIN {
   Variable_Keys[0] = ""
 
   # Output Fields
-  OFS = ","
+  if ("" != Use_Separator)
+    OFS = Use_Separator
 
   # MONTH_FORMAT = "%Y %b %d"
   # ISO_FORMAT = "%F"
@@ -5980,7 +5982,7 @@ BEGIN {
   Tax_Losses[0][SUBSEP] = 0; delete Tax_Losses[0][SUBSEP]
 
   # This is a CSV file
-  read_csv_records()
+  read_csv_records(Use_CSV)
 
   # Transaction line defaults
   new_line()
@@ -6098,6 +6100,8 @@ BEGIN {
   #
   Import_Record = !Import_Record
   if (Import_Record) {
+    read_csv_records(Import_Record)
+
     # Filter data
     # Currently importing Import_Array
     if (!index(Filter_Data, Import_Array_Name))
@@ -6116,10 +6120,12 @@ BEGIN {
       Import_Zero = (0)
     } else
       Import_Time = (12)
-  } else
+  } else {
     # End of block
     # Reset asset default prefix
     Asset_Prefix = ("ASSET.CAPITAL.SHARES")
+    read_csv_records(Import_Record)
+  }
 
   # End of if importing
   next
@@ -6132,7 +6138,7 @@ BEGIN {
 
 
 # Start Record
-# Syntax is [Date] START_JOURNAL 
+# Syntax is [Date] START_JOURNAL
 /START_JOURNAL/ {
 
   # Allow multiple calls

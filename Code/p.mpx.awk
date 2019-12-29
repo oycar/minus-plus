@@ -80,7 +80,8 @@ BEGIN {
   Variable_Keys[0] = ""
 
   # Output Fields
-  OFS = ","
+  if ("" != Use_Separator)
+    OFS = Use_Separator
 
   # MONTH_FORMAT = "%Y %b %d"
   # ISO_FORMAT = "%F"
@@ -161,7 +162,7 @@ BEGIN {
   Tax_Losses[0][SUBSEP] = 0; delete Tax_Losses[0][SUBSEP]
 
   # This is a CSV file
-  read_csv_records()
+  read_csv_records(Use_CSV)
 
   # Transaction line defaults
   new_line()
@@ -281,6 +282,8 @@ BEGIN {
   #
   Import_Record = !Import_Record
   if (Import_Record) {
+    read_csv_records(Import_Record)
+
     # Filter data
     # Currently importing Import_Array
     if (!index(Filter_Data, Import_Array_Name))
@@ -304,10 +307,12 @@ BEGIN {
       Import_Zero = FALSE
     } else
       Import_Time = HOUR
-  } else
+  } else {
     # End of block
     # Reset asset default prefix
     Asset_Prefix = ASSET_PREFIX
+    read_csv_records(Import_Record)
+  }
 
   # End of if importing
   next
@@ -320,7 +325,7 @@ BEGIN {
 
 
 # Start Record
-# Syntax is [Date] START_JOURNAL 
+# Syntax is [Date] START_JOURNAL
 /START_JOURNAL/ {
 
   # Allow multiple calls

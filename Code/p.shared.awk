@@ -81,13 +81,12 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
 }
 
 # read csv records
-function read_csv_records() {
-  # This is a CSV file
-  if (Use_CSV)
+function read_csv_records(use_csv) {
+  # Set the separator
+  if (use_csv)
     FPAT = "([^,]*)|(\"[^\"]+\")"
   else
     FPAT = "([^[:space:]]+)|(\"[^\"]+\")|([[](.)*])|(#(.)*)"
-
 }
 
 # Abstract read value out
@@ -185,7 +184,7 @@ function write_state(array_names, scalar_names,    name) {
   # Keep track of keys written out
   for (name in array_names) {
     make_array(Key_Index)
-    printf "<<,%s\n", array_names[name] > Write_State
+    printf "<<%s%s\n", OFS, array_names[name] > Write_State
     walk_array(SYMTAB[array_names[name]], 1, Write_State)
     printf ">>\n" > Write_State
     delete Key_Index
@@ -223,13 +222,13 @@ function walk_array(arr, level, stream,    key, last_key, i) {
       # Finished at the base level
       # The output string
       for (i = 1; i < level; i++) {
-        printf "%s,", Key_Index[i] > stream
+        printf "%s%s", Key_Index[i], OFS > stream
         if (DITTO)
           Key_Index[i] = DITTO
       }
 
       # Complete the output - use special key for deepest level
-      printf "%s,%s\n", last_key, format_value(arr[key]) > stream
+      printf "%s%s%s\n", last_key, OFS, format_value(arr[key]) > stream
     }
   }
 }

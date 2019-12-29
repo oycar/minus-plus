@@ -52,6 +52,9 @@ BEGIN {
   if (!(Epoch in Foreign_Offset_Limit))
     Foreign_Offset_Limit[Epoch] = 1000.00
 
+  # Initially no LIC Deduction
+  LIC_Deduction[Epoch] = 0.0
+
   # The default tax band
   Tax_Bands[Epoch][0] = 0.15
 
@@ -61,7 +64,6 @@ BEGIN {
   # The default low and middle income offsets
   Low_Income_Offset[Epoch][0] = 0.00
   Middle_Income_Offset[Epoch][0] = 0.00
-
 
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
