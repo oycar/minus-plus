@@ -102,8 +102,7 @@
 @define SHORT_LOSSES  ("SPECIAL.TAXABLE.LOSSES.SHORT")
 @define STAR          ("*")
 @define star(s)       ternary(is_star(s), (s), (STAR (s)))
-@define is_star(a)    @eval ((a) ~ /^\*/)
-
+@define is_star(a)    ((a) ~ STAR)
 
 # // The Epoch and minimum time difference
 @define EPOCH_START        (2000)
@@ -193,11 +192,9 @@
 @define set_entry(array, x, t) (array[t] = (x))
 
 # // Rounding etc
-# // @define near_zero(x) (((x) <= Epsilon) && ((x) >= -Epsilon))
 @define near_zero(x) (less_than_or_equal(x, Epsilon) && greater_than_or_equal(x, -Epsilon))
 
 # // Not zero
-# // @define not_zero(x) (((x) > Epsilon) || ((x) < -Epsilon))
 @define not_zero(x) (greater_than(x, Epsilon) || less_than(x, -Epsilon))
 
 # // Positive?
@@ -222,7 +219,7 @@
 
 @define account_closed(x, now) ((x) in Account_Closed && less_than(Account_Closed[x], (now)))
 @define is_closed(a, now) (!is_open((a), (now)))
-@define is_new(a) ("" == first_key(Cost_Basis[a]))
+
 @define ever_held(a) (Held_From[a][0] > Epoch)
 @define is_sold(a, p, now) (Held_Until[a][p] <= (now))
 @define is_unsold(a, p, now) (Held_Until[a][p] > (now))

@@ -83,8 +83,7 @@ BEGIN {
   if ("" != Use_Separator)
     OFS = Use_Separator
 
-  # MONTH_FORMAT = "%Y %b %d"
-  # ISO_FORMAT = "%F"
+  # 
   if ("" == DATE_FORMAT)
     DATE_FORMAT = MONTH_FORMAT
   LONG_FORMAT = (DATE_FORMAT " %H::%M::%S")
@@ -1361,7 +1360,7 @@ END {
     # The last line is (oddly enough) when the journal starts -
     # this allows initialization to occur when the file is read back in
     if (!Write_Variables)
-      printf "START_JOURNAL, %s\n", get_date(Start_Record) > Write_State
+      printf "%s%sSTART_JOURNAL\n", get_date(Start_Record, ISO_FORMAT), OFS > Write_State
   }
 
   # Log data about selected variables

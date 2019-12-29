@@ -50,13 +50,6 @@ $1 ~  /^([[:space:]])*(CHECK|SET)/  {
  next
 }
 
-# # read csv records
-# function read_csv_records() {
-#   # This is a CSV file
-#   FPAT = "([^,]*)|(\"[^\"]+\")"
-# }
-
-
 # Possible record styles
 # Journal styles (date format is somewhat flexible)
 #      2017 Aug 24, AMH.DIV, AMH.ASX, 3072, 2703.96, [1025.64,] [1655.49], # DRP & LIC

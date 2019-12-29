@@ -132,7 +132,6 @@ END {
 
 
 
-
 # // The Epoch and minimum time difference
 
 
@@ -221,11 +220,9 @@ END {
 
 
 # // Rounding etc
-# // @define near_zero(x) (((x) <= Epsilon) && ((x) >= -Epsilon))
 
 
 # // Not zero
-# // @define not_zero(x) (((x) > Epsilon) || ((x) < -Epsilon))
 
 
 # // Positive?
@@ -563,7 +560,7 @@ function write_state(array_names, scalar_names,    name) {
 
   # The scalars - compact form
   for (name in scalar_names)
-    printf "<<,%s,%s,>>\n", scalar_names[name], format_value(SYMTAB[scalar_names[name]]) > Write_State
+    printf "<<%s%s%s%s%s>>\n", OFS, scalar_names[name], OFS, format_value(SYMTAB[scalar_names[name]]), OFS > Write_State
 }
 
 # This walks the array that we want to dump to file
@@ -1399,23 +1396,24 @@ function one_year(now, sense,     year, day, sum) {
 # Useful account filters
 function is_open(a, now,     p) {
   # An asset is open if there are unsold parcels at time 'now'
-  for (p = 0; p < Number_Parcels[a]; p ++) {
-    if ((((Held_From[a][p]) - ( now)) > 0))
-      break
-    if ((Held_Until[a][ p] > ( now)))
-      return (1)
-  }
+  if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/))
+    for (p = 0; p < Number_Parcels[a]; p ++) {
+      if ((((Held_From[a][p]) - ( now)) > 0))
+        break
+      if ((Held_Until[a][ p] > ( now)))
+        return (1)
+    }
   return (0)
 }
 
 # Is an account a an ancestor of another account b?
 function is_ancestor(a, b,    p) {
-  if (!((a) ~ /^\*/))
+  if (!((a) ~ ("*")))
     return (0)
 
   # Check
   p = Parent_Name[b]
-  while ("" != p) {
+  while (("*") != p) {
     if (a == p) # Found
       return (1)
     p = Parent_Name[p]
@@ -1547,9 +1545,11 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # Debugging
 
-  } else
+  } else if (a in Cost_Basis)
     # This is the corresponding account
     sum_entry(Cost_Basis[a], x, now)
+  else
+    Cost_Basis[a][now] = x
 
   # Balance costs
   update_cost(a, x, now)
@@ -1559,12 +1559,14 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 function update_cost(a, x, now,      p) {
   # Now get the parent to this account
   p = Parent_Name[a]
-  if ("" == p)
+  if (("*") == p)
     return # Finished
 
   # Update the cost
-  assert(p in Cost_Basis, "Failed to find Cost_Basis of account  <" p ">")
-  sum_entry(Cost_Basis[p], x, now)
+  if (p in Cost_Basis)
+    sum_entry(Cost_Basis[p], x, now)
+  else
+    Cost_Basis[p][now] = x
 
   # Logging
 
@@ -1824,15 +1826,15 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
   # Is it not zero entry?
   if ("" != a)
     # At least single entry
-    string = string sprintf(", %13s, ", Leaf[a])
+    string = string sprintf("%s %13s ", OFS, Leaf[a])
 
   # Is it double entry?
   if ("" != b)
-    string = string sprintf("%13s, ", Leaf[b])
+    string = string sprintf("%13s%s ", Leaf[b], OFS)
 
   # Amount  and cost element and or units - if at least one entry
   if (a || b) {
-    string = string sprintf("%11.2f, ", amount)
+    string = string sprintf("%11.2f%s ", amount, OFS)
     if (element_string && element_string != ("II"))
       string = string sprintf("%10s", element_string)
     else # Pretty print
@@ -1841,15 +1843,15 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf(", %14s", print_cash(get_cost(matched, now)))
+      string = string sprintf("%s %14s", OFS, print_cash(get_cost(matched, now)))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)
-        string = string ", " fields[i]
+        string = string OFS " " fields[i]
   }
 
   # All done
-  print string ", " comments
+  print string OFS " " comments
 } # End of printing a transaction
 
 function initialize_account(account_name,    class_name, array, p, n,
@@ -1921,7 +1923,7 @@ function initialize_account(account_name,    class_name, array, p, n,
   if ((leaf_name in Long_Name)) {
     if (Leaf[Long_Name[leaf_name]] == leaf_name) {
       # If the existing account is new (unused) it can be deleted
-      assert(("" == first_key(Cost_Basis[Long_Name[leaf_name]])), sprintf("Account name %s: Leaf name[%s] => %s is already taken", account_name, leaf_name, Long_Name[leaf_name]))
+      assert(!(Long_Name[leaf_name] in Cost_Basis), sprintf("Account name %s: Leaf name[%s] => %s is already taken", account_name, leaf_name, Long_Name[leaf_name]))
 
       # Must be a new (unused) name
       delete Long_Name[leaf_name]
@@ -1948,16 +1950,12 @@ function initialize_account(account_name,    class_name, array, p, n,
     # Stored (as sums) by parcel, cost element and time
     # eg Accounting_Cost[account][parcel][element][time]
 
-
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel
     Parcel_Tag[account_name][SUBSEP] ; delete Parcel_Tag[account_name][SUBSEP] #
 
     # Keep track of units
     Total_Units[account_name][Epoch]     = Qualified_Units[account_name][Epoch] = 0
-
-    # Each account also has a number of parcels
-    (( account_name in Number_Parcels)?( 0):(Number_Parcels[ account_name] = ( 0)))
 
     # Set the account currency
     if (((a) ~ ("^" ( "ASSET.CAPITAL.CURRENCY") "[.:]")))
@@ -1982,25 +1980,19 @@ function initialize_account(account_name,    class_name, array, p, n,
     }
   }
 
-  # Initialize account with common entries
-  Cost_Basis[account_name][SUBSEP]; delete Cost_Basis[account_name][SUBSEP]
-
   # refer  to the parent item eg parent[A.B.C] => *A.B (long_name minus short_name with a distinguishing prefix)
-  p = Parent_Name[account_name] = "*" array[1]
+  p = Parent_Name[account_name] = ("*") array[1]
 
   # How many components in the name "p"
   n = split(p, array, ".")
 
   # Initialize the cost bases for this account's parents
-  while (p && !(p in Parent_Name)) {
-    # a new meta-account - needs a cost-basis
-    Cost_Basis[p][Epoch] = 0
-
+  while (!(p in Parent_Name)) {
     # Get p's parent - lose the last name component
     if (n > 1)
       Parent_Name[p] = get_name_component(p, 1, --n, array)
     else
-      Parent_Name[p] = ""
+      Parent_Name[p] = ("*")
 
     # Update p
     p = Parent_Name[p]
@@ -2143,7 +2135,7 @@ function filter_array(now, data_array, name, show_blocks,
                            stack, key, first_key,
                            earliest_key, latest_key, s) {
 
-  # Record the earlist and latest keys found
+  # Record the earliest and latest keys found
   if (show_blocks) {
     # Report on data held
     print Journal_Title > "/dev/stderr"
@@ -3283,12 +3275,12 @@ function get_capital_gains(now, past, is_detailed,
     expense_short_losses = get_cost("*EXPENSE.LOSSES.SHORT", now) - get_cost("*EXPENSE.LOSSES.SHORT", past)
 
     # The long gains and losses first
-    capital_long_gains  = get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), past)
-    capital_long_losses = get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), past)
+    capital_long_gains  = get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), past)
+    capital_long_losses = get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), past)
 
     # short gains & losses
-    capital_short_gains   = get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), past)
-    capital_short_losses  = get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), past)
+    capital_short_gains   = get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), past)
+    capital_short_losses  = get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), past)
 
     # The adjusted gains and losses
     printf "\n\tAdjusted Gains\n" > reports_stream
@@ -3365,8 +3357,8 @@ function get_capital_gains(now, past, is_detailed,
     # This is not strictly necessary in all cases but useful
     # Save net gains or losses
     # What happens when you manipulate a parent account?
-    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))),  ((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))))
-    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))))
+    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))),  ((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))))
+    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))))
 
     # Overall gains, losses and taxable gains
     underline(44, 8, reports_stream)
@@ -4202,7 +4194,7 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
       # The required name component is the last in the parent - watch out for
       # the leading "*" if only a single component
       subclass = get_name_component(Parent_Name[x], 0)
-      if (((subclass) ~ /^\*/))
+      if (((subclass) ~ ("*")))
         subclass = substr(subclass, 2)
 
       # Initialize sums
@@ -4378,7 +4370,7 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
 
     # Record the process
     # that adjusts the gains ONLY in this function
-    taxable_gains  = get_cost(((((("SPECIAL.TAXABLE")) ~ /^\*/))?( (("SPECIAL.TAXABLE"))):( (("*") (("SPECIAL.TAXABLE"))))), now)
+    taxable_gains  = get_cost(((((("SPECIAL.TAXABLE")) ~ ("*")))?( (("SPECIAL.TAXABLE"))):( (("*") (("SPECIAL.TAXABLE"))))), now)
     printf "\t%27s => %13s\n", "Write Back", get_date(now) > reports_stream
     printf "\t%27s => %14s\n", "Gains", print_cash(- taxable_gains) > reports_stream
 
@@ -5221,9 +5213,9 @@ function get_taxable_gains_aud(now, losses,
   # This function computes the taxable gains
   # It works for partioned long & short gains
   # And also for deferred gains when all such gains are long
-  losses     += get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), now) + get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), now)
-  long_gains  = get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), now)
-  short_gains = get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), now)
+  losses     += get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), now) + get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), now)
+  long_gains  = get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), now)
+  short_gains = get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), now)
 
   # Suppress negligible losses
   losses      = (((((losses) - ( Epsilon)) > 0))?( (losses)):(  0))
@@ -5903,8 +5895,7 @@ BEGIN {
   if ("" != Use_Separator)
     OFS = Use_Separator
 
-  # MONTH_FORMAT = "%Y %b %d"
-  # ISO_FORMAT = "%F"
+  # 
   if ("" == DATE_FORMAT)
     DATE_FORMAT = ("%Y %b %d") 
   LONG_FORMAT = (DATE_FORMAT " %H::%M::%S")
@@ -7101,7 +7092,7 @@ function checkset(now, a, account, units, amount, is_check,
         adjust_cost(account, amount, now)
 
         # top level class
-        adjust_cost(((((get_name_component(account, 1)) ~ /^\*/))?( (get_name_component(account, 1))):( (("*") (get_name_component(account, 1))))), - amount, now)
+        adjust_cost(((((get_name_component(account, 1)) ~ ("*")))?( (get_name_component(account, 1))):( (("*") (get_name_component(account, 1))))), - amount, now)
         break
 
       default : assert((0), sprintf("ADJUST/SET: %s => Unkown action %s\n",
@@ -7167,7 +7158,7 @@ END {
     # The last line is (oddly enough) when the journal starts -
     # this allows initialization to occur when the file is read back in
     if (!Write_Variables)
-      printf "START_JOURNAL, %s\n", get_date(Start_Record) > Write_State
+      printf "%s%sSTART_JOURNAL\n", get_date(Start_Record, ("%F")       ), OFS > Write_State
   }
 
   # Log data about selected variables
