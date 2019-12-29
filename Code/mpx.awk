@@ -46,8 +46,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Logic conventions
 
 
@@ -101,6 +99,8 @@ END {
 
 
 # // Default Reports
+
+
 
 
 
@@ -464,7 +464,11 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
 # read csv records
 function read_csv_records() {
   # This is a CSV file
-  FPAT = "([^,]*)|(\"[^\"]+\")"
+  if (Use_CSV)
+    FPAT = "([^,]*)|(\"[^\"]+\")"
+  else
+    FPAT = "([^[:space:]]+)|(\"[^\"]+\")|([[](.)*])|(#(.)*)"
+
 }
 
 # Abstract read value out
@@ -474,7 +478,10 @@ function read_value(x) {
   if (x ~ /^[0-9\.\-]+$/)
     return strtonum(x)
 
-  # Just return the field
+  if (x ~ /^"([[:print:]])+"$/)
+    x = ctrim(x, "\"")
+
+  # Just return the field0
   return x
 }
 
@@ -849,11 +856,7 @@ function parse_line(now,    i, j, x, number_accounts) {
   #     Double Entry => two accounts
   #     Single Entry => one account
   #  or No Entry => zero accounts
-  for (i = 2; i <= NF; i ++)
-    # Need to remove white space from the fields
-    $i = trim($i)
-
-  # Get next one or two fields
+  #  Get next one or two fields
   for (i = 1; i < 3 && i < NF; i ++) {
     # The field id
     j = i + 1
@@ -1438,13 +1441,6 @@ function held_to(ac, now,     p, latest_sale) {
   return latest_sale # returns the date the parcel was sold
 }
 
-# # Initialize cost element arrays
-# function set_array_entries(array, key,     e) {
-#   # Set all true cost elements to zero - ie elements I-V
-#   for (e in Elements)
-#     array[e][now] = 0
-# }
-
 # This splits up a branch name or a leaf name into dotted components
 function get_name_component(name, i, number_components, array,    name_length, s, dot) {
   # Just get one component
@@ -1903,8 +1899,10 @@ function initialize_account(account_name,    class_name, array, p, n,
   if (class_name ~ /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/) {
     assert(2 == split(account_name, array, ":"), sprintf("<%s> Account name %s is not in branch_name:leaf_name format", $0, account_name))
     leaf_name = array[2]
-  } else
+  } else {
+    assert(!Enforce_Names, sprintf("<%s> Account name %s is not defined", $0, account_name))
     leaf_name = account_name
+  }
 
   # Finally an uninitialized long name
   # BUT there is another trap;
@@ -1960,7 +1958,12 @@ function initialize_account(account_name,    class_name, array, p, n,
     # Each account also has a number of parcels
     (( account_name in Number_Parcels)?( 0):(Number_Parcels[ account_name] = ( 0)))
 
-    # End of if ASSET
+    # Set the account currency
+    if (((a) ~ ("^" ( "ASSET.CAPITAL.CURRENCY") "[.:]")))
+      if (leaf_name != Journal_Currency)
+        # A non-standard currency
+        Account_Currency[account_name] = leaf_name
+    # End of if Unitized
   } else if (((account_name) ~ ("^" ( "INCOME") "[.:]"))) {
     # Set an Underlying_Asset if the leaf name
     # is of the appropriate format
@@ -2489,6 +2492,12 @@ function underline(width, margin, stream) {
 ## DD-Month-YYYY or DD-Month-YY or DD/Month/YYYY or DD/Month/YY eg 14-Aug-18
 ## YYYY-MM-DD or YY-MM-DD or YYYY/MM/DD or YY/MM/DD eg 2018/08/14
 ##
+##
+## Regex to get initial modification to date string
+##  (20[01][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([0-3][0-9])
+##
+
+
 function read_date(date_string, hour,
                    date_fields, year, month, day, value) {
   # default time
@@ -3225,7 +3234,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("O" ~ /[cC]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3572,7 +3581,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("O" ~ /[oO]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3712,7 +3721,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("O" ~ /[bB]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3845,7 +3854,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("O" ~ /[mM]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3917,7 +3926,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("O" ~ /[dD]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4052,7 +4061,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("O" ~ /[qQ]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4579,7 +4588,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("O" ~ /[tT]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5379,7 +5388,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("O" ~ /[iI]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5842,7 +5851,7 @@ function process_member_benefits_smsf(now, array, amount,
 #    Original style
 #   2008 Apr 09, 604000, 776003,    200.000,    8382.00, BHP in specie transfer (200 units)
 #   became over time
-#   2008 Apr 09, CASH, BHP.ASX, 8382.00, 200, # (in specie transfer in fact)
+#   2008-Apr-09, CASH, BHP.ASX, 8382.00, 200, # (in specie transfer in fact)
 #
 # To Do =>
 #   ***in progress
@@ -5928,6 +5937,7 @@ BEGIN {
 
   # Initialize arrays
   ((SUBSEP in Account_Closed)?((1)):((0)))
+  ((SUBSEP in Account_Currency)?((1)):((0)))
   ((SUBSEP in Account_Term)?((1)):((0)))
   ((SUBSEP in Accounting_Cost)?((1)):((0)))
   ((SUBSEP in Carry_Offsets)?((1)):((0)))
@@ -6046,6 +6056,31 @@ BEGIN {
   next
 }
 
+# Control Record
+# Standard control function syntax is
+# FUNCTION, [ARGUMENT_1, ARGUMENT_2]
+# Control functions are:
+#  SET_ENTRY
+#  ADJUST_ENTRY
+
+#  SET_BANDS
+#  SET
+#  CHECK
+#  SPLIT
+#  MERGE
+#  CHANGE
+#
+/^!!/  {
+  #
+  ##Control_Record = !Control_Record
+
+## $1 ~  /^([[:space:]])*(ADJUST|CHECK|SET|SHOW|SPLIT|MERGE|CHANGE)/  {
+ # Use a function so we can control scope of variables
+ read_control_record()
+ next
+}
+
+# State Record
 # Program state can be given using a state pattern range
 # #
 /^<</,/>>$/ {
@@ -6072,7 +6107,7 @@ BEGIN {
   next
 }
 
-# Import data
+# Import Record
 # This imports an array
 # Array[Key] => Value
 # Need the following variables
@@ -6117,73 +6152,8 @@ BEGIN {
   next
 }
 
-##
-## Imports CSV format
-## <<,Account_Code, XYZ.ABC,>>
-## <<,Key_Field, X,>>
-## <<,Value_Field, Y,>>
-## <<,Key_is_Date, 1,>>
-## <<,Import_Array_Name, XXX,>>
-##
-## So for CBA price Data
-## <<,Key_Field,1,>>
-## <<,Value_Field,5>>
-##
-## Yields
-## XXX[read_date($1)] => $5
-##
-## %%
-## field-1, field-2, ..., field-NF
-## ...
-## %%
 
-##
-##
-# This reads an array from csv data
-function import_csv_data(array, symbol, name,
-                         a, key, value) {
-
-
-  # Check syntax
-  assert(Key_Field <= NF && Value_Field <= NF, "Illegal import record syntax <" $0 ">")
-
-  # Ok
-  a = initialize_account(symbol)
-
-  # Get the key
-  if (Key_is_Date) {
-    key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
-    assert((-1) != key, Read_Date_Error)
-
-    # Skip dates before the epoch
-    if ((-2) == key)
-      return
-  } else
-    key = trim($Key_Field)
-
-  # Get the value
-  if (Value_is_Date) {
-    value = read_date(trim($Value_Field))
-    assert((-1) != value, Read_Date_Error)
-
-    # Skip dates before the epoch
-    if ((-2) == value)
-      return
-  } else {
-    value = trim($Value_Field)
-    if (!Import_Zero && ((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
-      return # Don't import zero values
-  }
-
-  # Logging
-
-
-  # Set the price
-  (array[a][ key] = ( value))
-
-  # Done
-}
-
+# Start Record
 # Syntax is START_JOURNAL, Date
 /START_JOURNAL/ {
 
@@ -6275,6 +6245,90 @@ function import_csv_data(array, symbol, name,
   next
 }
 
+# Default record
+{
+  # Skip empty lines
+  if ("" == $0)
+    next
+
+ # Use a function so we can control scope of variables
+ read_input_record()
+ next
+}
+
+##
+## Imports CSV format
+## <<,Account_Code, XYZ.ABC,>>
+## <<,Key_Field, X,>>
+## <<,Value_Field, Y,>>
+## <<,Key_is_Date, 1,>>
+## <<,Import_Array_Name, XXX,>>
+##
+## So for CBA price Data
+## <<,Key_Field,1,>>
+## <<,Value_Field,5>>
+##
+## Yields
+## XXX[read_date($1)] => $5
+##
+## %%
+## field-1, field-2, ..., field-NF
+## ...
+## %%
+
+##
+##
+# This reads an array from csv data
+function import_csv_data(array, symbol, name,
+                         a, key, value) {
+
+
+  # Check syntax
+  assert(Key_Field <= NF && Value_Field <= NF, "Illegal import record syntax <" $0 ">")
+
+  # Ok
+  a = initialize_account(symbol)
+
+  # Get the key
+  if (Key_is_Date) {
+    key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
+    assert((-1) != key, Read_Date_Error)
+
+    # Skip dates before the epoch
+    if ((-2) == key)
+      return
+  } else
+    key = trim($Key_Field)
+
+  # Get the value
+  if (Value_is_Date) {
+    value = read_date(trim($Value_Field))
+    assert((-1) != value, Read_Date_Error)
+
+    # Skip dates before the epoch
+    if ((-2) == value)
+      return
+  } else {
+    value = trim($Value_Field)
+    if (!Import_Zero && ((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
+      return # Don't import zero values
+  }
+
+  # Logging
+
+
+  # Set the price
+  (array[a][ key] = ( value))
+
+  # Done
+}
+
+
+
+
+
+
+
 function set_financial_year(now,   new_fy) {
   # Which Calendar year is this?
   FY_Year = (strftime("%Y", (now), UTC) + 0)
@@ -6295,33 +6349,7 @@ function set_financial_year(now,   new_fy) {
   FY_Length = (((( FY_Day) <= (60))?( ((((FY_Year) - 1) % 4 == 0 && ((FY_Year) - 1) % 100 != 0) || ((FY_Year) - 1) % 400 == 0)):( (((FY_Year) % 4 == 0 && (FY_Year) % 100 != 0) || (FY_Year) % 400 == 0))) + 365)
 }
 
-# Standard control function syntax is
-# FUNCTION, [ARGUMENT_1, ARGUMENT_2]
-# Control functions are:
-#  SET_ENTRY
-#  SET_BANDS
-#  SET
-#  CHECK
-#  SPLIT
-#  MERGE
-#  CHANGE
-#
-$1 ~  /^([[:space:]])*(ADJUST|CHECK|SET|SHOW|SPLIT|MERGE|CHANGE)/  {
- # Use a function so we can control scope of variables
- read_control_record()
- next
-}
 
-# Default record
-{
-  # Skip empty lines
-  if ("" == $0)
-    next
-
- # Use a function so we can control scope of variables
- read_input_record()
- next
-}
 
 
 
@@ -6333,14 +6361,14 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Currency Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
-      if (!index(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
-        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
+      if (!index(("Account_Closed Account_Currency Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
+        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
         Scalar_Names[x] = Array_Names[x]
@@ -6349,13 +6377,14 @@ function initialize_state(    x) {
   } else {
     # Use default read and write list
     Write_Variables = (0)
-    MPX_Arrays = ("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
-    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
+    MPX_Arrays = ("Account_Closed Account_Currency Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
+    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
     split(MPX_Scalars, Scalar_Names, " ")
   }
 }
+
 
 #
 function read_control_record(       now, i, x, p, is_check){
@@ -6367,61 +6396,61 @@ function read_control_record(       now, i, x, p, is_check){
 
   # The control records - must be exact match
   is_check = 0
-  x = trim($1)
+  x = trim($2)
   switch (x) {
-    case "CHECK" :
-      is_check = 1
-    case "SHOW" :
-      if (!is_check)
-        is_check = -1
-    case "SET" :
-    case "ADJUST" :
-      # Syntax for check and set is
-      # CHECKSET, ACCOUNT, WHAT, X, # Comment
-      # We need to rebuild the line into something more standard
-      # DATE, ACCOUNT, WHAT, X, # Comment
-      #
-      # Some special accounts are needed
-
-      # Put DATE in 1st Field
-      $1 = get_date(now)
-
-      # Check amount is set
-      if (NF < 4) {
-        $4 = 0
-        NF = 4
-      }
-
-      # We can parse this line now
-      i = parse_line(now)
-
-      # Now either check or set the quantity
-      assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
-      checkset(now, Account[1], Account[2], Real_Value[(0)], amount, is_check)
-      break
-
-    case "CHANGE"  :
-    case "MERGE" :
-    case "SPLIT" :
-      # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
-      # Put DATE in 1st Field
-      $1 = get_date(now)
-
-      # Copy?
-      if ("CHANGE" == x)
-        $4 = 1
-
-      # Parse the line
-      i = parse_line(now)
-
-      # Merge?
-      if ("MERGE" == x)
-        # The reciprocal of split
-        amount = ((amount)?( 1.0 / amount):( 1))
-
-      # Split Account[1] => Account[2] by factor amount - zero means copy
-      split_account(now, Account[1], Account[2], amount)
-      break
+    # case "CHECK" :
+    #   is_check = 1
+    # case "SHOW" :
+    #   if (!is_check)
+    #     is_check = -1
+    # case "SET" :
+    # case "ADJUST" :
+    #   # Syntax for check and set is
+    #   # CHECKSET, ACCOUNT, WHAT, X, # Comment
+    #   # We need to rebuild the line into something more standard
+    #   # DATE, ACCOUNT, WHAT, X, # Comment
+    #   #
+    #   # Some special accounts are needed
+    #
+    #   # Put DATE in 1st Field
+    #   $1 = get_date(now)
+    #
+    #   # Check amount is set
+    #   if (NF < 4) {
+    #     $4 = 0
+    #     NF = 4
+    #   }
+    #
+    #   # We can parse this line now
+    #   i = parse_line(now)
+    #
+    #   # Now either check or set the quantity
+    #   assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
+    #   checkset(now, Account[1], Account[2], Real_Value[UNITS_KEY], amount, is_check)
+    #   break
+    #
+    # case "CHANGE"  :
+    # case "MERGE" :
+    # case "SPLIT" :
+    #   # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
+    #   # Put DATE in 1st Field
+    #   $1 = get_date(now)
+    #
+    #   # Copy?
+    #   if ("CHANGE" == x)
+    #     $4 = 1
+    #
+    #   # Parse the line
+    #   i = parse_line(now)
+    #
+    #   # Merge?
+    #   if ("MERGE" == x)
+    #     # The reciprocal of split
+    #     amount = ternary(amount, 1.0 / amount, 1)
+    #
+    #   # Split Account[1] => Account[2] by factor amount - zero means copy
+    #   split_account(now, Account[1], Account[2], amount)
+    #   break
 
     case "SET_BANDS" :
       # Set banded thresholds
@@ -6430,22 +6459,112 @@ function read_control_record(       now, i, x, p, is_check){
       set_array_bands(now, SYMTAB[i], NF)
       break
 
-    case "SET_ENTRY" :
+    case "ADJUST_ENTRY" :
       # Set a time-dependent array entry
       i = trim($2)
       assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
       p = strtonum($3)
-      (SYMTAB[i][ now] = ( p))
+      sum_entry(SYMTAB[i], p, now)
       break
 
     default: # This should not happen
-      assert((0), "Unknown Control Record <" i ">")
+      assert((0), "Unknown Control Record <" x ">")
       break
   }
 
   # Get the next record
   return
 }
+
+# #
+# function read_control_record(       now, i, x, p, is_check){
+#   # Clear initial values
+#   new_line()
+#
+#   # Use the last recorded date
+#   now = ternary(-1 != Last_Record, Last_Record, Epoch)
+#
+#   # The control records - must be exact match
+#   is_check = 0
+#   x = trim($2)
+#   switch (x) {
+#     case "CHECK" :
+#       is_check = 1
+#     case "SHOW" :
+#       if (!is_check)
+#         is_check = -1
+#     case "SET" :
+#     case "ADJUST" :
+#       # Syntax for check and set is
+#       # CHECKSET, ACCOUNT, WHAT, X, # Comment
+#       # We need to rebuild the line into something more standard
+#       # DATE, ACCOUNT, WHAT, X, # Comment
+#       #
+#       # Some special accounts are needed
+#
+#       # Put DATE in 1st Field
+#       $1 = get_date(now)
+#
+#       # Check amount is set
+#       if (NF < 4) {
+#         $4 = 0
+#         NF = 4
+#       }
+#
+#       # We can parse this line now
+#       i = parse_line(now)
+#
+#       # Now either check or set the quantity
+#       assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
+#       checkset(now, Account[1], Account[2], Real_Value[UNITS_KEY], amount, is_check)
+#       break
+#
+#     case "CHANGE"  :
+#     case "MERGE" :
+#     case "SPLIT" :
+#       # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
+#       # Put DATE in 1st Field
+#       $1 = get_date(now)
+#
+#       # Copy?
+#       if ("CHANGE" == x)
+#         $4 = 1
+#
+#       # Parse the line
+#       i = parse_line(now)
+#
+#       # Merge?
+#       if ("MERGE" == x)
+#         # The reciprocal of split
+#         amount = ternary(amount, 1.0 / amount, 1)
+#
+#       # Split Account[1] => Account[2] by factor amount - zero means copy
+#       split_account(now, Account[1], Account[2], amount)
+#       break
+#
+#     case "SET_BANDS" :
+#       # Set banded thresholds
+#       i = trim($2)
+#       assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
+#       set_array_bands(now, SYMTAB[i], NF)
+#       break
+#
+#     case "ADJUST_ENTRY" :
+#       # Set a time-dependent array entry
+#       i = trim($2)
+#       assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
+#       p = strtonum($3)
+#       sum_entry(SYMTAB[i], p, now)
+#       break
+#
+#     default: # This should not happen
+#       assert(FALSE, "Unknown Control Record <" x ">")
+#       break
+#   }
+#
+#   # Get the next record
+#   return
+# }
 
 # A function to set banded arrays (like tax bands)
 function set_array_bands(now, bands, nf,     i, k) {
@@ -6455,6 +6574,8 @@ function set_array_bands(now, bands, nf,     i, k) {
     k = strtonum($(i+1))
     bands[now][-k] = strtonum($i)
 
+    printf "[%s] => %11.2f\n\t", k, bands[now][-k] > "/dev/stderr"
+
   }
 
   # Need to deal with case
@@ -6462,6 +6583,8 @@ function set_array_bands(now, bands, nf,     i, k) {
   # i.e $(i+1) does not exist
   if (3 == nf) {
     bands[now][0] = strtonum($nf)
+
+    printf " => %11.2f\n", bands[now][0] > "/dev/stderr"
 
   }
 }
@@ -6506,8 +6629,12 @@ function read_input_record(   t, n, a, threshold) {
   } else # Check for semi-monotonicity
     assert(t == Last_Record, sprintf("Current entry %s is earlier than the previously recorded transaction %s", $0, get_date(Last_Record)))
 
-  # Modular form - parse the line
-  # returns number of accounts
+  # Parse the line
+  # First filter out any control actions (ADJUST|CHANGE|CHECK|MERGE|SET|SHOW|SPLIT)
+  if (control_action(t))
+    return
+
+  # Returns number of accounts
   n = parse_line(t)
 
   # There are n accounts in each transaction
@@ -6529,6 +6656,72 @@ function read_input_record(   t, n, a, threshold) {
 
   # Clean up the Account array
   delete Account
+}
+
+## Apply a account control action
+function control_action(now,    i, is_check, x) {
+  #
+  # Trim the fields
+  for (i = 2; i <= NF; i ++)
+    # Need to remove white space from the fields
+    $i = trim($i)
+
+  # Is this a control action?
+  # (ADJUST|CHANGE|CHECK|MERGE|SET|SHOW|SPLIT)
+  x = $2
+
+  # First deal with the case when X needs adjustment
+  is_check = 2
+  switch (x) {
+    case "CHANGE"  :
+      $5 = 1
+      break
+    case "MERGE"  : # Recirpocal of split
+      $5 = (($5)?( 1.0 / $5):( 1))
+      break
+    case "SPLIT"  :
+      $5 = (($5)?( $5):( 1))
+      break
+
+    # Checkset actions
+    case "CHECK" :
+      is_check = 1
+      break
+    case "SHOW" :
+      is_check = -1
+      break
+    case "SET" :
+    case "ADJUST" :
+      is_check = 0
+      break
+    default  :
+      return (0)
+  }
+
+  # Syntax for CONTROL is
+  # DATE CONTROL A B [X] [# Comment]
+  # We need to rebuild the line into something more standard
+  # DATE A B X [# Comment]
+  if (NF < 5) {
+    $5 = 0
+    NF = 5
+  }
+  for (i = 2; i < NF; i ++)
+    $i = $(i + 1)
+  NF --
+
+  # We can parse this line now
+  i = parse_line(now)
+  assert(2 == i, $0 " : Unknown syntax for CONTROL action <" x ">")
+
+  # Is this a CHANGE|MERGE|SPLIT action?
+  if (2 == is_check)
+    split_account(now, Account[1], Account[2], amount)
+  else
+    checkset(now, Account[1], Account[2], Real_Value[(0)], amount, is_check)
+
+  # Get the next record
+  return (1)
 }
 
 # Break out transaction parsing into a separate module
@@ -7044,12 +7237,10 @@ function checkset(now, a, account, units, amount, is_check,
     }
 
     # Is this a checkpoint?
-    if ((1) == is_check)
-      assert(((((amount - quantity) - ( Epsilon)) <= 0) && (((amount - quantity) - ( -Epsilon)) >= 0)), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
+    assert(((((amount - quantity) - ( Epsilon)) <= 0) && (((amount - quantity) - ( -Epsilon)) >= 0)), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
                                                  (Leaf[account]), action, get_date(now, LONG_FORMAT), quantity, amount))
-    else
-      # Show this
-      printf "## %s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
+    # Show this
+    printf "## %s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
   } else {
     # is a setter
     switch(action) {

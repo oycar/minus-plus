@@ -83,7 +83,11 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
 # read csv records
 function read_csv_records() {
   # This is a CSV file
-  FPAT = "([^,]*)|(\"[^\"]+\")"
+  if (Use_CSV)
+    FPAT = "([^,]*)|(\"[^\"]+\")"
+  else
+    FPAT = "([^[:space:]]+)|(\"[^\"]+\")|([[](.)*])|(#(.)*)"
+
 }
 
 # Abstract read value out
@@ -93,7 +97,10 @@ function read_value(x) {
   if (x ~ /^[0-9\.\-]+$/)
     return strtonum(x)
 
-  # Just return the field
+  if (x ~ /^"([[:print:]])+"$/)
+    x = ctrim(x, "\"")
+
+  # Just return the field0
   return x
 }
 
@@ -496,11 +503,7 @@ function parse_line(now,    i, j, x, number_accounts) {
   #     Double Entry => two accounts
   #     Single Entry => one account
   #  or No Entry => zero accounts
-  for (i = 2; i <= NF; i ++)
-    # Need to remove white space from the fields
-    $i = trim($i)
-
-  # Get next one or two fields
+  #  Get next one or two fields
   for (i = 1; i < 3 && i < NF; i ++) {
     # The field id
     j = i + 1
@@ -1085,13 +1088,6 @@ function held_to(ac, now,     p, latest_sale) {
   return latest_sale # returns the date the parcel was sold
 }
 
-# # Initialize cost element arrays
-# function set_array_entries(array, key,     e) {
-#   # Set all true cost elements to zero - ie elements I-V
-#   for (e in Elements)
-#     array[e][now] = 0
-# }
-
 # This splits up a branch name or a leaf name into dotted components
 function get_name_component(name, i, number_components, array,    name_length, s, dot) {
   # Just get one component
@@ -1591,8 +1587,10 @@ function initialize_account(account_name,    class_name, array, p, n,
   if (class_name ~ RESERVED_CLASSES) {
     assert(2 == split(account_name, array, ":"), sprintf("<%s> Account name %s is not in branch_name:leaf_name format", $0, account_name))
     leaf_name = array[2]
-  } else
+  } else {
+    assert(!Enforce_Names, sprintf("<%s> Account name %s is not defined", $0, account_name))
     leaf_name = account_name
+  }
 
   # Finally an uninitialized long name
   # BUT there is another trap;
@@ -1648,7 +1646,12 @@ function initialize_account(account_name,    class_name, array, p, n,
     # Each account also has a number of parcels
     set_key(Number_Parcels, account_name, 0)
 
-    # End of if ASSET
+    # Set the account currency
+    if (is_class(a, "ASSET.CAPITAL.CURRENCY"))
+      if (leaf_name != Journal_Currency)
+        # A non-standard currency
+        Account_Currency[account_name] = leaf_name
+    # End of if Unitized
   } else if (is_class(account_name, "INCOME")) {
     # Set an Underlying_Asset if the leaf name
     # is of the appropriate format
@@ -2204,6 +2207,12 @@ function underline(width, margin, stream) {
 ## DD-Month-YYYY or DD-Month-YY or DD/Month/YYYY or DD/Month/YY eg 14-Aug-18
 ## YYYY-MM-DD or YY-MM-DD or YYYY/MM/DD or YY/MM/DD eg 2018/08/14
 ##
+##
+## Regex to get initial modification to date string
+##  (20[01][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([0-3][0-9])
+##
+
+
 function read_date(date_string, hour,
                    date_fields, year, month, day, value) {
   # default time

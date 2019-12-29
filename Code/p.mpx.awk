@@ -34,7 +34,7 @@
 #    Original style
 #   2008 Apr 09, 604000, 776003,    200.000,    8382.00, BHP in specie transfer (200 units)
 #   became over time
-#   2008 Apr 09, CASH, BHP.ASX, 8382.00, 200, # (in specie transfer in fact)
+#   2008-Apr-09, CASH, BHP.ASX, 8382.00, 200, # (in specie transfer in fact)
 #
 # To Do =>
 #   ***in progress
@@ -120,6 +120,7 @@ BEGIN {
 
   # Initialize arrays
   make_array(Account_Closed)
+  make_array(Account_Currency)
   make_array(Account_Term)
   make_array(Accounting_Cost)
   make_array(Carry_Offsets)
@@ -238,6 +239,7 @@ BEGIN {
   next
 }
 
+# State Record
 # Program state can be given using a state pattern range
 # #
 /^<</,/>>$/ {
@@ -266,7 +268,32 @@ BEGIN {
   next
 }
 
-# Import data
+
+# Control Record
+# Standard control function syntax is
+# FUNCTION, [ARGUMENT_1, ARGUMENT_2]
+# Control functions are:
+#  SET_ENTRY
+#  ADJUST_ENTRY
+
+#  SET_BANDS
+#  SET
+#  CHECK
+#  SPLIT
+#  MERGE
+#  CHANGE
+#
+/^!!/  {
+  #
+  ##Control_Record = !Control_Record
+
+## $1 ~  /^([[:space:]])*(ADJUST|CHECK|SET|SHOW|SPLIT|MERGE|CHANGE)/  {
+ # Use a function so we can control scope of variables
+ read_control_record()
+ next
+}
+
+# Import Record
 # This imports an array
 # Array[Key] => Value
 # Need the following variables
@@ -316,75 +343,8 @@ BEGIN {
   next
 }
 
-##
-## Imports CSV format
-## <<,Account_Code, XYZ.ABC,>>
-## <<,Key_Field, X,>>
-## <<,Value_Field, Y,>>
-## <<,Key_is_Date, 1,>>
-## <<,Import_Array_Name, XXX,>>
-##
-## So for CBA price Data
-## <<,Key_Field,1,>>
-## <<,Value_Field,5>>
-##
-## Yields
-## XXX[read_date($1)] => $5
-##
-## %%
-## field-1, field-2, ..., field-NF
-## ...
-## %%
 
-##
-##
-# This reads an array from csv data
-function import_csv_data(array, symbol, name,
-                         a, key, value) {
-
-
-  # Check syntax
-  assert(Key_Field <= NF && Value_Field <= NF, "Illegal import record syntax <" $0 ">")
-
-  # Ok
-  a = initialize_account(symbol)
-
-  # Get the key
-  if (Key_is_Date) {
-    key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
-    assert(DATE_ERROR != key, Read_Date_Error)
-
-    # Skip dates before the epoch
-    if (BEFORE_EPOCH == key)
-      return
-  } else
-    key = trim($Key_Field)
-
-  # Get the value
-  if (Value_is_Date) {
-    value = read_date(trim($Value_Field))
-    assert(DATE_ERROR != value, Read_Date_Error)
-
-    # Skip dates before the epoch
-    if (BEFORE_EPOCH == value)
-      return
-  } else {
-    value = trim($Value_Field)
-    if (!Import_Zero && near_zero(value))
-      return # Don't import zero values
-  }
-
-  # Logging
-@ifeq LOG import_record
-  printf "%s %16s[%11s] => %14s\n", name, Leaf[a], ternary(Key_is_Date, get_date(key), key), ternary(Value_is_Date, get_date(value), print_cash(value, 4)) > STDERR
-@endif
-
-  # Set the price
-  set_entry(array[a], value, key)
-
-  # Done
-}
-
+# Start Record
 # Syntax is START_JOURNAL, Date
 /START_JOURNAL/ {
 
@@ -476,6 +436,92 @@ function import_csv_data(array, symbol, name,
   next
 }
 
+# Default record
+{
+  # Skip empty lines
+  if ("" == $0)
+    next
+
+ # Use a function so we can control scope of variables
+ read_input_record()
+ next
+}
+
+##
+## Imports CSV format
+## <<,Account_Code, XYZ.ABC,>>
+## <<,Key_Field, X,>>
+## <<,Value_Field, Y,>>
+## <<,Key_is_Date, 1,>>
+## <<,Import_Array_Name, XXX,>>
+##
+## So for CBA price Data
+## <<,Key_Field,1,>>
+## <<,Value_Field,5>>
+##
+## Yields
+## XXX[read_date($1)] => $5
+##
+## %%
+## field-1, field-2, ..., field-NF
+## ...
+## %%
+
+##
+##
+# This reads an array from csv data
+function import_csv_data(array, symbol, name,
+                         a, key, value) {
+
+
+  # Check syntax
+  assert(Key_Field <= NF && Value_Field <= NF, "Illegal import record syntax <" $0 ">")
+
+  # Ok
+  a = initialize_account(symbol)
+
+  # Get the key
+  if (Key_is_Date) {
+    key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
+    assert(DATE_ERROR != key, Read_Date_Error)
+
+    # Skip dates before the epoch
+    if (BEFORE_EPOCH == key)
+      return
+  } else
+    key = trim($Key_Field)
+
+  # Get the value
+  if (Value_is_Date) {
+    value = read_date(trim($Value_Field))
+    assert(DATE_ERROR != value, Read_Date_Error)
+
+    # Skip dates before the epoch
+    if (BEFORE_EPOCH == value)
+      return
+  } else {
+    value = trim($Value_Field)
+    if (!Import_Zero && near_zero(value))
+      return # Don't import zero values
+  }
+
+  # Logging
+@ifeq LOG import_record
+  printf "%s %16s[%11s] => %14s\n", name, Leaf[a], ternary(Key_is_Date, get_date(key), key), ternary(Value_is_Date, get_date(value), print_cash(value, 4)) > STDERR
+@endif
+
+  # Set the price
+  set_entry(array[a], value, key)
+
+  # Done
+}
+
+
+
+
+
+
+
 function set_financial_year(now,   new_fy) {
   # Which Calendar year is this?
   FY_Year = get_year_number(now)
@@ -496,33 +542,7 @@ function set_financial_year(now,   new_fy) {
   FY_Length = get_year_length(FY_Year, FY_Day)
 }
 
-# Standard control function syntax is
-# FUNCTION, [ARGUMENT_1, ARGUMENT_2]
-# Control functions are:
-#  SET_ENTRY
-#  SET_BANDS
-#  SET
-#  CHECK
-#  SPLIT
-#  MERGE
-#  CHANGE
-#
-$1 ~  /^([[:space:]])*(ADJUST|CHECK|SET|SHOW|SPLIT|MERGE|CHANGE)/  {
- # Use a function so we can control scope of variables
- read_control_record()
- next
-}
 
-# Default record
-{
-  # Skip empty lines
-  if ("" == $0)
-    next
-
- # Use a function so we can control scope of variables
- read_input_record()
- next
-}
 
 
 
@@ -558,6 +578,7 @@ function initialize_state(    x) {
   }
 }
 
+
 #
 function read_control_record(       now, i, x, p, is_check){
   # Clear initial values
@@ -568,61 +589,61 @@ function read_control_record(       now, i, x, p, is_check){
 
   # The control records - must be exact match
   is_check = 0
-  x = trim($1)
+  x = trim($2)
   switch (x) {
-    case "CHECK" :
-      is_check = 1
-    case "SHOW" :
-      if (!is_check)
-        is_check = -1
-    case "SET" :
-    case "ADJUST" :
-      # Syntax for check and set is
-      # CHECKSET, ACCOUNT, WHAT, X, # Comment
-      # We need to rebuild the line into something more standard
-      # DATE, ACCOUNT, WHAT, X, # Comment
-      #
-      # Some special accounts are needed
-
-      # Put DATE in 1st Field
-      $1 = get_date(now)
-
-      # Check amount is set
-      if (NF < 4) {
-        $4 = 0
-        NF = 4
-      }
-
-      # We can parse this line now
-      i = parse_line(now)
-
-      # Now either check or set the quantity
-      assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
-      checkset(now, Account[1], Account[2], Real_Value[UNITS_KEY], amount, is_check)
-      break
-
-    case "CHANGE"  :
-    case "MERGE" :
-    case "SPLIT" :
-      # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
-      # Put DATE in 1st Field
-      $1 = get_date(now)
-
-      # Copy?
-      if ("CHANGE" == x)
-        $4 = 1
-
-      # Parse the line
-      i = parse_line(now)
-
-      # Merge?
-      if ("MERGE" == x)
-        # The reciprocal of split
-        amount = ternary(amount, 1.0 / amount, 1)
-
-      # Split Account[1] => Account[2] by factor amount - zero means copy
-      split_account(now, Account[1], Account[2], amount)
-      break
+    # case "CHECK" :
+    #   is_check = 1
+    # case "SHOW" :
+    #   if (!is_check)
+    #     is_check = -1
+    # case "SET" :
+    # case "ADJUST" :
+    #   # Syntax for check and set is
+    #   # CHECKSET, ACCOUNT, WHAT, X, # Comment
+    #   # We need to rebuild the line into something more standard
+    #   # DATE, ACCOUNT, WHAT, X, # Comment
+    #   #
+    #   # Some special accounts are needed
+    #
+    #   # Put DATE in 1st Field
+    #   $1 = get_date(now)
+    #
+    #   # Check amount is set
+    #   if (NF < 4) {
+    #     $4 = 0
+    #     NF = 4
+    #   }
+    #
+    #   # We can parse this line now
+    #   i = parse_line(now)
+    #
+    #   # Now either check or set the quantity
+    #   assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
+    #   checkset(now, Account[1], Account[2], Real_Value[UNITS_KEY], amount, is_check)
+    #   break
+    #
+    # case "CHANGE"  :
+    # case "MERGE" :
+    # case "SPLIT" :
+    #   # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
+    #   # Put DATE in 1st Field
+    #   $1 = get_date(now)
+    #
+    #   # Copy?
+    #   if ("CHANGE" == x)
+    #     $4 = 1
+    #
+    #   # Parse the line
+    #   i = parse_line(now)
+    #
+    #   # Merge?
+    #   if ("MERGE" == x)
+    #     # The reciprocal of split
+    #     amount = ternary(amount, 1.0 / amount, 1)
+    #
+    #   # Split Account[1] => Account[2] by factor amount - zero means copy
+    #   split_account(now, Account[1], Account[2], amount)
+    #   break
 
     case "SET_BANDS" :
       # Set banded thresholds
@@ -631,22 +652,112 @@ function read_control_record(       now, i, x, p, is_check){
       set_array_bands(now, SYMTAB[i], NF)
       break
 
-    case "SET_ENTRY" :
+    case "ADJUST_ENTRY" :
       # Set a time-dependent array entry
       i = trim($2)
       assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
       p = strtonum($3)
-      set_entry(SYMTAB[i], p, now)
+      sum_entry(SYMTAB[i], p, now)
       break
 
     default: # This should not happen
-      assert(FALSE, "Unknown Control Record <" i ">")
+      assert(FALSE, "Unknown Control Record <" x ">")
       break
   }
 
   # Get the next record
   return
 }
+
+# #
+# function read_control_record(       now, i, x, p, is_check){
+#   # Clear initial values
+#   new_line()
+#
+#   # Use the last recorded date
+#   now = ternary(-1 != Last_Record, Last_Record, Epoch)
+#
+#   # The control records - must be exact match
+#   is_check = 0
+#   x = trim($2)
+#   switch (x) {
+#     case "CHECK" :
+#       is_check = 1
+#     case "SHOW" :
+#       if (!is_check)
+#         is_check = -1
+#     case "SET" :
+#     case "ADJUST" :
+#       # Syntax for check and set is
+#       # CHECKSET, ACCOUNT, WHAT, X, # Comment
+#       # We need to rebuild the line into something more standard
+#       # DATE, ACCOUNT, WHAT, X, # Comment
+#       #
+#       # Some special accounts are needed
+#
+#       # Put DATE in 1st Field
+#       $1 = get_date(now)
+#
+#       # Check amount is set
+#       if (NF < 4) {
+#         $4 = 0
+#         NF = 4
+#       }
+#
+#       # We can parse this line now
+#       i = parse_line(now)
+#
+#       # Now either check or set the quantity
+#       assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
+#       checkset(now, Account[1], Account[2], Real_Value[UNITS_KEY], amount, is_check)
+#       break
+#
+#     case "CHANGE"  :
+#     case "MERGE" :
+#     case "SPLIT" :
+#       # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
+#       # Put DATE in 1st Field
+#       $1 = get_date(now)
+#
+#       # Copy?
+#       if ("CHANGE" == x)
+#         $4 = 1
+#
+#       # Parse the line
+#       i = parse_line(now)
+#
+#       # Merge?
+#       if ("MERGE" == x)
+#         # The reciprocal of split
+#         amount = ternary(amount, 1.0 / amount, 1)
+#
+#       # Split Account[1] => Account[2] by factor amount - zero means copy
+#       split_account(now, Account[1], Account[2], amount)
+#       break
+#
+#     case "SET_BANDS" :
+#       # Set banded thresholds
+#       i = trim($2)
+#       assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
+#       set_array_bands(now, SYMTAB[i], NF)
+#       break
+#
+#     case "ADJUST_ENTRY" :
+#       # Set a time-dependent array entry
+#       i = trim($2)
+#       assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
+#       p = strtonum($3)
+#       sum_entry(SYMTAB[i], p, now)
+#       break
+#
+#     default: # This should not happen
+#       assert(FALSE, "Unknown Control Record <" x ">")
+#       break
+#   }
+#
+#   # Get the next record
+#   return
+# }
 
 # A function to set banded arrays (like tax bands)
 function set_array_bands(now, bands, nf,     i, k) {
@@ -711,8 +822,12 @@ function read_input_record(   t, n, a, threshold) {
   } else # Check for semi-monotonicity
     assert(t == Last_Record, sprintf("Current entry %s is earlier than the previously recorded transaction %s", $0, get_date(Last_Record)))
 
-  # Modular form - parse the line
-  # returns number of accounts
+  # Parse the line
+  # First filter out any control actions (ADJUST|CHANGE|CHECK|MERGE|SET|SHOW|SPLIT)
+  if (control_action(t))
+    return
+
+  # Returns number of accounts
   n = parse_line(t)
 
   # There are n accounts in each transaction
@@ -734,6 +849,72 @@ function read_input_record(   t, n, a, threshold) {
 
   # Clean up the Account array
   delete Account
+}
+
+## Apply a account control action
+function control_action(now,    i, is_check, x) {
+  #
+  # Trim the fields
+  for (i = 2; i <= NF; i ++)
+    # Need to remove white space from the fields
+    $i = trim($i)
+
+  # Is this a control action?
+  # (ADJUST|CHANGE|CHECK|MERGE|SET|SHOW|SPLIT)
+  x = $2
+
+  # First deal with the case when X needs adjustment
+  is_check = 2
+  switch (x) {
+    case "CHANGE"  :
+      $5 = 1
+      break
+    case "MERGE"  : # Recirpocal of split
+      $5 = ternary($5, 1.0 / $5, 1)
+      break
+    case "SPLIT"  :
+      $5 = ternary($5, $5, 1)
+      break
+
+    # Checkset actions
+    case "CHECK" :
+      is_check = 1
+      break
+    case "SHOW" :
+      is_check = -1
+      break
+    case "SET" :
+    case "ADJUST" :
+      is_check = 0
+      break
+    default  :
+      return FALSE
+  }
+
+  # Syntax for CONTROL is
+  # DATE CONTROL A B [X] [# Comment]
+  # We need to rebuild the line into something more standard
+  # DATE A B X [# Comment]
+  if (NF < 5) {
+    $5 = 0
+    NF = 5
+  }
+  for (i = 2; i < NF; i ++)
+    $i = $(i + 1)
+  NF --
+
+  # We can parse this line now
+  i = parse_line(now)
+  assert(2 == i, $0 " : Unknown syntax for CONTROL action <" x ">")
+
+  # Is this a CHANGE|MERGE|SPLIT action?
+  if (2 == is_check)
+    split_account(now, Account[1], Account[2], amount)
+  else
+    checkset(now, Account[1], Account[2], Real_Value[UNITS_KEY], amount, is_check)
+
+  # Get the next record
+  return TRUE
 }
 
 # Break out transaction parsing into a separate module
@@ -1249,12 +1430,10 @@ function checkset(now, a, account, units, amount, is_check,
     }
 
     # Is this a checkpoint?
-    if (TRUE == is_check)
-      assert(near_zero(amount - quantity), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
+    assert(near_zero(amount - quantity), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
                                                  get_short_name(account), action, get_date(now, LONG_FORMAT), quantity, amount))
-    else
-      # Show this
-      printf "## %s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
+    # Show this
+    printf "## %s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
   } else {
     # is a setter
     switch(action) {

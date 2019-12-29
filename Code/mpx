@@ -38,7 +38,8 @@ USAGE="Usage: $(basename $0) [-a: show-account-transactions]
  [-d: date-format]\
  [-i mpx-information-and-copyright-notice]\
  [-l: log-function]\
- [-q enforce-qualification]\
+ [-n relaxed-names]\
+ [-q relaxed-qualification]\
  [-v write-variable-1,write_variable-2,...]\
  [-w: write-state-file]\
  [-x show-extra-detail]\
@@ -51,6 +52,7 @@ USAGE="Usage: $(basename $0) [-a: show-account-transactions]
 # default arguments
 account_name=""
 date_format=""
+enforce_names=1
 enforce_qualification=1
 log_function=0
 write_file=0
@@ -70,7 +72,7 @@ shopt -s expand_aliases
 alias app='gpp -I /usr/local/share/awk -n -U "" "" "(" "," ")" "(" ")" "#" "" -M "\n@\w" "\n" " " " " "\n" "" "" +cccs "#" "\n" +c "\\\n" "" +s "\"" "\"" "\\"'
 
 # Interpret options
-while getopts ":a:c:d:il:qv:w:xy:zABCDIMOQTZ" opt; do
+while getopts ":a:c:d:il:nqv:w:xy:zABCDIMOQTZ" opt; do
     case $opt in
 
     a) account_name=$OPTARG;;
@@ -102,6 +104,9 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
 
     l) # Logging / debugging
       log_function=$OPTARG;;
+
+    n) # Enforce Strict Names?
+        enforce_names=0;;
 
     q) # Enforce Qualification?
       enforce_qualification=0;;
@@ -170,7 +175,7 @@ along with this program.  If not, see <http:#www.gnu.org/licenses/>.\n\n" >&2
   if [ "$preprocess_only" == "false" ]; then
     # Go back to original directory
     cd "${current_directory}"
-    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v Enforce_Qualification=${enforce_qualification} -v Show_Account=${account_name} -v Show_Extra=${Show_Extra} -v Show_FY=${Show_FY} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
+    gawk -f ${MPXDIR}/mpx.awk -v DATE_FORMAT="${date_format}"  -v Enforce_Names=${enforce_names} -v Enforce_Qualification=${enforce_qualification} -v Show_Account=${account_name} -v Show_Extra=${Show_Extra} -v Show_FY=${Show_FY} -v Write_Variables=${write_variables} -v Write_State=${write_file} $@
   fi
 
 exit 0;

@@ -20,7 +20,7 @@
 @define DEVNULL "/dev/null"
 
 # //
-@define SHARED_ARRAYS "Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date\
+@define SHARED_ARRAYS "Account_Closed Account_Currency Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date\
  Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name\
  Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price\
  Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses\
@@ -28,7 +28,7 @@
 
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
- Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time\
+ Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time\
  Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window\
  Start_Record ALLOCATED\
  Dividend_Qualification_Function Get_Taxable_Gains_Function\
