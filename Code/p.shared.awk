@@ -245,6 +245,8 @@ function format_value(v) {
   }
 
   # Return the formatted value
+  if (v ~ /[[:space:]]/)
+    return ("\"" v "\"")
   return v
 }
 

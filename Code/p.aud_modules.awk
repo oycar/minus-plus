@@ -635,7 +635,10 @@ function income_tax_aud(now, past, benefits,
     # (unused) franking offsets may still be present here
     # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
     x = - get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
-  } else
+  } else if (below_zero(tax_owed)) { # Losses recorded this FY
+    x = - get_taxable_income(now, tax_owed)
+    tax_owed = 0
+  } else # Zero losses
     x = 0
 
   # Now we can update the carried tax losses at last
