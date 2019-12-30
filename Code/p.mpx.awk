@@ -83,7 +83,7 @@ BEGIN {
   if ("" != Use_Separator)
     OFS = Use_Separator
 
-  # 
+  #
   if ("" == DATE_FORMAT)
     DATE_FORMAT = MONTH_FORMAT
   LONG_FORMAT = (DATE_FORMAT " %H::%M::%S")
@@ -281,8 +281,6 @@ BEGIN {
   #
   Import_Record = !Import_Record
   if (Import_Record) {
-    read_csv_records(Import_Record)
-
     # Filter data
     # Currently importing Import_Array
     if (!index(Filter_Data, Import_Array_Name))
@@ -310,7 +308,6 @@ BEGIN {
     # End of block
     # Reset asset default prefix
     Asset_Prefix = ASSET_PREFIX
-    read_csv_records(Import_Record)
   }
 
   # End of if importing
