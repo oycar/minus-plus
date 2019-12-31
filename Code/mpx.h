@@ -51,6 +51,8 @@
 @define VALUE_FIELD (2)
 @define KEY_IS_DATE @eval (TRUE)
 @define VALUE_IS_DATE @eval (FALSE)
+@define TIME_FIELDS ("")
+
 
 # // Constants for Real_Value keys
 @define UNITS_KEY (0)

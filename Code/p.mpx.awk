@@ -63,6 +63,7 @@ BEGIN {
 
   # An array to hold document strings
   make_array(Documents)
+  make_array(Time_Fields)
 
   # A Document shortcut code
   Document_Shortcut = "[:+]"
@@ -190,6 +191,9 @@ BEGIN {
   Import_Zero  = FALSE
   Import_Time  = HOUR
 
+  # Default Import Settings
+  split(TIME_FIELDS, Time_Fields, " ")
+
   # Set special accounts
   set_special_accounts()
 
@@ -240,6 +244,21 @@ BEGIN {
 }
 
 # State Record
+##
+## Read the listed fields from a delimited text file
+## For example
+## << Time_Fields  4 9 >>
+##
+## would result in each record yielding
+## An_Array[$1][read_date($4)][$7] => read_date($9)
+##
+## A scalar would be
+## << Import_Variable_Name  A_Scalar >>
+## << Use_Fields 1 >>
+## A_Scalar => $1
+##
+##
+# This reads an array from human readable data
 # Program state can be given using a state pattern range
 # #
 /^<</,/>>$/ {
@@ -251,18 +270,21 @@ BEGIN {
     # Scalar syntax
     # <<,Variable_Name,Value>>
     # Any more fields on this line?
-    if ($NF ~ />>/ && NF == 4) {
-      # This is a scalar - value in field 3
-      SYMTAB[Variable_Name] = read_value(trim($3))
+    if ($NF ~ />>/) {
+      if (NF == 4) {
+        # This is a scalar - value in field 3
+        SYMTAB[Variable_Name] = read_value(trim($3))
 
-      # Logging
+        # Logging
 @ifeq LOG read_state
-      printf "%s => %s\n", Variable_Name, SYMTAB[Variable_Name] > STDERR
+        printf "%s => %s\n", Variable_Name, SYMTAB[Variable_Name] > STDERR
 @endif
+      } else # an array
+        read_state(3, NF - 1)
     }
   } else if ($0 !~ /^>>/)
     # Could be array OR scalar
-    read_state(NF)
+    read_state(1, NF)
 
   # Get the next record
   next
@@ -315,7 +337,9 @@ BEGIN {
 }
 
 1 == Import_Record {
-  import_csv_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
+  # identify the array or scalar being imported
+  #
+  import_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
   next
 }
 
@@ -423,25 +447,9 @@ BEGIN {
  next
 }
 
-##
-## Imports CSV format
-## <<,Account_Code, XYZ.ABC,>>
-## <<,Key_Field, X,>>
-## <<,Value_Field, Y,>>
-## <<,Key_is_Date, 1,>>
-## <<,Import_Array_Name, XXX,>>
-##
-## So for CBA price Data
-## <<,Key_Field,1,>>
-## <<,Value_Field,5>>
-##
-## Yields
-## XXX[read_date($1)] => $5
-##
-## %%
-## field-1, field-2, ..., field-NF
-## ...
-## %%
+
+
+
 
 ## Import Prices
 ## The fields
@@ -458,16 +466,14 @@ BEGIN {
 #
 # #
 
-#
-# # This asset is AAA.ASX
-# <<,Asset_Prefix, ASSET.CAPITAL.SHARES,>>
-# <<,Asset_Symbol, AAA.ASX,>>
 
-
+# This asset is AAA.ASX
+## <<,Asset_Prefix, ASSET.CAPITAL.SHARES,>>
+## <<,Asset_Symbol, AAA.ASX,>>
 ##
 ##
-# This reads an array from csv data
-function import_csv_data(array, symbol, name,
+# This reads an array from human readable data
+function import_data(array, symbol, name,
                          a, key, value) {
 
 

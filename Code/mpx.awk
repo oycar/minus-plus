@@ -80,6 +80,8 @@ END {
 
 
 
+
+
 # // Constants for Real_Value keys
 
 
@@ -101,6 +103,8 @@ END {
 
 
 # // Default Reports
+
+
 
 
 
@@ -477,36 +481,47 @@ function read_value(x) {
   if (x ~ /^"([[:print:]])+"$/)
     x = ctrim(x, "\"")
 
-  # Just return the field0
+  # Just return the field
+  return x
+}
+
+# Read a state field
+function read_field(field, x) {
+  if (field in Time_Fields) {
+    x = read_date(trim($field))
+    assert((-1) != x, Read_Date_Error)
+  } else
+    x = trim($field)
+
   return x
 }
 
 
 # A somewhat generalized variable reading function
-function read_state(nf,    i, x, value) {
+function read_state(first_field, last_field,    i, x, value) {
   # The fields represent the keys & value
-  value = read_value($nf)
+  value = read_value($last_field)
 
   # Logging
 
 
   # Is this an array?
-  if (nf == 1) { # No
+  if (first_field == last_field) { # No
     SYMTAB[Variable_Name] = value
 
   } else {
     # The rest of the keys
-    for (i = 1; i < nf; i ++)
+    for (i = first_field; i < last_field; i ++)
       # The code can minimize output file by
       # retaining the old key if the "ditto"
       # symbol is encountered;
       if (($i != ("^")) || !(i in Variable_Keys))
-        Variable_Keys[i] = $i
+        Variable_Keys[i] = read_field(i)
 
 
 
     # Set the array value
-    set_array(SYMTAB[Variable_Name], Variable_Keys, 1, nf - 1, value, (0))
+    set_array(SYMTAB[Variable_Name], Variable_Keys, first_field, last_field - 1, value, (0))
   }
 }
 
@@ -3226,7 +3241,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3573,7 +3588,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3713,7 +3728,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3846,7 +3861,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3918,7 +3933,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4053,7 +4068,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4582,7 +4597,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5385,7 +5400,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[iI]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5877,6 +5892,7 @@ BEGIN {
 
   # An array to hold document strings
   ((SUBSEP in Documents)?((1)):((0)))
+  ((SUBSEP in Time_Fields)?((1)):((0)))
 
   # A Document shortcut code
   Document_Shortcut = "[:+]"
@@ -6004,6 +6020,9 @@ BEGIN {
   Import_Zero  = (0)
   Import_Time  = (12)
 
+  # Default Import Settings
+  split((""), Time_Fields, " ")
+
   # Set special accounts
   set_special_accounts()
 
@@ -6054,6 +6073,21 @@ BEGIN {
 }
 
 # State Record
+##
+## Read the listed fields from a delimited text file
+## For example
+## << Time_Fields  4 9 >>
+##
+## would result in each record yielding
+## An_Array[$1][read_date($4)][$7] => read_date($9)
+##
+## A scalar would be
+## << Import_Variable_Name  A_Scalar >>
+## << Use_Fields 1 >>
+## A_Scalar => $1
+##
+##
+# This reads an array from human readable data
 # Program state can be given using a state pattern range
 # #
 /^<</,/>>$/ {
@@ -6065,16 +6099,19 @@ BEGIN {
     # Scalar syntax
     # <<,Variable_Name,Value>>
     # Any more fields on this line?
-    if ($NF ~ />>/ && NF == 4) {
-      # This is a scalar - value in field 3
-      SYMTAB[Variable_Name] = read_value(trim($3))
+    if ($NF ~ />>/) {
+      if (NF == 4) {
+        # This is a scalar - value in field 3
+        SYMTAB[Variable_Name] = read_value(trim($3))
 
-      # Logging
+        # Logging
 
+      } else # an array
+        read_state(3, NF - 1)
     }
   } else if ($0 !~ /^>>/)
     # Could be array OR scalar
-    read_state(NF)
+    read_state(1, NF)
 
   # Get the next record
   next
@@ -6122,7 +6159,9 @@ BEGIN {
 }
 
 1 == Import_Record {
-  import_csv_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
+  # identify the array or scalar being imported
+  #
+  import_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
   next
 }
 
@@ -6230,25 +6269,9 @@ BEGIN {
  next
 }
 
-##
-## Imports CSV format
-## <<,Account_Code, XYZ.ABC,>>
-## <<,Key_Field, X,>>
-## <<,Value_Field, Y,>>
-## <<,Key_is_Date, 1,>>
-## <<,Import_Array_Name, XXX,>>
-##
-## So for CBA price Data
-## <<,Key_Field,1,>>
-## <<,Value_Field,5>>
-##
-## Yields
-## XXX[read_date($1)] => $5
-##
-## %%
-## field-1, field-2, ..., field-NF
-## ...
-## %%
+
+
+
 
 ## Import Prices
 ## The fields
@@ -6265,16 +6288,14 @@ BEGIN {
 #
 # #
 
-#
-# # This asset is AAA.ASX
-# <<,Asset_Prefix, ASSET.CAPITAL.SHARES,>>
-# <<,Asset_Symbol, AAA.ASX,>>
 
-
+# This asset is AAA.ASX
+## <<,Asset_Prefix, ASSET.CAPITAL.SHARES,>>
+## <<,Asset_Symbol, AAA.ASX,>>
 ##
 ##
-# This reads an array from csv data
-function import_csv_data(array, symbol, name,
+# This reads an array from human readable data
+function import_data(array, symbol, name,
                          a, key, value) {
 
 

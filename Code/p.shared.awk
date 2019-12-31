@@ -99,15 +99,26 @@ function read_value(x) {
   if (x ~ /^"([[:print:]])+"$/)
     x = ctrim(x, "\"")
 
-  # Just return the field0
+  # Just return the field
+  return x
+}
+
+# Read a state field
+function read_field(field, x) {
+  if (field in Time_Fields) {
+    x = read_date(trim($field))
+    assert(DATE_ERROR != x, Read_Date_Error)
+  } else
+    x = trim($field)
+
   return x
 }
 
 
 # A somewhat generalized variable reading function
-function read_state(nf,    i, x, value) {
+function read_state(first_field, last_field,    i, x, value) {
   # The fields represent the keys & value
-  value = read_value($nf)
+  value = read_value($last_field)
 
   # Logging
 @ifeq LOG read_state
@@ -115,7 +126,7 @@ function read_state(nf,    i, x, value) {
 @endif
 
   # Is this an array?
-  if (nf == 1) { # No
+  if (first_field == last_field) { # No
     SYMTAB[Variable_Name] = value
 @ifeq LOG read_state
     # Logging
@@ -123,22 +134,22 @@ function read_state(nf,    i, x, value) {
 @endif
   } else {
     # The rest of the keys
-    for (i = 1; i < nf; i ++)
+    for (i = first_field; i < last_field; i ++)
       # The code can minimize output file by
       # retaining the old key if the "ditto"
       # symbol is encountered;
       if (($i != DITTO) || !(i in Variable_Keys))
-        Variable_Keys[i] = $i
+        Variable_Keys[i] = read_field(i)
 
 @ifeq LOG read_state
     # Logging
-    for (i = 1; i < nf; i++)
+    for (i = first_field; i < last_field; i ++)
       printf "[%s]", Variable_Keys[i] > STDERR
     printf " => %s\n", value > STDERR
 @endif
 
     # Set the array value
-    set_array(SYMTAB[Variable_Name], Variable_Keys, 1, nf - 1, value, FALSE)
+    set_array(SYMTAB[Variable_Name], Variable_Keys, first_field, last_field - 1, value, FALSE)
   }
 }
 
