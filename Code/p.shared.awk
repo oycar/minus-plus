@@ -105,7 +105,7 @@ function read_value(x) {
 
 # Read a state field
 function read_field(field, x) {
-  if (field in Time_Fields) {
+  if (get_key(Time_Fields, field)) {
     x = read_date(trim($field))
     assert(DATE_ERROR != x, Read_Date_Error)
   } else
@@ -116,18 +116,21 @@ function read_field(field, x) {
 
 
 # A somewhat generalized variable reading function
-function read_state(first_field, last_field,    i, x, value) {
+function read_state(name, first_field, last_field,    i, x, value) {
+  if (first_field > last_field)
+    return "" # None read
+
   # The fields represent the keys & value
   value = read_value($last_field)
 
   # Logging
 @ifeq LOG read_state
-  printf "%s", Variable_Name > STDERR
+  printf "%s", name > STDERR
 @endif
 
-  # Is this an array?
-  if (first_field == last_field) { # No
-    SYMTAB[Variable_Name] = value
+  # Is this a scalar?
+  if (first_field == last_field) { # Yes
+    SYMTAB[name] = value
 @ifeq LOG read_state
     # Logging
     printf " => %s\n", value > STDERR
@@ -149,8 +152,10 @@ function read_state(first_field, last_field,    i, x, value) {
 @endif
 
     # Set the array value
-    set_array(SYMTAB[Variable_Name], Variable_Keys, first_field, last_field - 1, value, FALSE)
+    set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, FALSE)
   }
+
+  return value
 }
 
 # Set a multi-dimensional array value

@@ -265,26 +265,24 @@ BEGIN {
   # We need to establish if this is an array or a scalar
   if ($0 ~ /^<</) {
     Variable_Name = trim($2)
+    First_Field = 3
     assert(Variable_Name in SYMTAB, "<" Variable_Name "> is not declared")
+    delete Variable_Keys
+  } else
+    First_Field = 1
 
-    # Scalar syntax
-    # <<,Variable_Name,Value>>
-    # Any more fields on this line?
-    if ($NF ~ />>/) {
-      if (NF == 4) {
-        # This is a scalar - value in field 3
-        SYMTAB[Variable_Name] = read_value(trim($3))
 
-        # Logging
-@ifeq LOG read_state
-        printf "%s => %s\n", Variable_Name, SYMTAB[Variable_Name] > STDERR
-@endif
-      } else # an array
-        read_state(3, NF - 1)
-    }
-  } else if ($0 !~ /^>>/)
-    # Could be array OR scalar
-    read_state(1, NF)
+  # Syntax is
+  # << Variable_Name Scalar Value >> or
+  # << Variable_Name Vector Key-1 Key-2 .... Key-M Value >> or
+  # << Variable_Name Vector
+  #    Key-1-1 Key-1-2 ... Key-1-M Value-1
+  #    ......
+  #    Key-N-1 Key-N-2 ... Key-N-M Value-N >>
+  if ($0 ~ />>/)
+    read_state(Variable_Name, First_Field, NF - 1)
+  else
+    read_state(Variable_Name, First_Field, NF)
 
   # Get the next record
   next
@@ -311,7 +309,6 @@ BEGIN {
         Filter_Data = Filter_Data "," Import_Array_Name
       else
         Filter_Data = Import_Array_Name
-
 
 @ifeq LOG import_record
     printf "Import %s\n",  Import_Array_Name > STDERR
