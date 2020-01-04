@@ -46,8 +46,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Logic conventions
 
 
@@ -64,6 +62,7 @@ END {
 
 
 # // Some constants
+
 
 
 
@@ -505,11 +504,27 @@ function read_state(name, first_field, last_field,    i, x, value) {
 
   # Logging
 
+  printf "%s\n", name > "/dev/stderr"
+
 
   # Is this a scalar?
-  if (first_field == last_field) { # Yes
-    SYMTAB[name] = value
+  if (first_field == last_field) { # Maybe
+    # It could be an array that is being cleared
+    # << Some_Array CLEAR_ARRAY >>
+    if (("CLEAR_ARRAY") == value && isarray(SYMTAB[name])) {
+      clear_array(SYMTAB[name])
+      value = ""
 
+      # Logging
+      printf "=> Clear Array\n", name > "/dev/stderr"
+
+    } else {
+      SYMTAB[name] = value
+
+      # Logging
+      printf " => %s\n", value > "/dev/stderr"
+
+    }
   } else {
     # The rest of the keys
     for (i = first_field; i < last_field; i ++)
@@ -519,13 +534,21 @@ function read_state(name, first_field, last_field,    i, x, value) {
       if (($i != ("^")) || !(i in Variable_Keys))
         Variable_Keys[i] = read_field(i)
 
-
-
     # Set the array value
     set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, (0))
+
+
+    # Print the whole array out
+    walk_array(SYMTAB[name], 1, "/dev/stderr")
+
   }
 
   return value
+}
+
+# Delete an array
+function clear_array(array) {
+  delete array
 }
 
 # Set a multi-dimensional array value
@@ -2354,8 +2377,26 @@ function get_tax(now, bands, total_income,
                       band_width,
                       current_key, last_threshold, threshold) {
 
-  # More than one tax band - much more tricky
+  # Tax bands can either be the bands themselves
+  # eg Band[T_0] => 0.20
+  #    Band[T_1] => 0.30
+  #    Band[T_2] => 0.40
+  #
+  #    and so on
+  #
+  #  Or the negative integral
+  #    Band[T_0] =>   0.00
+  #    Band[T_1] => - 0.20 * (T_1 - T_0)
+  #    Band[T_2] => - 0.20 * (T_1 - T_0) - 0.30 * (T_2 - T_1)
+  #
+
+  # Get the current tax band
   current_key = find_key(bands, now)
+
+  # Ensure bands are listed in decreasing order
+  invert_array(bands[current_key])
+
+  # Compute tax
   tax_payable = last_threshold = 0
   for (threshold in bands[current_key]) {
     # The last band's width
@@ -2384,29 +2425,29 @@ function get_tax(now, bands, total_income,
 
 # the inverse function
 # only uses tax bands - not levies
-function get_taxable_income(now, tax_left,
+function get_taxable_income(now, bands, tax_left,
                                  total_income, band_width, band_tax,
                                  current_key, last_threshold, threshold) {
   # Now get the tax due on the whole sum
-  current_key = find_key(Tax_Bands, now)
+  current_key = find_key(bands, now)
   last_threshold = 0
 
   # When the tax left is zero or negative it must be the first band
   if (!(((tax_left) - ( Epsilon)) > 0)) {
     # If the first band has a zero rate no income is assumed
-    if (((((Tax_Bands[current_key][last_threshold]) - ( Epsilon)) <= 0) && (((Tax_Bands[current_key][last_threshold]) - ( -Epsilon)) >= 0)))
+    if (((((bands[current_key][last_threshold]) - ( Epsilon)) <= 0) && (((bands[current_key][last_threshold]) - ( -Epsilon)) >= 0)))
       return 0
-    return tax_left / Tax_Bands[current_key][last_threshold]
+    return tax_left / bands[current_key][last_threshold]
   }
 
   # Now get the tax due on the whole sum
   total_income = 0
-  for (threshold in Tax_Bands[current_key]) {
+  for (threshold in bands[current_key]) {
     # The last band's width
     band_width = last_threshold - threshold # negative thresholds stored
 
     # The maximum tax due in this band
-    band_tax = band_width * Tax_Bands[current_key][last_threshold]
+    band_tax = band_width * bands[current_key][last_threshold]
 
     # Is the tax_payable above the amount paid?
     if ((((band_tax) - ( tax_left)) >= 0)) {
@@ -2427,11 +2468,49 @@ function get_taxable_income(now, tax_left,
 
   # We can still have have tax unaccounted for here
   if ((((tax_left) - ( Epsilon)) > 0))
-    total_income += tax_left / Tax_Bands[current_key][last_threshold]
+    total_income += tax_left / bands[current_key][last_threshold]
 
   # The minimum total income that would generate this much tax
   return total_income
 }
+
+# force an array to have indices stored in ascending order of magnitude
+# even when the indices actually descend in simple numerical value
+function invert_array(array,        key, last_key, value) {
+  last_key = ""
+  for (key in array)
+    if ("" == last_key)
+      last_key = key
+    else
+      break
+
+  # Did we find more than one key?
+  if ("" == last_key)
+    # No
+    return
+
+
+
+  # Yes - what order do these keys have?
+  if (((((((last_key) < 0)?( -(last_key)):(last_key))) - ( (((key) < 0)?( -(key)):(key)))) < 0))
+    # Desired order
+    return
+
+
+
+  # Wrong order!
+  for (key in array)
+    if ((((key) - ( Epsilon)) > 0)) {
+      # Reverse sign of keys to enforce required ordering
+      value = array[key]
+      delete array[key]
+      array[-key] = value
+
+    }
+
+
+}
+
 
 
 # Initialize a url encoding lookup table
@@ -3244,7 +3323,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("M" ~ /[cC]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3591,7 +3670,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[oO]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3731,7 +3810,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[bB]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3864,7 +3943,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("M" ~ /[mM]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3936,7 +4015,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[dD]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4071,7 +4150,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("M" ~ /[qQ]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4600,7 +4679,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("M" ~ /[tT]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5051,12 +5130,12 @@ function income_tax_aud(now, past, benefits,
       # Yes so some losses will be extinguished
       # Which will reduce tax_owed to zero - so the effective reduction
       # in tax losses is the income that would produce tax equal to tax_owed
-      x = - get_taxable_income(now, tax_owed) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands, tax_owed) # This is effectively a gain - so make it negative
       tax_owed = 0
     } else if (((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0))) {
       # All losses extinguished
       tax_owed -= x
-      x = - get_taxable_income(now, x) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands, x) # This is effectively a gain - so make it negative
     }
 
     if (Show_Extra)
@@ -5067,9 +5146,9 @@ function income_tax_aud(now, past, benefits,
     # This is a bit tricky
     # (unused) franking offsets may still be present here
     # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-    x = - get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
+    x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
   } else if ((((tax_owed) - ( -Epsilon)) < 0)) { # Losses recorded this FY
-    x = - get_taxable_income(now, tax_owed)
+    x = - get_taxable_income(now, Tax_Bands, tax_owed)
     tax_owed = 0
   } else # Zero losses
     x = 0
@@ -5403,7 +5482,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("M" ~ /[iI]|[aA]/ && "M" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

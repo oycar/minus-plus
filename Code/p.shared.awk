@@ -125,16 +125,27 @@ function read_state(name, first_field, last_field,    i, x, value) {
 
   # Logging
 @ifeq LOG read_state
-  printf "%s", name > STDERR
+  printf "%s\n", name > STDERR
 @endif
 
   # Is this a scalar?
-  if (first_field == last_field) { # Yes
-    SYMTAB[name] = value
+  if (first_field == last_field) { # Maybe
+    # It could be an array that is being cleared
+    # << Some_Array CLEAR_ARRAY >>
+    if (CLEAR_ARRAY == value && isarray(SYMTAB[name])) {
+      clear_array(SYMTAB[name])
+      value = ""
 @ifeq LOG read_state
-    # Logging
-    printf " => %s\n", value > STDERR
+      # Logging
+      printf "=> Clear Array\n", name > STDERR
 @endif
+    } else {
+      SYMTAB[name] = value
+@ifeq LOG read_state
+      # Logging
+      printf " => %s\n", value > STDERR
+@endif
+    }
   } else {
     # The rest of the keys
     for (i = first_field; i < last_field; i ++)
@@ -144,18 +155,21 @@ function read_state(name, first_field, last_field,    i, x, value) {
       if (($i != DITTO) || !(i in Variable_Keys))
         Variable_Keys[i] = read_field(i)
 
-@ifeq LOG read_state
-    # Logging
-    for (i = first_field; i < last_field; i ++)
-      printf "[%s]", Variable_Keys[i] > STDERR
-    printf " => %s\n", value > STDERR
-@endif
-
     # Set the array value
     set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, FALSE)
+
+@ifeq LOG read_state
+    # Print the whole array out
+    walk_array(SYMTAB[name], 1, STDERR)
+@endif
   }
 
   return value
+}
+
+# Delete an array
+function clear_array(array) {
+  delete array
 }
 
 # Set a multi-dimensional array value
@@ -2070,8 +2084,26 @@ function get_tax(now, bands, total_income,
                       band_width,
                       current_key, last_threshold, threshold) {
 
-  # More than one tax band - much more tricky
+  # Tax bands can either be the bands themselves
+  # eg Band[T_0] => 0.20
+  #    Band[T_1] => 0.30
+  #    Band[T_2] => 0.40
+  #
+  #    and so on
+  #
+  #  Or the negative integral
+  #    Band[T_0] =>   0.00
+  #    Band[T_1] => - 0.20 * (T_1 - T_0)
+  #    Band[T_2] => - 0.20 * (T_1 - T_0) - 0.30 * (T_2 - T_1)
+  #
+
+  # Get the current tax band
   current_key = find_key(bands, now)
+
+  # Ensure bands are listed in decreasing order
+  invert_array(bands[current_key])
+
+  # Compute tax
   tax_payable = last_threshold = 0
   for (threshold in bands[current_key]) {
     # The last band's width
@@ -2100,29 +2132,33 @@ function get_tax(now, bands, total_income,
 
 # the inverse function
 # only uses tax bands - not levies
-function get_taxable_income(now, tax_left,
+function get_taxable_income(now, bands, tax_left,
                                  total_income, band_width, band_tax,
                                  current_key, last_threshold, threshold) {
-  # Now get the tax due on the whole sum
-  current_key = find_key(Tax_Bands, now)
-  last_threshold = 0
+
+  # Get the current tax band
+  current_key = find_key(bands, now)
+
+  # Ensure bands are listed in decreasing order
+  invert_array(bands[current_key])
 
   # When the tax left is zero or negative it must be the first band
+  last_threshold = 0
   if (!above_zero(tax_left)) {
     # If the first band has a zero rate no income is assumed
-    if (near_zero(Tax_Bands[current_key][last_threshold]))
+    if (near_zero(bands[current_key][last_threshold]))
       return 0
-    return tax_left / Tax_Bands[current_key][last_threshold]
+    return tax_left / bands[current_key][last_threshold]
   }
 
   # Now get the tax due on the whole sum
   total_income = 0
-  for (threshold in Tax_Bands[current_key]) {
+  for (threshold in bands[current_key]) {
     # The last band's width
     band_width = last_threshold - threshold # negative thresholds stored
 
     # The maximum tax due in this band
-    band_tax = band_width * Tax_Bands[current_key][last_threshold]
+    band_tax = band_width * bands[current_key][last_threshold]
 
     # Is the tax_payable above the amount paid?
     if (greater_than_or_equal(band_tax, tax_left)) {
@@ -2143,11 +2179,56 @@ function get_taxable_income(now, tax_left,
 
   # We can still have have tax unaccounted for here
   if (greater_than(tax_left, Epsilon))
-    total_income += tax_left / Tax_Bands[current_key][last_threshold]
+    total_income += tax_left / bands[current_key][last_threshold]
 
   # The minimum total income that would generate this much tax
   return total_income
 }
+
+# force an array to have indices stored in ascending order of magnitude
+# even when the indices actually descend in simple numerical value
+function invert_array(array,        key, last_key, value) {
+  last_key = ""
+  for (key in array)
+    if ("" == last_key)
+      last_key = key
+    else
+      break
+
+  # Did we find more than one key?
+  if ("" == last_key)
+    # No
+    return
+
+@ifeq LOG  invert_array
+  printf "Array Key Order\n" > STDERR
+  printf "First Key => %s\n", last_key > STDERR
+  printf "Next  Key => %s\n", key > STDERR
+@endif
+
+  # Yes - what order do these keys have?
+  if (less_than(abs_value(last_key), abs_value(key)))
+    # Desired order
+    return
+
+@ifeq LOG  invert_array
+  printf "Invert Array\n" > STDERR
+@endif
+
+  # Wrong order!
+  for (key in array)
+    if (above_zero(key)) {
+      # Reverse sign of keys to enforce required ordering
+      value = array[key]
+      delete array[key]
+      array[-key] = value
+@ifeq LOG  invert_array
+      printf "Invert  Array[%s] => %s\n",  key, format_value(value) > STDERR
+      printf "New Key Array[%s] => %s\n", -key, format_value(value) > STDERR
+@endif
+    }
+}
+
 
 
 # Initialize a url encoding lookup table

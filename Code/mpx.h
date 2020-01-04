@@ -36,6 +36,7 @@
  Income_Tax_Function Initialize_Tax_Function "
 
 # // Some constants
+@define CLEAR_ARRAY ("CLEAR_ARRAY")
 @define DITTO ("^")
 @define NUMBER_MONTHS (12)
 @define HOUR (12)

@@ -618,12 +618,12 @@ function income_tax_aud(now, past, benefits,
       # Yes so some losses will be extinguished
       # Which will reduce tax_owed to zero - so the effective reduction
       # in tax losses is the income that would produce tax equal to tax_owed
-      x = - get_taxable_income(now, tax_owed) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands, tax_owed) # This is effectively a gain - so make it negative
       tax_owed = 0
     } else if (not_zero(x)) {
       # All losses extinguished
       tax_owed -= x
-      x = - get_taxable_income(now, x) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands, x) # This is effectively a gain - so make it negative
     }
 
     if (Show_Extra)
@@ -634,9 +634,9 @@ function income_tax_aud(now, past, benefits,
     # This is a bit tricky
     # (unused) franking offsets may still be present here
     # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-    x = - get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
+    x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
   } else if (below_zero(tax_owed)) { # Losses recorded this FY
-    x = - get_taxable_income(now, tax_owed)
+    x = - get_taxable_income(now, Tax_Bands, tax_owed)
     tax_owed = 0
   } else # Zero losses
     x = 0
