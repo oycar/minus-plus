@@ -116,7 +116,10 @@ function read_field(field, x) {
 
 
 # A somewhat generalized variable reading function
-function read_state(name, first_field, last_field,    i, x, value) {
+##
+
+function read_state(name, adjust_value, first_field, last_field,    i, x, value) {
+  # The end of the input
   if (first_field > last_field)
     return "" # None read
 
@@ -125,27 +128,22 @@ function read_state(name, first_field, last_field,    i, x, value) {
 
   # Logging
 @ifeq LOG read_state
-  printf "%s\n", name > STDERR
+  printf "%s => ", name > STDERR
 @endif
 
   # Is this a scalar?
-  if (first_field == last_field) { # Maybe
-    # It could be an array that is being cleared
-    # << Some_Array CLEAR_ARRAY >>
-    if (CLEAR_ARRAY == value && isarray(SYMTAB[name])) {
-      clear_array(SYMTAB[name])
-      value = ""
+  if (first_field == last_field) {
+    # Yes
+    if (adjust_value)
+      SYMTAB[name] += adjust_value * value
+    else
+      SYMTAB[name]  = value
+
 @ifeq LOG read_state
       # Logging
-      printf "=> Clear Array\n", name > STDERR
+      printf " %s\n", value > STDERR
 @endif
-    } else {
-      SYMTAB[name] = value
-@ifeq LOG read_state
-      # Logging
-      printf " => %s\n", value > STDERR
-@endif
-    }
+
   } else {
     # The rest of the keys
     for (i = first_field; i < last_field; i ++)
@@ -156,7 +154,7 @@ function read_state(name, first_field, last_field,    i, x, value) {
         Variable_Keys[i] = read_field(i)
 
     # Set the array value
-    set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, FALSE)
+    set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, adjust_value, FALSE)
 
 @ifeq LOG read_state
     # Print the whole array out
@@ -174,7 +172,7 @@ function clear_array(array) {
 
 # Set a multi-dimensional array value
 # This assumes array is correctly defined
-function set_array(array, keys, first_key, last_key, value, flag) {
+function set_array(array, keys, first_key, last_key, value, adjust_value, flag) {
   # The idea of deleting the a temporary scalar entry in this function was based on
   # Ed Morton's code found here => https://groups.google.com/forum/#!topic/comp.lang.awk/vKiSODr6Bds
   # Catch errors
@@ -189,10 +187,13 @@ function set_array(array, keys, first_key, last_key, value, flag) {
   }
 
   # Set the array recursively
-  if (first_key == last_key)
+  if (first_key == last_key) {
     # Set the value
-    set_entry(array, value, keys[first_key])
-  else {
+    if (adjust_value)
+      sum_entry(array, adjust_value * value, keys[first_key])
+    else
+      set_entry(array, value, keys[first_key])
+  } else {
     # Yikes
     # We need to ensure the subarray exists before calling set_array() otherwise
     # inside set_array() the entry would be a scalar, but then we need to delete
@@ -204,7 +205,7 @@ function set_array(array, keys, first_key, last_key, value, flag) {
     }
 
     # Recursively set the array elements
-    set_array(array[keys[first_key]], keys, first_key + 1, last_key, value, flag)
+    set_array(array[keys[first_key]], keys, first_key + 1, last_key, value, adjust_value, flag)
   }
 }
 
@@ -476,7 +477,7 @@ function maximum_entry(array, start_bracket, end_bracket,
 # White space trimming
 function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
 function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
-function trim(s) { return rtrim(ltrim(s)); }
+#function trim(s) { return rtrim(ltrim(s)); }
 function to_number(s, default_value) {return "" == s ? default_value : strtonum(s)}
 
 # character trimming

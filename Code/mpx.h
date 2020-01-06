@@ -36,7 +36,7 @@
  Income_Tax_Function Initialize_Tax_Function "
 
 # // Some constants
-@define CLEAR_ARRAY ("CLEAR_ARRAY")
+# // @define CLEAR_ARRAY ("CLEAR_ARRAY")
 @define DITTO ("^")
 @define NUMBER_MONTHS (12)
 @define HOUR (12)
@@ -134,6 +134,7 @@
 
 @define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
+@define trim(s) (s)
 #
 # // Useful shorthands for various kinds of accounts
 @define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/)
@@ -170,11 +171,11 @@
 
 # // Reserved Tax Offset Classes
 @define is_offset(a)      ((a) ~ /^SPECIAL\.OFFSET[.:]/)
-@define is_franking(a)    ((a) ~ /^SPECIAL\.OFFSET\.FRANKING[.:]/)
-@define is_foreign(a)     ((a) ~ /^SPECIAL\.OFFSET\.FOREIGN[.:]/)
-@define is_no_carry(a)   ((a) ~ /^SPECIAL\.OFFSET\.NO_CARRY[.:]/)
-@define is_carry(a)      ((a) ~ /^SPECIAL\.OFFSET\.CARRY[.:]/)
-@define is_refund(a)     ((a) ~ /^SPECIAL\.OFFSET\.REFUNDABLE[.:]/)
+# // @define is_franking(a)    ((a) ~ /^SPECIAL\.OFFSET\.FRANKING[.:]/)
+# // @define is_foreign(a)     ((a) ~ /^SPECIAL\.OFFSET\.FOREIGN[.:]/)
+# // @define is_no_carry(a)   ((a) ~ /^SPECIAL\.OFFSET\.NO_CARRY[.:]/)
+# // @define is_carry(a)      ((a) ~ /^SPECIAL\.OFFSET\.CARRY[.:]/)
+# // @define is_refund(a)     ((a) ~ /^SPECIAL\.OFFSET\.REFUNDABLE[.:]/)
 
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR|GAINS).LEAF => LEAF

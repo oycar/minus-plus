@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Logic conventions
 
 
@@ -62,7 +64,7 @@ END {
 
 
 # // Some constants
-
+# // @define CLEAR_ARRAY ("CLEAR_ARRAY")
 
 
 
@@ -102,6 +104,8 @@ END {
 
 
 # // Default Reports
+
+
 
 
 
@@ -158,6 +162,7 @@ END {
 
 
 
+
 #
 # // Useful shorthands for various kinds of accounts
 
@@ -194,11 +199,11 @@ END {
 
 # // Reserved Tax Offset Classes
 
-
-
-
-
-
+# // @define is_franking(a)    ((a) ~ /^SPECIAL\.OFFSET\.FRANKING[.:]/)
+# // @define is_foreign(a)     ((a) ~ /^SPECIAL\.OFFSET\.FOREIGN[.:]/)
+# // @define is_no_carry(a)   ((a) ~ /^SPECIAL\.OFFSET\.NO_CARRY[.:]/)
+# // @define is_carry(a)      ((a) ~ /^SPECIAL\.OFFSET\.CARRY[.:]/)
+# // @define is_refund(a)     ((a) ~ /^SPECIAL\.OFFSET\.REFUNDABLE[.:]/)
 
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR|GAINS).LEAF => LEAF
@@ -485,17 +490,20 @@ function read_value(x) {
 # Read a state field
 function read_field(field, x) {
   if ((( field in Time_Fields)?( Time_Fields[ field]):( ""))) {
-    x = read_date(trim($field))
+    x = read_date(($field))
     assert((-1) != x, Read_Date_Error)
   } else
-    x = trim($field)
+    x = ($field)
 
   return x
 }
 
 
 # A somewhat generalized variable reading function
-function read_state(name, first_field, last_field,    i, x, value) {
+##
+
+function read_state(name, adjust_value, first_field, last_field,    i, x, value) {
+  # The end of the input
   if (first_field > last_field)
     return "" # None read
 
@@ -504,27 +512,17 @@ function read_state(name, first_field, last_field,    i, x, value) {
 
   # Logging
 
-  printf "%s\n", name > "/dev/stderr"
-
 
   # Is this a scalar?
-  if (first_field == last_field) { # Maybe
-    # It could be an array that is being cleared
-    # << Some_Array CLEAR_ARRAY >>
-    if (("CLEAR_ARRAY") == value && isarray(SYMTAB[name])) {
-      clear_array(SYMTAB[name])
-      value = ""
+  if (first_field == last_field) {
+    # Yes
+    if (adjust_value)
+      SYMTAB[name] += adjust_value * value
+    else
+      SYMTAB[name]  = value
 
-      # Logging
-      printf "=> Clear Array\n", name > "/dev/stderr"
 
-    } else {
-      SYMTAB[name] = value
 
-      # Logging
-      printf " => %s\n", value > "/dev/stderr"
-
-    }
   } else {
     # The rest of the keys
     for (i = first_field; i < last_field; i ++)
@@ -535,11 +533,8 @@ function read_state(name, first_field, last_field,    i, x, value) {
         Variable_Keys[i] = read_field(i)
 
     # Set the array value
-    set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, (0))
+    set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, adjust_value, (0))
 
-
-    # Print the whole array out
-    walk_array(SYMTAB[name], 1, "/dev/stderr")
 
   }
 
@@ -553,7 +548,7 @@ function clear_array(array) {
 
 # Set a multi-dimensional array value
 # This assumes array is correctly defined
-function set_array(array, keys, first_key, last_key, value, flag) {
+function set_array(array, keys, first_key, last_key, value, adjust_value, flag) {
   # The idea of deleting the a temporary scalar entry in this function was based on
   # Ed Morton's code found here => https://groups.google.com/forum/#!topic/comp.lang.awk/vKiSODr6Bds
   # Catch errors
@@ -566,10 +561,13 @@ function set_array(array, keys, first_key, last_key, value, flag) {
   }
 
   # Set the array recursively
-  if (first_key == last_key)
+  if (first_key == last_key) {
     # Set the value
-    (array[ keys[first_key]] = ( value))
-  else {
+    if (adjust_value)
+      sum_entry(array, adjust_value * value, keys[first_key])
+    else
+      (array[ keys[first_key]] = ( value))
+  } else {
     # Yikes
     # We need to ensure the subarray exists before calling set_array() otherwise
     # inside set_array() the entry would be a scalar, but then we need to delete
@@ -581,7 +579,7 @@ function set_array(array, keys, first_key, last_key, value, flag) {
     }
 
     # Recursively set the array elements
-    set_array(array[keys[first_key]], keys, first_key + 1, last_key, value, flag)
+    set_array(array[keys[first_key]], keys, first_key + 1, last_key, value, adjust_value, flag)
   }
 }
 
@@ -837,7 +835,7 @@ function maximum_entry(array, start_bracket, end_bracket,
 # White space trimming
 function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
 function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
-function trim(s) { return rtrim(ltrim(s)); }
+#function trim(s) { return rtrim(ltrim(s)); }
 function to_number(s, default_value) {return "" == s ? default_value : strtonum(s)}
 
 # character trimming
@@ -1238,7 +1236,7 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
   if (field ~ /^\((.)+\)$/) {
     # bracketed
     len = length(field)
-    field = trim(toupper(substr(field, 2, len - 2)))
+    field = (toupper(substr(field, 2, len - 2)))
     if (field ~ /D/) {
       Tax_Adjustment = Automatic_Depreciation = (1)
       Cost_Element = I
@@ -2428,11 +2426,15 @@ function get_tax(now, bands, total_income,
 function get_taxable_income(now, bands, tax_left,
                                  total_income, band_width, band_tax,
                                  current_key, last_threshold, threshold) {
-  # Now get the tax due on the whole sum
+
+  # Get the current tax band
   current_key = find_key(bands, now)
-  last_threshold = 0
+
+  # Ensure bands are listed in decreasing order
+  invert_array(bands[current_key])
 
   # When the tax left is zero or negative it must be the first band
+  last_threshold = 0
   if (!(((tax_left) - ( Epsilon)) > 0)) {
     # If the first band has a zero rate no income is assumed
     if (((((bands[current_key][last_threshold]) - ( Epsilon)) <= 0) && (((bands[current_key][last_threshold]) - ( -Epsilon)) >= 0)))
@@ -2507,8 +2509,6 @@ function invert_array(array,        key, last_key, value) {
       array[-key] = value
 
     }
-
-
 }
 
 
@@ -2601,7 +2601,7 @@ function read_date(date_string, hour,
 
 
   # Split the input date
-  if (3 == split(trim(date_string), date_fields, "[-/ ]")) {
+  if (3 == split((date_string), date_fields, "[-/ ]")) {
     # The fields are YYYY MM DD
     # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
     # or             Mon DD YYYY
@@ -3323,7 +3323,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3670,7 +3670,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3810,7 +3810,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3943,7 +3943,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4015,7 +4015,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4150,7 +4150,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4679,7 +4679,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5482,7 +5482,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6163,25 +6163,39 @@ BEGIN {
 ## would result in each record yielding
 ## An_Array[$1][read_date($4)][$7] => read_date($9)
 ##
-## A scalar would be
-## << Import_Variable_Name  A_Scalar >>
-## << Use_Fields 1 >>
-## A_Scalar => $1
-##
 ##
 # This reads an array from human readable data
 # Program state can be given using a state pattern range
-# #
+#
 /^<</,/>>$/ {
+  # Set =
+  read_state_record($0 ~ /^<</, $0 ~ />>/)
+}
+
+function read_state_record(first_line, last_line) {
   # We need to establish if this is an array or a scalar
-  if ($0 ~ /^<</) {
-    Variable_Name = trim($2)
-    First_Field = 3
+  if (first_line) {
+    assert(NF > 1, "Syntax error <" $0 "> state record needs a variable name")
+    Variable_Name = ($2)
     assert(Variable_Name in SYMTAB, "<" Variable_Name "> is not declared")
     delete Variable_Keys
-  } else
-    First_Field = 1
 
+    # Special case if  this of the form << Array_Name >> then clear the array
+    first_line = 2
+    if (last_line && (first_line > NF - 2) && isarray(SYMTAB[Variable_Name])) {
+      clear_array(SYMTAB[Variable_Name])
+
+      next
+    } else if (NF > 2 && "+=" == $3) {
+      Adjust_Value = 1
+      first_line = 3
+    } else if (NF > 2 && "-=" == $3) {
+      Adjust_Value = -1
+      first_line = 3
+    } else
+      Adjust_Value = 0
+  } else
+    first_line = 0
 
   # Syntax is
   # << Variable_Name Scalar Value >> or
@@ -6190,10 +6204,7 @@ BEGIN {
   #    Key-1-1 Key-1-2 ... Key-1-M Value-1
   #    ......
   #    Key-N-1 Key-N-2 ... Key-N-M Value-N >>
-  if ($0 ~ />>/)
-    read_state(Variable_Name, First_Field, NF - 1)
-  else
-    read_state(Variable_Name, First_Field, NF)
+  read_state(Variable_Name, Adjust_Value, first_line + 1, NF - last_line)
 
   # Get the next record
   next
@@ -6388,25 +6399,25 @@ function import_data(array, symbol, name,
 
   # Get the key
   if (Key_is_Date) {
-    key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
+    key = read_date(($Key_Field)) # Default Hour overruled sometimes
     assert((-1) != key, Read_Date_Error)
 
     # Skip dates before the epoch
     if ((-2) == key)
       return
   } else
-    key = trim($Key_Field)
+    key = ($Key_Field)
 
   # Get the value
   if (Value_is_Date) {
-    value = read_date(trim($Value_Field))
+    value = read_date(($Value_Field))
     assert((-1) != value, Read_Date_Error)
 
     # Skip dates before the epoch
     if ((-2) == value)
       return
   } else {
-    value = trim($Value_Field)
+    value = ($Value_Field)
     if (!Import_Zero && ((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
       return # Don't import zero values
   }
@@ -6569,7 +6580,7 @@ function control_action(now,    i, is_check, x) {
   # Trim the fields
   for (i = 2; i <= NF; i ++)
     # Need to remove white space from the fields
-    $i = trim($i)
+    $i = ($i)
 
   # Is this a control action?
   # (ADJUST|CHANGE|CHECK|MERGE|SET|SHOW|SPLIT)
@@ -6588,29 +6599,6 @@ function control_action(now,    i, is_check, x) {
       $5 = (($5)?( $5):( 1))
       break
 
-    # Special case - this is a temporary fix these entries should be handled elsewhere
-    case "SET_BANDS" :
-      # Set banded thresholds
-      x = trim($3)
-      assert(x in SYMTAB && isarray(SYMTAB[x]), "Variable <" x "> is not an array")
-      set_array_bands(now, SYMTAB[x], NF)
-      return (1)
-
-    case "ADJUST_ENTRY" :
-      # Set a time-dependent array entry
-      x = trim($3)
-      assert(x in SYMTAB && isarray(SYMTAB[x]), "Variable <" x "> is not an array")
-      p = strtonum($4)
-      sum_entry(SYMTAB[x], p, now)
-      return (1)
-
-    case "SET_ENTRY" :
-      # Set a time-dependent array entry
-      x = trim($3)
-      assert(x in SYMTAB && isarray(SYMTAB[x]), "Variable <" x "> is not an array")
-      p = strtonum($4)
-      (SYMTAB[x][ now] = ( p))
-      return (1)
 
     # Checkset actions
     case "CHECK" :

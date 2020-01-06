@@ -252,25 +252,42 @@ BEGIN {
 ## would result in each record yielding
 ## An_Array[$1][read_date($4)][$7] => read_date($9)
 ##
-## A scalar would be
-## << Import_Variable_Name  A_Scalar >>
-## << Use_Fields 1 >>
-## A_Scalar => $1
-##
 ##
 # This reads an array from human readable data
 # Program state can be given using a state pattern range
-# #
+#
 /^<</,/>>$/ {
+  # Set =
+  read_state_record($0 ~ /^<</, $0 ~ />>/)
+}
+
+function read_state_record(first_line, last_line) {
   # We need to establish if this is an array or a scalar
-  if ($0 ~ /^<</) {
+  if (first_line) {
+    assert(NF > 1, "Syntax error <" $0 "> state record needs a variable name")
     Variable_Name = trim($2)
-    First_Field = 3
     assert(Variable_Name in SYMTAB, "<" Variable_Name "> is not declared")
     delete Variable_Keys
-  } else
-    First_Field = 1
 
+    # Special case if  this of the form << Array_Name >> then clear the array
+    first_line = 2
+    if (last_line && (first_line > NF - 2) && isarray(SYMTAB[Variable_Name])) {
+      clear_array(SYMTAB[Variable_Name])
+@ifeq LOG read_state
+      # Logging
+      printf "Clear Array %s\n", Variable_Name > STDERR
+@endif
+      next
+    } else if (NF > 2 && "+=" == $3) {
+      Adjust_Value = 1
+      first_line = 3
+    } else if (NF > 2 && "-=" == $3) {
+      Adjust_Value = -1
+      first_line = 3
+    } else
+      Adjust_Value = 0
+  } else
+    first_line = 0
 
   # Syntax is
   # << Variable_Name Scalar Value >> or
@@ -279,10 +296,7 @@ BEGIN {
   #    Key-1-1 Key-1-2 ... Key-1-M Value-1
   #    ......
   #    Key-N-1 Key-N-2 ... Key-N-M Value-N >>
-  if ($0 ~ />>/)
-    read_state(Variable_Name, First_Field, NF - 1)
-  else
-    read_state(Variable_Name, First_Field, NF)
+  read_state(Variable_Name, Adjust_Value, first_line + 1, NF - last_line)
 
   # Get the next record
   next
@@ -688,29 +702,6 @@ function control_action(now,    i, is_check, x) {
       $5 = ternary($5, $5, 1)
       break
 
-    # Special case - this is a temporary fix these entries should be handled elsewhere
-    case "SET_BANDS" :
-      # Set banded thresholds
-      x = trim($3)
-      assert(x in SYMTAB && isarray(SYMTAB[x]), "Variable <" x "> is not an array")
-      set_array_bands(now, SYMTAB[x], NF)
-      return TRUE
-
-    case "ADJUST_ENTRY" :
-      # Set a time-dependent array entry
-      x = trim($3)
-      assert(x in SYMTAB && isarray(SYMTAB[x]), "Variable <" x "> is not an array")
-      p = strtonum($4)
-      sum_entry(SYMTAB[x], p, now)
-      return TRUE
-
-    case "SET_ENTRY" :
-      # Set a time-dependent array entry
-      x = trim($3)
-      assert(x in SYMTAB && isarray(SYMTAB[x]), "Variable <" x "> is not an array")
-      p = strtonum($4)
-      set_entry(SYMTAB[x], p, now)
-      return TRUE
 
     # Checkset actions
     case "CHECK" :
