@@ -46,14 +46,11 @@
 @define PRECISION (2)
 @define MAX_PRECISION (6)
 @define CLASS_INDEX (1)
+@define BUY ("BUY")
+@define SELL ("SELL")
 
-# // Default Import Values
-@define KEY_FIELD  (1)
-@define VALUE_FIELD (2)
-@define KEY_IS_DATE @eval (TRUE)
-@define VALUE_IS_DATE @eval (FALSE)
+# // Default State Record - no time fields
 @define TIME_FIELDS ("")
-
 
 # // Constants for Real_Value keys
 @define UNITS_KEY (0)
@@ -137,18 +134,18 @@
 @define trim(s) (s)
 #
 # // Useful shorthands for various kinds of accounts
-@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/)
+@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|CURRENCY|FIXED)[.:]/)
 @define is_equity(a) ((a) ~ /^EQUITY[.:]/)
 @define is_liability(a) ((a) ~ /^LIABILITY[.:]/)
 @define is_cash(a) ((a) ~ /^ASSET\.CURRENT[.:]/)
-@define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)
+@define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|CURRENCY|FIXED)|EQUITY)[.:]/)
 
 # // Fixed asset
 @define is_fixed(a) ((a) ~ /^ASSET\.FIXED[.:]/)
 @define is_tax(a)  ((a) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)
 @define is_term(a) ((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)
 @define is_current(a) ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/)
-@define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/)
+@define is_capital(a) ((a) ~ /^ASSET\.(CAPITAL|CURRENCY)[.:]/)
 #
 #
 # // Contribution
@@ -171,11 +168,6 @@
 
 # // Reserved Tax Offset Classes
 @define is_offset(a)      ((a) ~ /^SPECIAL\.OFFSET[.:]/)
-# // @define is_franking(a)    ((a) ~ /^SPECIAL\.OFFSET\.FRANKING[.:]/)
-# // @define is_foreign(a)     ((a) ~ /^SPECIAL\.OFFSET\.FOREIGN[.:]/)
-# // @define is_no_carry(a)   ((a) ~ /^SPECIAL\.OFFSET\.NO_CARRY[.:]/)
-# // @define is_carry(a)      ((a) ~ /^SPECIAL\.OFFSET\.CARRY[.:]/)
-# // @define is_refund(a)     ((a) ~ /^SPECIAL\.OFFSET\.REFUNDABLE[.:]/)
 
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR|GAINS).LEAF => LEAF

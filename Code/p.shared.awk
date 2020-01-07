@@ -570,9 +570,13 @@ function parse_line(now,    i, j, x, number_accounts) {
     i ++
     j = 0
 
-    # Must ba number
-    assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
-    amount = strtonum($i)
+    # The amount - usually a number BUT can be BUY or SELL (which implies a market price)
+    if (BUY == $i || SELL == $i)
+      amount = $i
+    else {
+      assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
+      amount = strtonum($i)
+    }
   } else
     j = 1
 
@@ -619,12 +623,28 @@ function parse_line(now,    i, j, x, number_accounts) {
     if (x) { # x is not zero or ""
       # The zeroth case can be Units
       if (0 == j) {
-        if (above_zero(x) && is_purchase(Account[1], Account[2]))
+        if (above_zero(x) && is_purchase(Account[1], Account[2])) {
           # Interpret these as units
           Real_Value[j] = x
-        else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
+
+          # Can convert BUY to an amount
+          assert(SELL != amount, "<" $0 "> is an asset purchase not a sale")
+          if (BUY == amount) {
+            find_key(Price[Account[2]], now)
+            assert("" != found_key, "No price available for <" Leaf[Account[2]] "> at <" get_date(now) ">")
+            amount = x * find_entry(Price[Account[2]], now)
+          }
+        } else if (below_zero(x) && is_sale(now, Account[1], Account[2])) {
           Real_Value[j] = x
-        else # This is not Units so it is the next possible real value, index 1
+
+          # Can convert SELL to an amount
+          assert(BUY != amount, "<" $0 "> is an asset sale not a purchase")
+          if (SELL == amount) {
+            find_key(Price[Account[1]], now)
+            assert("" != found_key, "No price available for <" Leaf[Account[1]] "> at <" get_date(now) ">")
+            amount = -x * find_entry(Price[Account[1]], now)
+          }
+        } else # This is not Units so it is the next possible real value, index 1
           Real_Value[j = 1] = x
       } else
         Real_Value[j] = x
@@ -1565,7 +1585,7 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf("%s %14s", OFS, print_cash(get_cost(matched, now)))
+      string = string sprintf("%s %14s", OFS, print_cash(ternary(matched ~ /^ASSET.CURRENCY/, get_units(matched, now), get_cost(matched, now))))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)
@@ -1680,7 +1700,7 @@ function initialize_account(account_name,    class_name, array, p, n,
     Total_Units[account_name][Epoch]     = Qualified_Units[account_name][Epoch] = 0
 
     # Set the account currency
-    if (is_class(a, "ASSET.CAPITAL.CURRENCY"))
+    if (is_class(a, "ASSET.CURRENCY"))
       if (leaf_name != Journal_Currency)
         # A non-standard currency
         Account_Currency[account_name] = leaf_name
@@ -2324,7 +2344,7 @@ function read_date(date_string, hour,
     # The fields are YYYY MM DD
     # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
     # or             Mon DD YYYY
-    # or             DD MM YYYY if DD & YYYY are inconsistent with dates
+    # or             DD MM YYYY if DD & YYYY are consistent with dates
     # year-month-day, monthname/day/year, monthname-day-year
     if (month = get_month_number(date_fields[1])) {
       day   = date_fields[2] + 0
@@ -2332,6 +2352,19 @@ function read_date(date_string, hour,
     } else if (month = get_month_number(date_fields[2])) {
       year  = date_fields[1] + 0
       day   = date_fields[3] + 0
+
+      # Catch DD-Mon-YYYY
+      # Will not work unless YYYY >= 32
+      if (day > 31) {
+        if (year <= 31) {
+          day   = date_fields[1] + 0
+          year  = date_fields[3] + 0
+        } else {
+          Read_Date_Error = "Can't parse date <" date_string "> day number inconsistent with any month"
+          return DATE_ERROR
+        }
+      } # end of bad day number
+
     } else {
       day   = date_fields[3] + 0
       month = date_fields[2] + 0

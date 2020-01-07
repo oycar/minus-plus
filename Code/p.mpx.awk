@@ -184,10 +184,11 @@ BEGIN {
   Asset_Symbol = ""
 
   # Default import fields
-  Key_Field    = KEY_FIELD
-  Value_Field  = VALUE_FIELD
-  Key_is_Date     = KEY_IS_DATE
-  Value_is_Date   = VALUE_IS_DATE
+  Key_Field      = 1
+  Value_Field    = 2
+  Key_is_Date    = TRUE
+  Value_is_Date  = FALSE
+  Value_is_XRate = FALSE
   Import_Zero  = FALSE
   Import_Time  = HOUR
 
@@ -517,6 +518,10 @@ function import_data(array, symbol, name,
     value = trim($Value_Field)
     if (!Import_Zero && near_zero(value))
       return # Don't import zero values
+
+    # Exchange rates are reciprocal prices
+    if (Value_is_XRate)
+      value = 1.0 / value
   }
 
   # Logging

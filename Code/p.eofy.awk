@@ -1244,9 +1244,6 @@ function depreciate_all(now,      a, current_depreciation) {
 
       # Balance accounts
       adjust_cost(DEPRECIATION, current_depreciation, now)
-
-      # Print the transaction
-      # print_transaction(now, "# Automatic Depreciation", a, DEPRECIATION, current_depreciation, "(I)")
     }
 
   # Restore defaults

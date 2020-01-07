@@ -52,3 +52,7 @@
 @define QUALIFICATION_WINDOW (121)
 
 @endif # // JOURNAL_CURRENCY
+
+
+# // Get the account currency
+@define get_currency(a) ternary((a) in Account_Currency, (a), Journal_Currency)
