@@ -1698,12 +1698,6 @@ function initialize_account(account_name,    class_name, array, p, n,
 
     # Keep track of units
     Total_Units[account_name][Epoch]     = Qualified_Units[account_name][Epoch] = 0
-
-    # Set the account currency
-    if (is_class(a, "ASSET.CURRENCY"))
-      if (leaf_name != Journal_Currency)
-        # A non-standard currency
-        Account_Currency[account_name] = leaf_name
     # End of if Unitized
   } else if (is_class(account_name, "INCOME")) {
     # Set an Underlying_Asset if the leaf name

@@ -55,4 +55,4 @@
 
 
 # // Get the account currency
-@define get_currency(a) ternary((a) in Account_Currency, (a), Journal_Currency)
+# // @define get_currency(a) ternary((a) in Account_Currency, (a), Journal_Currency)
