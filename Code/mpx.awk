@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Logic conventions
 
 
@@ -99,6 +101,8 @@ END {
 
 
 # // Default Reports
+
+
 
 
 
@@ -920,11 +924,20 @@ function parse_line(now,    i, j, x, number_accounts) {
     i ++
 
     # The amount - usually in the default currency
-    # BUT may be prefixed by an ISO 4217 Currency Code
+    # BUT may be prefixed by an ISO 4217 Currency Code (Three Uppercase Characters.)
     amount = $i
     if ($i ~ /^[[:upper:]]{3}$/) {
       # Explicit currency given
-      Transaction_Currency = Long_Name[$i]
+      if (Enforce_Qualification) {
+        assert($i in Long_Name, "Currency Code <" $i "> not defined - provide exchange rates")
+        Transaction_Currency = Long_Name[$i]
+      } else if ($i in Long_Name)
+        Transaction_Currency = Long_Name[$i]
+      else {
+        printf "## Warning Ignoring Unknown Currency Code %s - treating as Journal Currency %s\n", $i, Journal_Currency > "/dev/stderr"
+        Transaction_Currency = Long_Name[Journal_Currency]
+      }
+
 
       # Is this a simple currency translation -
       j = i + 1
@@ -940,6 +953,7 @@ function parse_line(now,    i, j, x, number_accounts) {
         # Rebuild line - remove currency code and shuffle down fields
         for (j = i; j < NF; j ++)
           $j = $(j + 1)
+        NF --
       }
 
       # Get translation price
@@ -1024,7 +1038,7 @@ function parse_line(now,    i, j, x, number_accounts) {
 
       # Treat as a comment
       if (x)
-        Comments = (("" == Comments)?(  x):( (("" ==  x)?( Comments):( (Comments  ", "  x)))))
+        Comments = (("" == Comments)?(  x):( (("" ==  x)?( Comments):( (Comments  OFS  x)))))
     }
 
     # Increment i & j
@@ -1032,9 +1046,9 @@ function parse_line(now,    i, j, x, number_accounts) {
     j ++
   }
 
-  # Comments should be signified with an octothorpe
+  # Comments should be signified with an octothorp
   if (Comments !~ /^#/)
-    Comments = (("" == "# ")?(  Comments):( (("" ==  Comments)?( "# "):( ("# "  ", "  Comments)))))
+    Comments = (("" == "# ")?(  Comments):( (("" ==  Comments)?( "# "):( ("# "  OFS  Comments)))))
 
   # Documents can be added as comments
   # Some special document names are supported
@@ -1046,7 +1060,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     i = parse_document_name(x, now)
 
     # Add the parsed name to the comments
-    Comments = (("" == Comments)?(  i):( (("" ==  i)?( Comments):( (Comments  ", "  i)))))
+    Comments = (("" == Comments)?(  i):( (("" ==  i)?( Comments):( (Comments  OFS  i)))))
   }
 
   # All done - return record type
@@ -3361,7 +3375,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("CM" ~ /[cC]|[aA]/ && "CM" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3708,7 +3722,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("CM" ~ /[oO]|[aA]/ && "CM" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3848,7 +3862,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("CM" ~ /[bB]|[aA]/ && "CM" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3981,7 +3995,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("CM" ~ /[mM]|[aA]/ && "CM" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4050,7 +4064,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("CM" ~ /[dD]|[aA]/ && "CM" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4185,7 +4199,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("CM" ~ /[qQ]|[aA]/ && "CM" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4714,7 +4728,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("CM" ~ /[tT]|[aA]/ && "CM" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5517,7 +5531,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("CM" ~ /[iI]|[aA]/ && "CM" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -7381,14 +7395,6 @@ function get_held_time(now, from,     held_time) {
 function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
                                              last_parcel, p) {
 
-  printf "%s: %s units => %.3f amount => %11.2f\n", "buy_units", (Leaf[a]), u, x > "/dev/stderr"
-  printf "\tU => %.3f Cost => %.2f\n", ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0)), get_cost(a, now) > "/dev/stderr"
-  printf "\tTime => %s\n", get_date(now) > "/dev/stderr"
-  if (parcel_tag)
-    printf "\tParcel Name => %s\n", parcel_tag > "/dev/stderr"
-  if (parcel_timestamp >= Epoch)
-    printf "\tSet purchase date   => %s\n", get_date(parcel_timestamp) > "/dev/stderr"
-
 
   # Some units are bought
   assert(((((u) - ( Epsilon)) > 0) || (((u) - ( -Epsilon)) < 0)), sprintf("buy_units[%s] : can't buy zero units", $0))
@@ -7411,9 +7417,6 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 
   # Debugging
 
-  printf "\t%s\n\t\tUnits => %.3f Cost => %.2f\n", (Leaf[a]), ((a in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[a],   now))?( Total_Units[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[a][0]):( 0))))):( 0)), get_cost(a, now) > "/dev/stderr"
-  printf "\t\tParcel => %05d\n", last_parcel > "/dev/stderr"
-
 
   # Buy u units for x
   u = Units_Held[a][last_parcel]
@@ -7421,12 +7424,6 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
 
   # Passive revaluation
   p = x / u
-
-  printf "\tPrice       => %11.2f\n", p > "/dev/stderr"
-  printf "\tParcel      => %05d\n", last_parcel > "/dev/stderr"
-  printf "\tCost        => %11.2f\n", x > "/dev/stderr"
-  if ((( a in Parcel_Tag) && ( last_parcel in Parcel_Tag[ a])))
-    printf "\tParcel Name => %s\n", Parcel_Tag[a][last_parcel] > "/dev/stderr"
 
 
   # Set the new price - not when Translation_Rate is set or this is circular

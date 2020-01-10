@@ -573,11 +573,20 @@ function parse_line(now,    i, j, x, number_accounts) {
     i ++
 
     # The amount - usually in the default currency
-    # BUT may be prefixed by an ISO 4217 Currency Code
+    # BUT may be prefixed by an ISO 4217 Currency Code (Three Uppercase Characters.)
     amount = $i
     if ($i ~ /^[[:upper:]]{3}$/) {
       # Explicit currency given
-      Transaction_Currency = Long_Name[$i]
+      if (Enforce_Qualification) {
+        assert($i in Long_Name, "Currency Code <" $i "> not defined - provide exchange rates")
+        Transaction_Currency = Long_Name[$i]
+      } else if ($i in Long_Name)
+        Transaction_Currency = Long_Name[$i]
+      else {
+        printf "## Warning Ignoring Unknown Currency Code %s - treating as Journal Currency %s\n", $i, Journal_Currency > STDERR
+        Transaction_Currency = Long_Name[Journal_Currency]
+      }
+
 
       # Is this a simple currency translation -
       j = i + 1
@@ -593,6 +602,7 @@ function parse_line(now,    i, j, x, number_accounts) {
         # Rebuild line - remove currency code and shuffle down fields
         for (j = i; j < NF; j ++)
           $j = $(j + 1)
+        NF --
       }
 
       # Get translation price
@@ -677,7 +687,7 @@ function parse_line(now,    i, j, x, number_accounts) {
 
       # Treat as a comment
       if (x)
-        Comments = add_field(Comments, x, ", ")
+        Comments = add_field(Comments, x, OFS)
     }
 
     # Increment i & j
@@ -685,9 +695,9 @@ function parse_line(now,    i, j, x, number_accounts) {
     j ++
   }
 
-  # Comments should be signified with an octothorpe
+  # Comments should be signified with an octothorp
   if (Comments !~ /^#/)
-    Comments = add_field("# ", Comments, ", ")
+    Comments = add_field("# ", Comments, OFS)
 
   # Documents can be added as comments
   # Some special document names are supported
@@ -699,7 +709,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     i = parse_document_name(x, now)
 
     # Add the parsed name to the comments
-    Comments = add_field(Comments, i, ", ")
+    Comments = add_field(Comments, i, OFS)
   }
 
   # All done - return record type
