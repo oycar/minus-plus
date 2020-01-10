@@ -924,7 +924,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     amount = $i
     if ($i ~ /^[[:upper:]]{3}$/) {
       # Explicit currency given
-      Transaction_Currency = "ASSET.CURRENCY:" $i
+      Transaction_Currency = Long_Name[$i]
 
       # Is this a simple currency translation -
       j = i + 1
@@ -6328,6 +6328,11 @@ function read_state_record(first_line, last_line) {
   Gross_Up_Gains_Function   = "gross_up_gains_" tolower(Journal_Currency)
   Get_Taxable_Gains_Function   = "get_taxable_gains_" tolower(Journal_Currency)
 
+  # Set translation rate for journal currency
+  initialize_account("ASSET.CURRENCY:" Journal_Currency)
+  (Price[Long_Name[Journal_Currency]][ Epoch] = ( 1.0))
+
+
   # These functions are not dependent on currency
   Balance_Profits_Function     = "balance_journal"
   Check_Balance_Function       = "check_balance"
@@ -6752,7 +6757,7 @@ function parse_transaction(now, a, b, amount,
   if (((a) ~ ("^" ( "INCOME") "[.:]"))) {
     # Income accounts are caught to check for franking credits
     # Income must always be account a
-    tax_credits = Real_Value[(1)]
+    tax_credits = Translation_Rate * Real_Value[(1)]
     Real_Value[(1)] = 0
 
     # Get the underlying asset (if there is one)
@@ -6803,8 +6808,8 @@ function parse_transaction(now, a, b, amount,
     # Now LIC deduction if any
     if (((((Real_Value[(2)]) - ( Epsilon)) > 0) || (((Real_Value[(2)]) - ( -Epsilon)) < 0))) {
       # Record LIC Deduction to the listing
-      sum_entry(LIC_Deduction, - Real_Value[(2)], now)
-      fields[++ number_fields] = Real_Value[(2)]
+      sum_entry(LIC_Deduction, - Translation_Rate * Real_Value[(2)], now)
+      fields[++ number_fields] = Translation_Rate * Real_Value[(2)]
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present
@@ -6886,7 +6891,7 @@ function parse_transaction(now, a, b, amount,
     }
 
     # Get brokerage (if any)
-    current_brokerage = Real_Value[(1)]
+    current_brokerage = Translation_Rate * Real_Value[(1)]
     Real_Value[(1)] = 0
 
     # Amount should be the consideration as recorded by the broker
@@ -6985,7 +6990,7 @@ function parse_transaction(now, a, b, amount,
 
     # Allow for brokerage if required - note can't have brokerage with depreciation
     if (((((Real_Value[(1)]) - ( Epsilon)) > 0) || (((Real_Value[(1)]) - ( -Epsilon)) < 0))) {
-      current_brokerage = Real_Value[(1)]
+      current_brokerage = Translation_Rate * Real_Value[(1)]
       Real_Value[(1)] = 0
     }
 

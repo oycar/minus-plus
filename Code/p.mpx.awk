@@ -390,6 +390,11 @@ function read_state_record(first_line, last_line) {
   Gross_Up_Gains_Function   = "gross_up_gains_" tolower(Journal_Currency)
   Get_Taxable_Gains_Function   = "get_taxable_gains_" tolower(Journal_Currency)
 
+  # Set translation rate for journal currency
+  initialize_account("ASSET.CURRENCY:" Journal_Currency)
+  set_entry(Price[Long_Name[Journal_Currency]], 1.0, Epoch)
+
+
   # These functions are not dependent on currency
   Balance_Profits_Function     = "balance_journal"
   Check_Balance_Function       = "check_balance"
@@ -820,7 +825,7 @@ function parse_transaction(now, a, b, amount,
   if (is_class(a, "INCOME")) {
     # Income accounts are caught to check for franking credits
     # Income must always be account a
-    tax_credits = Real_Value[TAX_CREDITS_KEY]
+    tax_credits = Translation_Rate * Real_Value[TAX_CREDITS_KEY]
     Real_Value[TAX_CREDITS_KEY] = 0
 
     # Get the underlying asset (if there is one)
@@ -871,8 +876,8 @@ function parse_transaction(now, a, b, amount,
     # Now LIC deduction if any
     if (not_zero(Real_Value[LIC_DEDUCTION_KEY])) {
       # Record LIC Deduction to the listing
-      sum_entry(LIC_Deduction, - Real_Value[LIC_DEDUCTION_KEY], now)
-      fields[++ number_fields] = Real_Value[LIC_DEDUCTION_KEY]
+      sum_entry(LIC_Deduction, - Translation_Rate * Real_Value[LIC_DEDUCTION_KEY], now)
+      fields[++ number_fields] = Translation_Rate * Real_Value[LIC_DEDUCTION_KEY]
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present
@@ -954,7 +959,7 @@ function parse_transaction(now, a, b, amount,
     }
 
     # Get brokerage (if any)
-    current_brokerage = Real_Value[BROKERAGE_KEY]
+    current_brokerage = Translation_Rate * Real_Value[BROKERAGE_KEY]
     Real_Value[BROKERAGE_KEY] = 0
 
     # Amount should be the consideration as recorded by the broker
@@ -1053,7 +1058,7 @@ function parse_transaction(now, a, b, amount,
 
     # Allow for brokerage if required - note can't have brokerage with depreciation
     if (not_zero(Real_Value[BROKERAGE_KEY])) {
-      current_brokerage = Real_Value[BROKERAGE_KEY]
+      current_brokerage = Translation_Rate * Real_Value[BROKERAGE_KEY]
       Real_Value[BROKERAGE_KEY] = 0
     }
 

@@ -577,7 +577,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     amount = $i
     if ($i ~ /^[[:upper:]]{3}$/) {
       # Explicit currency given
-      Transaction_Currency = "ASSET.CURRENCY:" $i
+      Transaction_Currency = Long_Name[$i]
 
       # Is this a simple currency translation -
       j = i + 1
