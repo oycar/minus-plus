@@ -926,10 +926,21 @@ function parse_line(now,    i, j, x, number_accounts) {
       # Explicit currency given
       Transaction_Currency = "ASSET.CURRENCY:" $i
 
-      # Rebuild line
-      for (j = i; j < NF; j ++)
-        $j = $(j + 1)
-      NF --
+      # Is this a simple currency translation -
+      j = i + 1
+      assert($j ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax: cash amount <" $j "> is not a number")
+
+      # that is a purchase or a sale
+      if ((Account[2] == Transaction_Currency) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || (( Account[2]) ~ /\.CURRENCY:/)) || ((Account[1]) ~ /^EQUITY[.:]/)))
+        $i = strtonum($j) # A purchase
+      else if ((Account[1] == Transaction_Currency) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || (( Account[1]) ~ /\.CURRENCY:/)) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now)))) {
+        $i = strtonum($j) # A sale
+        $j = - $i
+      } else { # Other cases
+        # Rebuild line - remove currency code and shuffle down fields
+        for (j = i; j < NF; j ++)
+          $j = $(j + 1)
+      }
 
       # Get translation price
       if (Transaction_Currency in Price)
@@ -946,7 +957,6 @@ function parse_line(now,    i, j, x, number_accounts) {
     }
 
     # Check that this is a number
-    assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax: cash amount <" $i "> is not a number")
     amount = strtonum($i)
 
     # Zero j
