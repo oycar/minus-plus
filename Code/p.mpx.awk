@@ -757,6 +757,7 @@ function parse_transaction(now, a, b, amount,
                            bought_parcel,
                            current_brokerage, gst,
                            correct_order, tax_credits,
+                           other_currency,
                            fields, number_fields) {
 
   # No swop
@@ -767,6 +768,10 @@ function parse_transaction(now, a, b, amount,
 
   # a list of output fields is needed
   make_array(fields)
+
+  # Just process the amount at this point - later consider other values (especially brokerage!)
+  if (Transaction_Currency)
+    amount *= Translation_Rate
 
   # Special franking provisions
   if (a == TAX) {
@@ -1518,8 +1523,9 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
     printf "\tParcel Name => %s\n", Parcel_Tag[a][last_parcel] > STDERR
 @endif # LOG
 
-  # Set the new price
-  set_entry(Price[a], p, now)
+  # Set the new price - not when Translation_Rate is set or this is circular
+  if (!Translation_Currency)
+    set_entry(Price[a], p, now)
 
   # Return the parcel id
   return last_parcel
@@ -1639,8 +1645,9 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     # Both x & u are positive by design
     new_price = x / u
 
-    # Can set the price of a normal asset
-    set_entry(Price[ac], new_price, now)
+    # Can set the price of a normal asset - not when Transaction_Currency is set
+    if (Transaction_Currency)
+      set_entry(Price[ac], new_price, now)
   }
 
   # Default assumption is first-in-first-out (FIFO)
@@ -1887,8 +1894,10 @@ function copy_parcel(a, p, b, q,     e, key) {
   Held_From[b][q] = Held_From[a][p]
   Held_Until[b][q] = Held_Until[a][p]
   Parcel_Proceeds[b][q] = Parcel_Proceeds[a][p]
-  if (keys_in(Parcel_Tag, ac, p))
+  if (keys_in(Parcel_Tag, a, p)) {
     Parcel_Tag[b][q] = Parcel_Tag[a][p]
+    delete Parcel_Tag[a][p]
+  }
 
   # Copy all entries
   # Note keys will not match so need to delete old entries from parcel q

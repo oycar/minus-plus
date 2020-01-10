@@ -511,6 +511,8 @@ function new_line(  key) {
   Comments = ""
 
   Account[1] = Account[2] = ""
+  Transaction_Currency = FALSE
+  Translation_Rate = 1
 }
 
 # Accounting format printing
@@ -530,6 +532,7 @@ function print_cash(x,   precision) {
 # Journal styles (date format is somewhat flexible)
 #      2017 Aug 24, AMH.DIV, AMH.ASX, 2703.96, 3072, [1025.64,] [1655.49], # DRP & LIC
 function parse_line(now,    i, j, x, number_accounts) {
+
   #
   # The record may be
   #     Double Entry => two accounts
@@ -565,18 +568,42 @@ function parse_line(now,    i, j, x, number_accounts) {
 
   #
   # The amount
-  # Must exist if number accounts > 0
-  if (number_accounts) {
+  # Must exist if number accounts == 2
+  if (2 == number_accounts) {
     i ++
-    j = 0
 
-    # The amount - usually a number BUT can be BUY or SELL (which implies a market price)
-    if (BUY == $i || SELL == $i)
-      amount = $i
-    else {
-      assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
-      amount = strtonum($i)
+    # The amount - usually in the default currency
+    # BUT may be prefixed by an ISO 4217 Currency Code
+    amount = $i
+    if ($i ~ /^[[:upper:]]{3}$/) {
+      # Explicit currency given
+      Transaction_Currency = "ASSET.CURRENCY:" $i
+
+      # Rebuild line
+      for (j = i; j < NF; j ++)
+        $j = $(j + 1)
+      NF --
+
+      # Get translation price
+      if (Transaction_Currency in Price)
+        Translation_Rate = find_entry(Price[Transaction_Currency], now)
+      else
+        Translation_Rate = ""
+
+      # Did we get a price?
+      assert("" != Translation_Rate, "No exchange rate available for <" Transaction_Currency "> at <" get_date(now) ">")
+    } else {
+      # Use default currency
+      Transaction_Currency = FALSE
+      Translation_Rate = 1
     }
+
+    # Check that this is a number
+    assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax: cash amount <" $i "> is not a number")
+    amount = strtonum($i)
+
+    # Zero j
+    j = 0
   } else
     j = 1
 
@@ -622,28 +649,13 @@ function parse_line(now,    i, j, x, number_accounts) {
     # Shared code - save x if set
     if (x) { # x is not zero or ""
       # The zeroth case can be Units
+      # If there is a non default transaction currency
       if (0 == j) {
         if (above_zero(x) && is_purchase(Account[1], Account[2])) {
           # Interpret these as units
-          Real_Value[j] = x
-
-          # Can convert BUY to an amount
-          assert(SELL != amount, "<" $0 "> is an asset purchase not a sale")
-          if (BUY == amount) {
-            find_key(Price[Account[2]], now)
-            assert("" != found_key, "No price available for <" Leaf[Account[2]] "> at <" get_date(now) ">")
-            amount = x * find_entry(Price[Account[2]], now)
-          }
+          Real_Value[UNITS_KEY] = x
         } else if (below_zero(x) && is_sale(now, Account[1], Account[2])) {
-          Real_Value[j] = x
-
-          # Can convert SELL to an amount
-          assert(BUY != amount, "<" $0 "> is an asset sale not a purchase")
-          if (SELL == amount) {
-            find_key(Price[Account[1]], now)
-            assert("" != found_key, "No price available for <" Leaf[Account[1]] "> at <" get_date(now) ">")
-            amount = -x * find_entry(Price[Account[1]], now)
-          }
+          Real_Value[UNITS_KEY] = x
         } else # This is not Units so it is the next possible real value, index 1
           Real_Value[j = 1] = x
       } else
@@ -1585,7 +1597,7 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf("%s %14s", OFS, print_cash(ternary(matched ~ /^ASSET.CURRENCY/, get_units(matched, now), get_cost(matched, now))))
+      string = string sprintf("%s %14s", OFS, print_cash(ternary(is_currency(matched), get_units(matched, now), get_cost(matched, now))))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)

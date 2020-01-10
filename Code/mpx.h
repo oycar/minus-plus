@@ -53,11 +53,11 @@
 @define TIME_FIELDS ("")
 
 # // Constants for Real_Value keys
-@define UNITS_KEY (0)
-@define BROKERAGE_KEY (1)
-@define LIFETIME_KEY (1)
+@define UNITS_KEY         (0)
+@define BROKERAGE_KEY     (1)
+@define LIFETIME_KEY      (1)
 @define MATURITY_DATE_KEY (1)
-@define TAX_CREDITS_KEY (1)
+@define TAX_CREDITS_KEY   (1)
 @define LIC_DEDUCTION_KEY (2)
 
 # // Default Cost Element
@@ -134,18 +134,19 @@
 @define trim(s) (s)
 #
 # // Useful shorthands for various kinds of accounts
-@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|CURRENCY|FIXED)[.:]/)
+@define is_currency(a)  ((a) ~ /\.CURRENCY:/)
+@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || is_currency(a))
 @define is_equity(a) ((a) ~ /^EQUITY[.:]/)
 @define is_liability(a) ((a) ~ /^LIABILITY[.:]/)
 @define is_cash(a) ((a) ~ /^ASSET\.CURRENT[.:]/)
-@define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|CURRENCY|FIXED)|EQUITY)[.:]/)
+@define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/ || is_currency(a))
 
 # // Fixed asset
 @define is_fixed(a) ((a) ~ /^ASSET\.FIXED[.:]/)
 @define is_tax(a)  ((a) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)
 @define is_term(a) ((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)
 @define is_current(a) ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/)
-@define is_capital(a) ((a) ~ /^ASSET\.(CAPITAL|CURRENCY)[.:]/)
+@define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/ || is_currency(a))
 #
 #
 # // Contribution
