@@ -46,8 +46,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Logic conventions
 
 
@@ -88,6 +86,9 @@ END {
 
 
 
+
+
+
 # // Default Cost Element
 
 
@@ -101,8 +102,6 @@ END {
 
 
 # // Default Reports
-
-
 
 
 
@@ -849,7 +848,7 @@ function ctrim(s, left_c, right_c,      string) {
 # Clear global values ready to read a new input record
 function new_line(  key) {
   # Clear real values
-  for (key = 0; key < 3; key ++)
+  for (key in Real_Value)
     Real_Value[key] = 0
 
   Extra_Timestamp = (-1)
@@ -943,12 +942,12 @@ function parse_line(now,    i, j, x, number_accounts) {
       j = i + 1
       assert($j ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax: cash amount <" $j "> is not a number")
 
-      # that is a purchase or a sale
+      # is this a purchase or a sale of currency units?
       if ((Account[2] == Transaction_Currency) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || (( Account[2]) ~ /\.CURRENCY:/)) || ((Account[1]) ~ /^EQUITY[.:]/)))
-        $i = strtonum($j) # A purchase
+        Real_Value[(-1)] = $i = strtonum($j) # A purchase (of forex)
       else if ((Account[1] == Transaction_Currency) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || (( Account[1]) ~ /\.CURRENCY:/)) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now)))) {
         $i = strtonum($j) # A sale
-        $j = - $i
+        Real_Value[(-2)] = $j = - $i # A sale (of forex)
       } else { # Other cases
         # Rebuild line - remove currency code and shuffle down fields
         for (j = i; j < NF; j ++)
@@ -974,7 +973,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     amount = strtonum($i)
 
     # Zero j
-    j = 0
+    j = ((Real_Value[(-1)] || Real_Value[(-2)])?( -1):( 0))
   } else
     j = 1
 
@@ -1021,7 +1020,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     if (x) { # x is not zero or ""
       # The zeroth case can be Units
       # If there is a non default transaction currency
-      if (0 == j) {
+      if (0 >= j) {
         if ((((x) - ( Epsilon)) > 0) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || (( Account[2]) ~ /\.CURRENCY:/)) || ((Account[1]) ~ /^EQUITY[.:]/))) {
           # Interpret these as units
           Real_Value[(0)] = x
@@ -3375,7 +3374,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("C" ~ /[cC]|[aA]/ && "C" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3722,7 +3721,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("C" ~ /[oO]|[aA]/ && "C" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3862,7 +3861,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("C" ~ /[bB]|[aA]/ && "C" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3995,7 +3994,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("C" ~ /[mM]|[aA]/ && "C" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4064,7 +4063,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("C" ~ /[dD]|[aA]/ && "C" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4199,7 +4198,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("C" ~ /[qQ]|[aA]/ && "C" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4728,7 +4727,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("C" ~ /[tT]|[aA]/ && "C" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5531,7 +5530,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("C" ~ /[iI]|[aA]/ && "C" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6948,7 +6947,21 @@ function parse_transaction(now, a, b, amount,
     sell_units(now, a, -units, amount + g, Parcel_Name, Extra_Timestamp)
 
     # And simply adjust settlement account b by the
-    adjust_cost(b, amount, now)
+    if (Real_Value[(-1)] > 0) {
+      # This is a forex account - extra arguments fo not apply to complementary account
+      buy_units(now, b, Real_Value[(-1)], amount)
+
+      # Update parent entries for <b>
+      update_cost(b, amount, now)
+      Real_Value[(-1)] = 0
+    } else # Normal account
+      adjust_cost(b, amount, now)
+
+    # Buy units in asset (b) - this ignores impact of brokerage
+    bought_parcel = buy_units(now, b, units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
+
+    # Adjust the cost of this **parcel** for the impact of brokerage and GST
+    adjust_parcel_cost(b, bought_parcel, now, current_brokerage - g,  II, (0))
 
     # Did we swop? If so swop back
     if (b == swop) {
@@ -7008,8 +7021,13 @@ function parse_transaction(now, a, b, amount,
       Real_Value[(1)] = 0
     }
 
-    # Simply adjust cost of <a> by the whole amount
-    adjust_cost(a, -amount, now)
+    # And simply adjust settlement account a by the
+    if ((((Real_Value[(-2)]) - ( -Epsilon)) < 0)) {
+      # This is a forex account - extra arguments fo not apply to complementary account
+      sell_units(now, a, - Real_Value[(-2)], amount)
+      Real_Value[(-2)] = 0
+    } else # Simply adjust cost of <a> by the whole amount
+      adjust_cost(a, -amount, now)
 
     # Impact of GST
     if (((((GST_Claimable) - ( Epsilon)) > 0) || (((GST_Claimable) - ( -Epsilon)) < 0))) {
@@ -7476,6 +7494,17 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
 #  Sale receipts go to cash_out and happen at Held_Until
 #  At this point only the adjusted cost is made use of
 function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost, catch_up_depreciation, t) {
+  # Set a default parcel_timestamp
+  parcel_timestamp = (("" == parcel_timestamp)?( (-1)):( parcel_timestamp))
+
+
+  printf "%s: %s units => %.3f amount => %11.2f\n", "sell_units", (Leaf[ac]), u, x > "/dev/stderr"
+  if ("" != parcel_tag)
+    printf "\tSpecified parcel   => %s\n", parcel_tag > "/dev/stderr"
+  if (parcel_timestamp >= Epoch)
+    printf "\tParcel bought at   => %s\n", get_date(parcel_timestamp) > "/dev/stderr"
+  printf "\tInitial Units      => %.3f\n", ((ac in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[ac],   now))?( Total_Units[ac][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[ac][0]):( 0))))):( 0)) > "/dev/stderr"
+  printf "\tInitial Total Cost => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 
 
   # Try adjusting units now...
@@ -7489,6 +7518,9 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     # Is this asset's depreciation upto date?
     # Depreciate
 
+    printf "\tDate => %s\n",  get_date(now, LONG_FORMAT)> "/dev/stderr"
+    printf "\tEOFY => %s\n",  get_date(FY_Time, LONG_FORMAT)> "/dev/stderr"
+
     if (now > FY_Time) {
       t = ((FY_Time) - 1)
       catch_up_depreciation = depreciate_now(ac, t)
@@ -7500,6 +7532,10 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
 
         # Print the transaction
         print_transaction(t, "# Closing Depreciation", ac, DEPRECIATION, catch_up_depreciation, "(D)")
+
+        printf "\tCatch-Up Depreciation => %s\n", print_cash(catch_up_depreciation) > "/dev/stderr"
+        printf "\tApplied At Time => %s\n", get_date(t, LONG_FORMAT) > "/dev/stderr"
+        printf "\tModified Total Cost => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 
       }
     }
@@ -7569,10 +7605,33 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
         new_price = get_parcel_cost(ac, p, now) * proportional_cost
 
 
+      # Identify which parcel matches
+      printf "\tprice => %11.2f\n", new_price > "/dev/stderr"
+
+      printf "\tSell from parcel => %05d\n", p > "/dev/stderr"
+      if (parcel_tag)
+        printf "\t\tParcel Tag       => %s\n", Parcel_Tag[ac][p] > "/dev/stderr"
+      if (parcel_timestamp > Epoch)
+        printf "\t\tParcel TimeStamp => %s\n", get_date(Held_From[ac][p]) > "/dev/stderr"
+
 
       # Sell the parcel
       did_split = sell_parcel(ac, p, du, du * new_price, now)
 
+
+      if (did_split) {
+        # Parcel was split
+        if (0 == u) {
+          # Was this the last sold parcel
+          if (p + 1 < Number_Parcels[ac])
+            # Was a parcel kept
+            printf "\tkept parcel => %05d on  => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n",
+              p + 1, Units_Held[ac][p + 1], get_date(now),
+              get_date(Held_From[ac][p + 1]), get_date(Held_Until[ac][p + 1]),
+              print_cash(get_cost_modifications(ac, p + 1, now)),
+              print_cash(get_parcel_cost(ac, p + 1, now)) > "/dev/stderr"
+        } # Was this the last parcel sold
+      } # Was a parcel split
 
     } # End of match parcel
 
@@ -7580,6 +7639,9 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     p ++
   } # End of while statement
 
+
+  printf "\tFinal Units => %.3f\n", ((ac in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[ac],   now))?( Total_Units[ac][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[ac][0]):( 0))))):( 0)) > "/dev/stderr"
+  printf "\tFinal Total Cost     => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 
 
   # Were all the requested units actually sold?
@@ -7606,12 +7668,17 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
 
   # Amount paid
 
+  printf "\tAmount Paid => %s\n", print_cash(amount_paid) > "/dev/stderr"
+
 
   # Check for an empty parcel - allow for rounding error
   if (((((Units_Held[a][p] - du) - ( Epsilon)) <= 0) && (((Units_Held[a][p] - du) - ( -Epsilon)) >= 0)))
     # Parcel is sold off
     Units_Held[a][p] = du
   else { # Units remain - parcel not completely sold off
+
+    printf "\tsplit parcel %3d on => %10.3f off => %10.3f\n\t\tadjustment => %s\n\t\tparcel cost => %s\n",
+          p, Units_Held[a][p], du, print_cash(get_cost_modifications(a, p, now)), print_cash(get_parcel_cost(a, p, now)) > "/dev/stderr"
 
 
     # Shuffle parcels up by one
@@ -7643,6 +7710,13 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   (Parcel_Proceeds[a][ p] = ( -amount_paid))
 
 
+  printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n",
+    p, du,  get_date(now),
+    get_date(Held_From[a][p]), get_date(Held_Until[a][p]),
+    print_cash(get_cost_modifications(a, p, now)),
+    print_cash(get_parcel_cost(a, p, now)),
+    print_cash((Parcel_Proceeds[a][ p])) > "/dev/stderr"
+
 
   # Was a parcel split
   return is_split
@@ -7661,6 +7735,13 @@ function sell_fixed_parcel(a, p, now, gains,    cost) {
   # Appreciation             c + p >  0
 
   gains += sum_cost_elements(Accounting_Cost[a][p], now)
+
+  if ((((gains) - ( Epsilon)) > 0)) # This was a DEPRECIATION expense
+    printf "\tDepreciation => %s\n", print_cash(gains) > "/dev/stderr"
+  else if ((((gains) - ( -Epsilon)) < 0)) # This was an APPRECIATION income
+    printf "\tAppreciation => %s\n", print_cash(-gains) > "/dev/stderr"
+  else
+    printf "\tZero Depreciation\n" > "/dev/stderr"
 
 
   # Any excess income or expenses are recorded

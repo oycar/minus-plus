@@ -1002,7 +1002,21 @@ function parse_transaction(now, a, b, amount,
     sell_units(now, a, -units, amount + g, Parcel_Name, Extra_Timestamp)
 
     # And simply adjust settlement account b by the
-    adjust_cost(b, amount, now)
+    if (Real_Value[BUY_FOREX_KEY] > 0) {
+      # This is a forex account - extra arguments fo not apply to complementary account
+      buy_units(now, b, Real_Value[BUY_FOREX_KEY], amount)
+
+      # Update parent entries for <b>
+      update_cost(b, amount, now)
+      Real_Value[BUY_FOREX_KEY] = 0
+    } else # Normal account
+      adjust_cost(b, amount, now)
+
+    # Buy units in asset (b) - this ignores impact of brokerage
+    bought_parcel = buy_units(now, b, units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
+
+    # Adjust the cost of this **parcel** for the impact of brokerage and GST
+    adjust_parcel_cost(b, bought_parcel, now, current_brokerage - g,  II, FALSE)
 
     # Did we swop? If so swop back
     if (b == swop) {
@@ -1062,8 +1076,13 @@ function parse_transaction(now, a, b, amount,
       Real_Value[BROKERAGE_KEY] = 0
     }
 
-    # Simply adjust cost of <a> by the whole amount
-    adjust_cost(a, -amount, now)
+    # And simply adjust settlement account a by the
+    if (below_zero(Real_Value[SELL_FOREX_KEY])) {
+      # This is a forex account - extra arguments fo not apply to complementary account
+      sell_units(now, a, - Real_Value[SELL_FOREX_KEY], amount)
+      Real_Value[SELL_FOREX_KEY] = 0
+    } else # Simply adjust cost of <a> by the whole amount
+      adjust_cost(a, -amount, now)
 
     # Impact of GST
     if (not_zero(GST_Claimable)) {
@@ -1578,6 +1597,9 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
 #  Sale receipts go to cash_out and happen at Held_Until
 #  At this point only the adjusted cost is made use of
 function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost, catch_up_depreciation, t) {
+  # Set a default parcel_timestamp
+  parcel_timestamp = ternary("" == parcel_timestamp, DATE_ERROR, parcel_timestamp)
+
 @ifeq LOG sell_units
   printf "%s: %s units => %.3f amount => %11.2f\n", "sell_units", get_short_name(ac), u, x > STDERR
   if ("" != parcel_tag)

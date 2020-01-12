@@ -498,7 +498,7 @@ function ctrim(s, left_c, right_c,      string) {
 # Clear global values ready to read a new input record
 function new_line(  key) {
   # Clear real values
-  for (key = 0; key < 3; key ++)
+  for (key in Real_Value)
     Real_Value[key] = 0
 
   Extra_Timestamp = DATE_ERROR
@@ -592,12 +592,12 @@ function parse_line(now,    i, j, x, number_accounts) {
       j = i + 1
       assert($j ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax: cash amount <" $j "> is not a number")
 
-      # that is a purchase or a sale
+      # is this a purchase or a sale of currency units?
       if ((Account[2] == Transaction_Currency) && is_purchase(Account[1], Account[2]))
-        $i = strtonum($j) # A purchase
+        Real_Value[BUY_FOREX_KEY] = $i = strtonum($j) # A purchase (of forex)
       else if ((Account[1] == Transaction_Currency) && is_sale(now, Account[1], Account[2])) {
         $i = strtonum($j) # A sale
-        $j = - $i
+        Real_Value[SELL_FOREX_KEY] = $j = - $i # A sale (of forex)
       } else { # Other cases
         # Rebuild line - remove currency code and shuffle down fields
         for (j = i; j < NF; j ++)
@@ -623,7 +623,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     amount = strtonum($i)
 
     # Zero j
-    j = 0
+    j = ternary(Real_Value[BUY_FOREX_KEY] || Real_Value[SELL_FOREX_KEY], -1, 0)
   } else
     j = 1
 
@@ -670,7 +670,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     if (x) { # x is not zero or ""
       # The zeroth case can be Units
       # If there is a non default transaction currency
-      if (0 == j) {
+      if (0 >= j) {
         if (above_zero(x) && is_purchase(Account[1], Account[2])) {
           # Interpret these as units
           Real_Value[UNITS_KEY] = x

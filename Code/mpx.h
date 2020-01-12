@@ -53,6 +53,9 @@
 @define TIME_FIELDS ("")
 
 # // Constants for Real_Value keys
+@define SELL_FOREX_KEY    (-2)
+@define BUY_FOREX_KEY     (-1)
+
 @define UNITS_KEY         (0)
 @define BROKERAGE_KEY     (1)
 @define LIFETIME_KEY      (1)
