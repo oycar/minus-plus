@@ -86,7 +86,8 @@ function read_csv_records(use_csv) {
   if (use_csv)
     FPAT = "([^,]*)|(\"[^\"]+\")"
   else
-    FPAT = "([^[:space:]]+)|(\"[^\"]+\")|([[](.)*])|(#(.)*)"
+    FPAT = "([^[:space:]]+)|(\"[^\"]+\")|(\\[[^]]+\\])|(#(.)*)"
+
 }
 
 # Abstract read value out

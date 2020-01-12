@@ -203,7 +203,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
               # Print the gains report
               if (no_header_printed) {
                 print Journal_Title > reports_stream
-                printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
+                printf "%s Report for Period Ending %s\n", gains_type, get_date(yesterday(now))  > reports_stream                
               }
 
               # Two types of header

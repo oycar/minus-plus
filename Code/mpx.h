@@ -137,19 +137,24 @@
 @define trim(s) (s)
 #
 # // Useful shorthands for various kinds of accounts
-@define is_currency(a)  ((a) ~ /\.CURRENCY:/)
-@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || is_currency(a))
+# // @define is_currency(a)  ((a) ~ /\.CURRENCY:/)
+# // @define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || is_currency(a))
+# // @define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/ || is_currency(a))
+# // @define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/ || is_currency(a))
+
+@define is_currency(a) ((a) ~ /^ASSET.CURRENCY:/)
+@define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|CURRENCY|FIXED)|EQUITY)[.:]/)
+@define is_capital(a) ((a) ~ /^ASSET\.(CAPITAL|CURRENCY)[.:]/)
+@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|CURRENCY|FIXED)[.:]/)
 @define is_equity(a) ((a) ~ /^EQUITY[.:]/)
 @define is_liability(a) ((a) ~ /^LIABILITY[.:]/)
 @define is_cash(a) ((a) ~ /^ASSET\.CURRENT[.:]/)
-@define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/ || is_currency(a))
 
 # // Fixed asset
 @define is_fixed(a) ((a) ~ /^ASSET\.FIXED[.:]/)
 @define is_tax(a)  ((a) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)
 @define is_term(a) ((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)
 @define is_current(a) ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/)
-@define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/ || is_currency(a))
 #
 #
 # // Contribution
