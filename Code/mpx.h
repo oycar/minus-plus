@@ -142,10 +142,11 @@
 # // @define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/ || is_currency(a))
 # // @define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/ || is_currency(a))
 
-@define is_currency(a) ((a) ~ /^ASSET.CURRENCY:/)
-@define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|CURRENCY|FIXED)|EQUITY)[.:]/)
-@define is_capital(a) ((a) ~ /^ASSET\.(CAPITAL|CURRENCY)[.:]/)
-@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|CURRENCY|FIXED)[.:]/)
+
+@define is_currency(a) ((a) ~ /^ASSET\.CURRENT\.CURRENCY[.:]/)
+@define is_unitized(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/)
+@define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/)
+@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/)
 @define is_equity(a) ((a) ~ /^EQUITY[.:]/)
 @define is_liability(a) ((a) ~ /^LIABILITY[.:]/)
 @define is_cash(a) ((a) ~ /^ASSET\.CURRENT[.:]/)

@@ -87,7 +87,6 @@ function read_csv_records(use_csv) {
     FPAT = "([^,]*)|(\"[^\"]+\")"
   else
     FPAT = "([^[:space:]]+)|(\"[^\"]+\")|(\\[[^]]+\\])|(#(.)*)"
-
 }
 
 # Abstract read value out
@@ -594,9 +593,9 @@ function parse_line(now,    i, j, x, number_accounts) {
       assert($j ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax: cash amount <" $j "> is not a number")
 
       # is this a purchase or a sale of currency units?
-      if ((Account[2] == Transaction_Currency) && is_purchase(Account[1], Account[2]))
+      if (Account[2] == Transaction_Currency)
         Real_Value[BUY_FOREX_KEY] = $i = strtonum($j) # A purchase (of forex)
-      else if ((Account[1] == Transaction_Currency) && is_sale(now, Account[1], Account[2])) {
+      else if ((Account[1] == Transaction_Currency) && is_open(Account[1], now)) {
         $i = strtonum($j) # A sale
         Real_Value[SELL_FOREX_KEY] = $j = - $i # A sale (of forex)
       } else { # Other cases

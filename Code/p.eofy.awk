@@ -203,7 +203,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
               # Print the gains report
               if (no_header_printed) {
                 print Journal_Title > reports_stream
-                printf "%s Report for Period Ending %s\n", gains_type, get_date(yesterday(now))  > reports_stream                
+                printf "%s Report for Period Ending %s\n", gains_type, get_date(yesterday(now))  > reports_stream
               }
 
               # Two types of header
@@ -232,7 +232,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
             # Number of units
             units = Units_Held[a][p]
-            units_sold += units
 
             # Parcel sale times are tricky
             if (is_sold(a, p, now) && is_unsold(a, p, past))
@@ -244,7 +243,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
             # The held time (will be wrong when key is FALSE)
             held_time = get_held_time(key, Held_From[a][p])
-
 
             # Total gains (accounting gains)
             if (is_sold(a, p, now)) {
@@ -258,9 +256,11 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             parcel_cost     =   get_cash_in(a, p, now)
             cost           += parcel_cost
             if (key) {
-              proceeds       += parcel_proceeds
+              # Sold parcels
+              proceeds      += parcel_proceeds
               reduced_cost  += get_parcel_cost(a, p, now)
               adjusted_cost += get_parcel_cost(a, p, now, TRUE)
+              units_sold    += units
             }
 
             # Keep track of accounting gains

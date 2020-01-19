@@ -391,7 +391,7 @@ function read_state_record(first_line, last_line) {
   Get_Taxable_Gains_Function   = "get_taxable_gains_" tolower(Journal_Currency)
 
   # Set translation rate for journal currency
-  initialize_account("ASSET.CURRENCY:" Journal_Currency)
+  initialize_account("ASSET.CURRENT.CURRENCY:" Journal_Currency)
   set_entry(Price[Long_Name[Journal_Currency]], 1.0, Epoch)
 
 
