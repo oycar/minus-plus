@@ -628,18 +628,32 @@ function income_tax_aud(now, past, benefits,
 
     if (Show_Extra)
       printf "%48s %32s>\n\n", "<Tax Owed After Using Carried Tax Losses", print_cash(tax_owed) > write_stream
+  } else {
+    # No tax is owed
+    # Was this caused by refundable offsets?
+    if (!above_zero(tax_owed + refundable_offsets)) {
+      # No - there are increased tax losses
+      # This is a bit tricky
+      # (unused) franking offsets may still be present here
+      # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
+      x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
+    } else
+      # Yes so zero new losses
+      x = 0
+  }
 
-    # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
-  } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
-    # This is a bit tricky
-    # (unused) franking offsets may still be present here
-    # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-    x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
-  } else if (below_zero(tax_owed)) { # Losses recorded this FY
-    x = - get_taxable_income(now, Tax_Bands, tax_owed)
-    tax_owed = 0
-  } else # Zero losses
-    x = 0
+
+  #   # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
+  # } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
+  #   # This is a bit tricky
+  #   # (unused) franking offsets may still be present here
+  #   # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
+  #   x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
+  # } else if (below_zero(tax_owed)) { # Losses recorded this FY
+  #   x = - get_taxable_income(now, Tax_Bands, tax_owed)
+  #   tax_owed = 0
+  # } else # Zero losses
+  #   x = 0
 
   # Now we can update the carried tax losses at last
   tax_losses = get_carried_losses(now, Tax_Losses, x, CARRY_FORWARD_TAX_LIMIT, write_stream)
