@@ -28,7 +28,7 @@
 
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
- Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time\
+ Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time\
  Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window\
  Start_Record ALLOCATED\
  Dividend_Qualification_Function Get_Taxable_Gains_Function\
@@ -36,6 +36,7 @@
  Income_Tax_Function Initialize_Tax_Function "
 
 # // Some constants
+# // @define CLEAR_ARRAY ("CLEAR_ARRAY")
 @define DITTO ("^")
 @define NUMBER_MONTHS (12)
 @define HOUR (12)
@@ -45,19 +46,21 @@
 @define PRECISION (2)
 @define MAX_PRECISION (6)
 @define CLASS_INDEX (1)
+@define BUY ("BUY")
+@define SELL ("SELL")
 
-# // Default Import Values
-@define KEY_FIELD  (1)
-@define VALUE_FIELD (2)
-@define KEY_IS_DATE @eval (TRUE)
-@define VALUE_IS_DATE @eval (FALSE)
+# // Default State Record - no time fields
+@define TIME_FIELDS ("")
 
 # // Constants for Real_Value keys
-@define UNITS_KEY (0)
-@define BROKERAGE_KEY (1)
-@define LIFETIME_KEY (1)
+@define SELL_FOREX_KEY    (-2)
+@define BUY_FOREX_KEY     (-1)
+
+@define UNITS_KEY         (0)
+@define BROKERAGE_KEY     (1)
+@define LIFETIME_KEY      (1)
 @define MATURITY_DATE_KEY (1)
-@define TAX_CREDITS_KEY (1)
+@define TAX_CREDITS_KEY   (1)
 @define LIC_DEDUCTION_KEY (2)
 
 # // Default Cost Element
@@ -102,8 +105,7 @@
 @define SHORT_LOSSES  ("SPECIAL.TAXABLE.LOSSES.SHORT")
 @define STAR          ("*")
 @define star(s)       ternary(is_star(s), (s), (STAR (s)))
-@define is_star(a)    @eval ((a) ~ /^\*/)
-
+@define is_star(a)    ((a) ~ STAR)
 
 # // The Epoch and minimum time difference
 @define EPOCH_START        (2000)
@@ -132,20 +134,28 @@
 
 @define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
+@define trim(s) (s)
 #
 # // Useful shorthands for various kinds of accounts
-@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/)
+# // @define is_currency(a)  ((a) ~ /\.CURRENCY:/)
+# // @define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || is_currency(a))
+# // @define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/ || is_currency(a))
+# // @define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/ || is_currency(a))
+
+
+@define is_currency(a) ((a) ~ /^ASSET\.CURRENT\.CURRENCY[.:]/)
+@define is_unitized(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/)
+@define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/)
+@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/)
 @define is_equity(a) ((a) ~ /^EQUITY[.:]/)
 @define is_liability(a) ((a) ~ /^LIABILITY[.:]/)
 @define is_cash(a) ((a) ~ /^ASSET\.CURRENT[.:]/)
-@define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)
 
 # // Fixed asset
 @define is_fixed(a) ((a) ~ /^ASSET\.FIXED[.:]/)
 @define is_tax(a)  ((a) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)
 @define is_term(a) ((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)
 @define is_current(a) ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/)
-@define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/)
 #
 #
 # // Contribution
@@ -168,11 +178,6 @@
 
 # // Reserved Tax Offset Classes
 @define is_offset(a)      ((a) ~ /^SPECIAL\.OFFSET[.:]/)
-@define is_franking(a)    ((a) ~ /^SPECIAL\.OFFSET\.FRANKING[.:]/)
-@define is_foreign(a)     ((a) ~ /^SPECIAL\.OFFSET\.FOREIGN[.:]/)
-@define is_no_carry(a)   ((a) ~ /^SPECIAL\.OFFSET\.NO_CARRY[.:]/)
-@define is_carry(a)      ((a) ~ /^SPECIAL\.OFFSET\.CARRY[.:]/)
-@define is_refund(a)     ((a) ~ /^SPECIAL\.OFFSET\.REFUNDABLE[.:]/)
 
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR|GAINS).LEAF => LEAF
@@ -193,11 +198,9 @@
 @define set_entry(array, x, t) (array[t] = (x))
 
 # // Rounding etc
-# // @define near_zero(x) (((x) <= Epsilon) && ((x) >= -Epsilon))
 @define near_zero(x) (less_than_or_equal(x, Epsilon) && greater_than_or_equal(x, -Epsilon))
 
 # // Not zero
-# // @define not_zero(x) (((x) > Epsilon) || ((x) < -Epsilon))
 @define not_zero(x) (greater_than(x, Epsilon) || less_than(x, -Epsilon))
 
 # // Positive?
@@ -222,7 +225,7 @@
 
 @define account_closed(x, now) ((x) in Account_Closed && less_than(Account_Closed[x], (now)))
 @define is_closed(a, now) (!is_open((a), (now)))
-@define is_new(a) ("" == first_key(Cost_Basis[a]))
+
 @define ever_held(a) (Held_From[a][0] > Epoch)
 @define is_sold(a, p, now) (Held_Until[a][p] <= (now))
 @define is_unsold(a, p, now) (Held_Until[a][p] > (now))

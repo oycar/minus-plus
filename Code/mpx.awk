@@ -64,6 +64,7 @@ END {
 
 
 # // Some constants
+# // @define CLEAR_ARRAY ("CLEAR_ARRAY")
 
 
 
@@ -74,13 +75,15 @@ END {
 
 
 
-# // Default Import Values
 
 
-
+# // Default State Record - no time fields
 
 
 # // Constants for Real_Value keys
+
+
+
 
 
 
@@ -130,7 +133,6 @@ END {
 
 
 
-
 # // The Epoch and minimum time difference
 
 
@@ -158,8 +160,17 @@ END {
 
 
 
+
 #
 # // Useful shorthands for various kinds of accounts
+# // @define is_currency(a)  ((a) ~ /\.CURRENCY:/)
+# // @define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || is_currency(a))
+# // @define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/ || is_currency(a))
+# // @define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/ || is_currency(a))
+
+
+
+
 
 
 
@@ -167,7 +178,6 @@ END {
 
 
 # // Fixed asset
-
 
 
 
@@ -195,11 +205,6 @@ END {
 # // Reserved Tax Offset Classes
 
 
-
-
-
-
-
 # // Is a leaf name in a linked account format i.e. first component is
 # // (DIV|DIST|FOR|GAINS).LEAF => LEAF
 
@@ -219,11 +224,9 @@ END {
 
 
 # // Rounding etc
-# // @define near_zero(x) (((x) <= Epsilon) && ((x) >= -Epsilon))
 
 
 # // Not zero
-# // @define not_zero(x) (((x) > Epsilon) || ((x) < -Epsilon))
 
 
 # // Positive?
@@ -462,9 +465,12 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
 }
 
 # read csv records
-function read_csv_records() {
-  # This is a CSV file
-  FPAT = "([^,]*)|(\"[^\"]+\")"
+function read_csv_records(use_csv) {
+  # Set the separator
+  if (use_csv)
+    FPAT = "([^,]*)|(\"[^\"]+\")"
+  else
+    FPAT = "([^[:space:]]+)|(\"[^\"]+\")|(\\[[^]]+\\])|(#(.)*)"
 }
 
 # Abstract read value out
@@ -474,42 +480,75 @@ function read_value(x) {
   if (x ~ /^[0-9\.\-]+$/)
     return strtonum(x)
 
+  if (x ~ /^"([[:print:]])+"$/)
+    x = ctrim(x, "\"")
+
   # Just return the field
+  return x
+}
+
+# Read a state field
+function read_field(field, x) {
+  if ((( field in Time_Fields)?( Time_Fields[ field]):( ""))) {
+    x = read_date(($field))
+    assert((-1) != x, Read_Date_Error)
+  } else
+    x = ($field)
+
   return x
 }
 
 
 # A somewhat generalized variable reading function
-function read_state(nf,    i, x, value) {
+##
+
+function read_state(name, adjust_value, first_field, last_field,    i, x, value) {
+  # The end of the input
+  if (first_field > last_field)
+    return "" # None read
+
   # The fields represent the keys & value
-  value = read_value($nf)
+  value = read_value($last_field)
 
   # Logging
 
 
-  # Is this an array?
-  if (nf == 1) { # No
-    SYMTAB[Variable_Name] = value
+  # Is this a scalar?
+  if (first_field == last_field) {
+    # Yes
+    if (adjust_value)
+      SYMTAB[name] += adjust_value * value
+    else
+      SYMTAB[name]  = value
+
+
 
   } else {
     # The rest of the keys
-    for (i = 1; i < nf; i ++)
+    for (i = first_field; i < last_field; i ++)
       # The code can minimize output file by
       # retaining the old key if the "ditto"
       # symbol is encountered;
       if (($i != ("^")) || !(i in Variable_Keys))
-        Variable_Keys[i] = $i
-
-
+        Variable_Keys[i] = read_field(i)
 
     # Set the array value
-    set_array(SYMTAB[Variable_Name], Variable_Keys, 1, nf - 1, value, (0))
+    set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, adjust_value, (0))
+
+
   }
+
+  return value
+}
+
+# Delete an array
+function clear_array(array) {
+  delete array
 }
 
 # Set a multi-dimensional array value
 # This assumes array is correctly defined
-function set_array(array, keys, first_key, last_key, value, flag) {
+function set_array(array, keys, first_key, last_key, value, adjust_value, flag) {
   # The idea of deleting the a temporary scalar entry in this function was based on
   # Ed Morton's code found here => https://groups.google.com/forum/#!topic/comp.lang.awk/vKiSODr6Bds
   # Catch errors
@@ -522,10 +561,13 @@ function set_array(array, keys, first_key, last_key, value, flag) {
   }
 
   # Set the array recursively
-  if (first_key == last_key)
+  if (first_key == last_key) {
     # Set the value
-    (array[ keys[first_key]] = ( value))
-  else {
+    if (adjust_value)
+      sum_entry(array, adjust_value * value, keys[first_key])
+    else
+      (array[ keys[first_key]] = ( value))
+  } else {
     # Yikes
     # We need to ensure the subarray exists before calling set_array() otherwise
     # inside set_array() the entry would be a scalar, but then we need to delete
@@ -537,7 +579,7 @@ function set_array(array, keys, first_key, last_key, value, flag) {
     }
 
     # Recursively set the array elements
-    set_array(array[keys[first_key]], keys, first_key + 1, last_key, value, flag)
+    set_array(array[keys[first_key]], keys, first_key + 1, last_key, value, adjust_value, flag)
   }
 }
 
@@ -547,7 +589,7 @@ function write_state(array_names, scalar_names,    name) {
   # Keep track of keys written out
   for (name in array_names) {
     ((SUBSEP in Key_Index)?((1)):((0)))
-    printf "<<,%s\n", array_names[name] > Write_State
+    printf "<<%s%s\n", OFS, array_names[name] > Write_State
     walk_array(SYMTAB[array_names[name]], 1, Write_State)
     printf ">>\n" > Write_State
     delete Key_Index
@@ -555,7 +597,7 @@ function write_state(array_names, scalar_names,    name) {
 
   # The scalars - compact form
   for (name in scalar_names)
-    printf "<<,%s,%s,>>\n", scalar_names[name], format_value(SYMTAB[scalar_names[name]]) > Write_State
+    printf "<<%s%s%s%s%s>>\n", OFS, scalar_names[name], OFS, format_value(SYMTAB[scalar_names[name]]), OFS > Write_State
 }
 
 # This walks the array that we want to dump to file
@@ -585,13 +627,13 @@ function walk_array(arr, level, stream,    key, last_key, i) {
       # Finished at the base level
       # The output string
       for (i = 1; i < level; i++) {
-        printf "%s,", Key_Index[i] > stream
+        printf "%s%s", Key_Index[i], OFS > stream
         if (("^"))
           Key_Index[i] = ("^")
       }
 
       # Complete the output - use special key for deepest level
-      printf "%s,%s\n", last_key, format_value(arr[key]) > stream
+      printf "%s%s%s\n", last_key, OFS, format_value(arr[key]) > stream
     }
   }
 }
@@ -608,6 +650,8 @@ function format_value(v) {
   }
 
   # Return the formatted value
+  if (v ~ /[[:space:]]/)
+    return ("\"" v "\"")
   return v
 }
 
@@ -791,7 +835,7 @@ function maximum_entry(array, start_bracket, end_bracket,
 # White space trimming
 function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
 function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
-function trim(s) { return rtrim(ltrim(s)); }
+#function trim(s) { return rtrim(ltrim(s)); }
 function to_number(s, default_value) {return "" == s ? default_value : strtonum(s)}
 
 # character trimming
@@ -812,7 +856,7 @@ function ctrim(s, left_c, right_c,      string) {
 # Clear global values ready to read a new input record
 function new_line(  key) {
   # Clear real values
-  for (key = 0; key < 3; key ++)
+  for (key in Real_Value)
     Real_Value[key] = 0
 
   Extra_Timestamp = (-1)
@@ -825,6 +869,8 @@ function new_line(  key) {
   Comments = ""
 
   Account[1] = Account[2] = ""
+  Transaction_Currency = (0)
+  Translation_Rate = 1
 }
 
 # Accounting format printing
@@ -844,16 +890,13 @@ function print_cash(x,   precision) {
 # Journal styles (date format is somewhat flexible)
 #      2017 Aug 24, AMH.DIV, AMH.ASX, 2703.96, 3072, [1025.64,] [1655.49], # DRP & LIC
 function parse_line(now,    i, j, x, number_accounts) {
+
   #
   # The record may be
   #     Double Entry => two accounts
   #     Single Entry => one account
   #  or No Entry => zero accounts
-  for (i = 2; i <= NF; i ++)
-    # Need to remove white space from the fields
-    $i = trim($i)
-
-  # Get next one or two fields
+  #  Get next one or two fields
   for (i = 1; i < 3 && i < NF; i ++) {
     # The field id
     j = i + 1
@@ -883,14 +926,62 @@ function parse_line(now,    i, j, x, number_accounts) {
 
   #
   # The amount
-  # Must exist if number accounts > 0
-  if (number_accounts) {
+  # Must exist if number accounts == 2
+  if (2 == number_accounts) {
     i ++
-    j = 0
 
-    # Must ba number
-    assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
+    # The amount - usually in the default currency
+    # BUT may be prefixed by an ISO 4217 Currency Code (Three Uppercase Characters.)
+    amount = $i
+    if ($i ~ /^[[:upper:]]{3}$/) {
+      # Explicit currency given
+      if (Enforce_Qualification) {
+        assert($i in Long_Name, "Currency Code <" $i "> not defined - provide exchange rates")
+        Transaction_Currency = Long_Name[$i]
+      } else if ($i in Long_Name)
+        Transaction_Currency = Long_Name[$i]
+      else {
+        printf "## Warning Ignoring Unknown Currency Code %s - treating as Journal Currency %s\n", $i, Journal_Currency > "/dev/stderr"
+        Transaction_Currency = Long_Name[Journal_Currency]
+      }
+
+
+      # Is this a simple currency translation -
+      j = i + 1
+      assert($j ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax: cash amount <" $j "> is not a number")
+
+      # is this a purchase or a sale of currency units?
+      if (Account[2] == Transaction_Currency)
+        Real_Value[(-1)] = $i = strtonum($j) # A purchase (of forex)
+      else if ((Account[1] == Transaction_Currency) && is_open(Account[1], now)) {
+        $i = strtonum($j) # A sale
+        Real_Value[(-2)] = $j = - $i # A sale (of forex)
+      } else { # Other cases
+        # Rebuild line - remove currency code and shuffle down fields
+        for (j = i; j < NF; j ++)
+          $j = $(j + 1)
+        NF --
+      }
+
+      # Get translation price
+      if (Transaction_Currency in Price)
+        Translation_Rate = ((__MPX_KEY__ = find_key(Price[Transaction_Currency],  now))?( Price[Transaction_Currency][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[Transaction_Currency][0]):( 0))))
+      else
+        Translation_Rate = ""
+
+      # Did we get a price?
+      assert("" != Translation_Rate, "No exchange rate available for <" Transaction_Currency "> at <" get_date(now) ">")
+    } else {
+      # Use default currency
+      Transaction_Currency = (0)
+      Translation_Rate = 1
+    }
+
+    # Check that this is a number
     amount = strtonum($i)
+
+    # Zero j
+    j = ((Real_Value[(-1)] || Real_Value[(-2)])?( -1):( 0))
   } else
     j = 1
 
@@ -936,13 +1027,14 @@ function parse_line(now,    i, j, x, number_accounts) {
     # Shared code - save x if set
     if (x) { # x is not zero or ""
       # The zeroth case can be Units
-      if (0 == j) {
-        if ((((x) - ( Epsilon)) > 0) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((Account[1]) ~ /^EQUITY[.:]/)))
+      # If there is a non default transaction currency
+      if (0 >= j) {
+        if ((((x) - ( Epsilon)) > 0) && ((( Account[2]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/) || ((Account[1]) ~ /^EQUITY[.:]/))) {
           # Interpret these as units
-          Real_Value[j] = x
-        else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now))))
-          Real_Value[j] = x
-        else # This is not Units so it is the next possible real value, index 1
+          Real_Value[(0)] = x
+        } else if ((((x) - ( -Epsilon)) < 0) && (((( Account[1]) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/) && is_open( Account[1], now)) || ((( Account[2]) ~ /^EQUITY[.:]/) && is_open( Account[2], now)))) {
+          Real_Value[(0)] = x
+        } else # This is not Units so it is the next possible real value, index 1
           Real_Value[j = 1] = x
       } else
         Real_Value[j] = x
@@ -953,7 +1045,7 @@ function parse_line(now,    i, j, x, number_accounts) {
 
       # Treat as a comment
       if (x)
-        Comments = (("" == Comments)?(  x):( (("" ==  x)?( Comments):( (Comments  ", "  x)))))
+        Comments = (("" == Comments)?(  x):( (("" ==  x)?( Comments):( (Comments  OFS  x)))))
     }
 
     # Increment i & j
@@ -961,9 +1053,9 @@ function parse_line(now,    i, j, x, number_accounts) {
     j ++
   }
 
-  # Comments should be signified with an octothorpe
+  # Comments should be signified with an octothorp
   if (Comments !~ /^#/)
-    Comments = (("" == "# ")?(  Comments):( (("" ==  Comments)?( "# "):( ("# "  ", "  Comments)))))
+    Comments = (("" == "# ")?(  Comments):( (("" ==  Comments)?( "# "):( ("# "  OFS  Comments)))))
 
   # Documents can be added as comments
   # Some special document names are supported
@@ -975,7 +1067,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     i = parse_document_name(x, now)
 
     # Add the parsed name to the comments
-    Comments = (("" == Comments)?(  i):( (("" ==  i)?( Comments):( (Comments  ", "  i)))))
+    Comments = (("" == Comments)?(  i):( (("" ==  i)?( Comments):( (Comments  OFS  i)))))
   }
 
   # All done - return record type
@@ -1196,7 +1288,7 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
   if (field ~ /^\((.)+\)$/) {
     # bracketed
     len = length(field)
-    field = trim(toupper(substr(field, 2, len - 2)))
+    field = (toupper(substr(field, 2, len - 2)))
     if (field ~ /D/) {
       Tax_Adjustment = Automatic_Depreciation = (1)
       Cost_Element = I
@@ -1306,6 +1398,10 @@ function set_special_accounts() {
   SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
   SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
 
+  # When a foreign exchange asset is sold any profit or loss is booked as income/expense to these accounts
+  FOREX_INCOME  =  initialize_account("INCOME.FOREX:FOREX.GAINS")
+  FOREX_EXPENSE =  initialize_account("EXPENSE.FOREX:FOREX.LOSSES")
+
   # Built in TAX accounts - debtor like
   WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
   PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
@@ -1395,23 +1491,24 @@ function one_year(now, sense,     year, day, sum) {
 # Useful account filters
 function is_open(a, now,     p) {
   # An asset is open if there are unsold parcels at time 'now'
-  for (p = 0; p < Number_Parcels[a]; p ++) {
-    if ((((Held_From[a][p]) - ( now)) > 0))
-      break
-    if ((Held_Until[a][ p] > ( now)))
-      return (1)
-  }
+  if (((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/))
+    for (p = 0; p < Number_Parcels[a]; p ++) {
+      if ((((Held_From[a][p]) - ( now)) > 0))
+        break
+      if ((Held_Until[a][ p] > ( now)))
+        return (1)
+    }
   return (0)
 }
 
 # Is an account a an ancestor of another account b?
 function is_ancestor(a, b,    p) {
-  if (!((a) ~ /^\*/))
+  if (!((a) ~ ("*")))
     return (0)
 
   # Check
   p = Parent_Name[b]
-  while ("" != p) {
+  while (("*") != p) {
     if (a == p) # Found
       return (1)
     p = Parent_Name[p]
@@ -1437,13 +1534,6 @@ function held_to(ac, now,     p, latest_sale) {
 
   return latest_sale # returns the date the parcel was sold
 }
-
-# # Initialize cost element arrays
-# function set_array_entries(array, key,     e) {
-#   # Set all true cost elements to zero - ie elements I-V
-#   for (e in Elements)
-#     array[e][now] = 0
-# }
 
 # This splits up a branch name or a leaf name into dotted components
 function get_name_component(name, i, number_components, array,    name_length, s, dot) {
@@ -1505,7 +1595,7 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
   # if an asset is adjusted note the adjustment in
   # each active parcel
   # Adjustments for units bought
-  if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
+  if (((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/)) {
 
     # What proportion of the sum is allocated to each unit at time now?
 
@@ -1550,9 +1640,11 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 
     # Debugging
 
-  } else
+  } else if (a in Cost_Basis)
     # This is the corresponding account
     sum_entry(Cost_Basis[a], x, now)
+  else
+    Cost_Basis[a][now] = x
 
   # Balance costs
   update_cost(a, x, now)
@@ -1562,12 +1654,14 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 function update_cost(a, x, now,      p) {
   # Now get the parent to this account
   p = Parent_Name[a]
-  if ("" == p)
+  if (("*") == p)
     return # Finished
 
   # Update the cost
-  assert(p in Cost_Basis, "Failed to find Cost_Basis of account  <" p ">")
-  sum_entry(Cost_Basis[p], x, now)
+  if (p in Cost_Basis)
+    sum_entry(Cost_Basis[p], x, now)
+  else
+    Cost_Basis[p][now] = x
 
   # Logging
 
@@ -1666,7 +1760,7 @@ function adjust_parcel_cost(a, p, now, parcel_adjustment, element, adjust_tax,
 #
 function get_cost(a, now,     i, sum_cost) {
   # Adjustments for units bought
-  if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
+  if (((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/)) {
     # Initial cost
     sum_cost = 0
 
@@ -1697,7 +1791,7 @@ function get_cost_adjustment(a, now,   i, sum_adjustments) {
 
   # Adjustments for units bought
   # Do not apply to equities
-  if (((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/)) {
+  if (((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/)) {
     for (i = 0; i < Number_Parcels[a]; i ++) {
       if ((((Held_From[a][i]) - ( now)) > 0)) # All further transactions occured after (now)
         break # All done
@@ -1827,15 +1921,15 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
   # Is it not zero entry?
   if ("" != a)
     # At least single entry
-    string = string sprintf(", %13s, ", Leaf[a])
+    string = string sprintf("%s %13s ", OFS, Leaf[a])
 
   # Is it double entry?
   if ("" != b)
-    string = string sprintf("%13s, ", Leaf[b])
+    string = string sprintf("%13s%s ", Leaf[b], OFS)
 
   # Amount  and cost element and or units - if at least one entry
   if (a || b) {
-    string = string sprintf("%11.2f, ", amount)
+    string = string sprintf("%11.2f%s ", amount, OFS)
     if (element_string && element_string != ("II"))
       string = string sprintf("%10s", element_string)
     else # Pretty print
@@ -1844,15 +1938,15 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf(", %14s", print_cash(get_cost(matched, now)))
+      string = string sprintf("%s %14s", OFS, print_cash(((((matched) ~ /^ASSET\.CURRENT\.CURRENCY[.:]/))?( ((matched in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[matched],   now))?( Total_Units[matched][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[matched][0]):( 0))))):( 0))):( get_cost(matched, now)))))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)
-        string = string ", " fields[i]
+        string = string OFS " " fields[i]
   }
 
   # All done
-  print string ", " comments
+  print string OFS " " comments
 } # End of printing a transaction
 
 function initialize_account(account_name,    class_name, array, p, n,
@@ -1903,8 +1997,10 @@ function initialize_account(account_name,    class_name, array, p, n,
   if (class_name ~ /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/) {
     assert(2 == split(account_name, array, ":"), sprintf("<%s> Account name %s is not in branch_name:leaf_name format", $0, account_name))
     leaf_name = array[2]
-  } else
+  } else {
+    assert(!Enforce_Names, sprintf("<%s> Account name %s is not defined", $0, account_name))
     leaf_name = account_name
+  }
 
   # Finally an uninitialized long name
   # BUT there is another trap;
@@ -1922,7 +2018,7 @@ function initialize_account(account_name,    class_name, array, p, n,
   if ((leaf_name in Long_Name)) {
     if (Leaf[Long_Name[leaf_name]] == leaf_name) {
       # If the existing account is new (unused) it can be deleted
-      assert(("" == first_key(Cost_Basis[Long_Name[leaf_name]])), sprintf("Account name %s: Leaf name[%s] => %s is already taken", account_name, leaf_name, Long_Name[leaf_name]))
+      assert(!(Long_Name[leaf_name] in Cost_Basis), sprintf("Account name %s: Leaf name[%s] => %s is already taken", account_name, leaf_name, Long_Name[leaf_name]))
 
       # Must be a new (unused) name
       delete Long_Name[leaf_name]
@@ -1938,7 +2034,7 @@ function initialize_account(account_name,    class_name, array, p, n,
     Show_Account = account_name
 
   # Set extra items needed for ASSET or EQUITY class accounts
-  if (((account_name) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) { # This could include EQUITY too
+  if (((account_name) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/)) { # This could include EQUITY too
     # Each parcel's adjusted and reduced cost
     #   The accounting cost (== reduced cost) is Accounting_Cost
     #   The adjusted cost is                     Accounting_Cost - Tax_Adjustments
@@ -1949,18 +2045,13 @@ function initialize_account(account_name,    class_name, array, p, n,
     # Stored (as sums) by parcel, cost element and time
     # eg Accounting_Cost[account][parcel][element][time]
 
-
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel
     Parcel_Tag[account_name][SUBSEP] ; delete Parcel_Tag[account_name][SUBSEP] #
 
     # Keep track of units
     Total_Units[account_name][Epoch]     = Qualified_Units[account_name][Epoch] = 0
-
-    # Each account also has a number of parcels
-    (( account_name in Number_Parcels)?( 0):(Number_Parcels[ account_name] = ( 0)))
-
-    # End of if ASSET
+    # End of if Unitized
   } else if (((account_name) ~ ("^" ( "INCOME") "[.:]"))) {
     # Set an Underlying_Asset if the leaf name
     # is of the appropriate format
@@ -1978,25 +2069,19 @@ function initialize_account(account_name,    class_name, array, p, n,
     }
   }
 
-  # Initialize account with common entries
-  Cost_Basis[account_name][SUBSEP]; delete Cost_Basis[account_name][SUBSEP]
-
   # refer  to the parent item eg parent[A.B.C] => *A.B (long_name minus short_name with a distinguishing prefix)
-  p = Parent_Name[account_name] = "*" array[1]
+  p = Parent_Name[account_name] = ("*") array[1]
 
   # How many components in the name "p"
   n = split(p, array, ".")
 
   # Initialize the cost bases for this account's parents
-  while (p && !(p in Parent_Name)) {
-    # a new meta-account - needs a cost-basis
-    Cost_Basis[p][Epoch] = 0
-
+  while (!(p in Parent_Name)) {
     # Get p's parent - lose the last name component
     if (n > 1)
       Parent_Name[p] = get_name_component(p, 1, --n, array)
     else
-      Parent_Name[p] = ""
+      Parent_Name[p] = ("*")
 
     # Update p
     p = Parent_Name[p]
@@ -2023,7 +2108,7 @@ function split_account(now, a, b, split_factor,
   # Both accounts must be of the same class
   # Both accounts must be unitized (this can be revisited)
   assert(Parent_Name[a] == Parent_Name[b], "split: Class<" a "> != Class<" b ">")
-  assert(((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), "split_account: <" a "> not a unitized account")
+  assert(((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/), "split_account: <" a "> not a unitized account")
 
   # Set split factor
   split_factor = ((split_factor)?( split_factor):( 1))
@@ -2139,7 +2224,7 @@ function filter_array(now, data_array, name, show_blocks,
                            stack, key, first_key,
                            earliest_key, latest_key, s) {
 
-  # Record the earlist and latest keys found
+  # Record the earliest and latest keys found
   if (show_blocks) {
     # Report on data held
     print Journal_Title > "/dev/stderr"
@@ -2152,7 +2237,7 @@ function filter_array(now, data_array, name, show_blocks,
   # list holding "blocks" - ie non-overlapping holding periods
   # Each block is preceeded and/or followed by "gaps"
   for (a in Leaf)
-    if ((a in data_array) && ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/))
+    if ((a in data_array) && ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/))
       if ((Held_From[a][0] > Epoch)) {
         # Get each parcel in turn and list the contiguous blocks of time held
         start_block = Held_From[a][0]
@@ -2332,7 +2417,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
   return sum_delta
 }
 
-
 # get_tax payable on total income
 # can be used to get other banded quantities such as the low income tax offset & the medicare levy
 function get_tax(now, bands, total_income,
@@ -2341,8 +2425,26 @@ function get_tax(now, bands, total_income,
                       band_width,
                       current_key, last_threshold, threshold) {
 
-  # More than one tax band - much more tricky
+  # Tax bands can either be the bands themselves
+  # eg Band[T_0] => 0.20
+  #    Band[T_1] => 0.30
+  #    Band[T_2] => 0.40
+  #
+  #    and so on
+  #
+  #  Or the negative integral
+  #    Band[T_0] =>   0.00
+  #    Band[T_1] => - 0.20 * (T_1 - T_0)
+  #    Band[T_2] => - 0.20 * (T_1 - T_0) - 0.30 * (T_2 - T_1)
+  #
+
+  # Get the current tax band
   current_key = find_key(bands, now)
+
+  # Ensure bands are listed in decreasing order
+  invert_array(bands[current_key])
+
+  # Compute tax
   tax_payable = last_threshold = 0
   for (threshold in bands[current_key]) {
     # The last band's width
@@ -2371,29 +2473,33 @@ function get_tax(now, bands, total_income,
 
 # the inverse function
 # only uses tax bands - not levies
-function get_taxable_income(now, tax_left,
+function get_taxable_income(now, bands, tax_left,
                                  total_income, band_width, band_tax,
                                  current_key, last_threshold, threshold) {
-  # Now get the tax due on the whole sum
-  current_key = find_key(Tax_Bands, now)
-  last_threshold = 0
+
+  # Get the current tax band
+  current_key = find_key(bands, now)
+
+  # Ensure bands are listed in decreasing order
+  invert_array(bands[current_key])
 
   # When the tax left is zero or negative it must be the first band
+  last_threshold = 0
   if (!(((tax_left) - ( Epsilon)) > 0)) {
     # If the first band has a zero rate no income is assumed
-    if (((((Tax_Bands[current_key][last_threshold]) - ( Epsilon)) <= 0) && (((Tax_Bands[current_key][last_threshold]) - ( -Epsilon)) >= 0)))
+    if (((((bands[current_key][last_threshold]) - ( Epsilon)) <= 0) && (((bands[current_key][last_threshold]) - ( -Epsilon)) >= 0)))
       return 0
-    return tax_left / Tax_Bands[current_key][last_threshold]
+    return tax_left / bands[current_key][last_threshold]
   }
 
   # Now get the tax due on the whole sum
   total_income = 0
-  for (threshold in Tax_Bands[current_key]) {
+  for (threshold in bands[current_key]) {
     # The last band's width
     band_width = last_threshold - threshold # negative thresholds stored
 
     # The maximum tax due in this band
-    band_tax = band_width * Tax_Bands[current_key][last_threshold]
+    band_tax = band_width * bands[current_key][last_threshold]
 
     # Is the tax_payable above the amount paid?
     if ((((band_tax) - ( tax_left)) >= 0)) {
@@ -2414,11 +2520,47 @@ function get_taxable_income(now, tax_left,
 
   # We can still have have tax unaccounted for here
   if ((((tax_left) - ( Epsilon)) > 0))
-    total_income += tax_left / Tax_Bands[current_key][last_threshold]
+    total_income += tax_left / bands[current_key][last_threshold]
 
   # The minimum total income that would generate this much tax
   return total_income
 }
+
+# force an array to have indices stored in ascending order of magnitude
+# even when the indices actually descend in simple numerical value
+function invert_array(array,        key, last_key, value) {
+  last_key = ""
+  for (key in array)
+    if ("" == last_key)
+      last_key = key
+    else
+      break
+
+  # Did we find more than one key?
+  if ("" == last_key)
+    # No
+    return
+
+
+
+  # Yes - what order do these keys have?
+  if (((((((last_key) < 0)?( -(last_key)):(last_key))) - ( (((key) < 0)?( -(key)):(key)))) < 0))
+    # Desired order
+    return
+
+
+
+  # Wrong order!
+  for (key in array)
+    if ((((key) - ( Epsilon)) > 0)) {
+      # Reverse sign of keys to enforce required ordering
+      value = array[key]
+      delete array[key]
+      array[-key] = value
+
+    }
+}
+
 
 
 # Initialize a url encoding lookup table
@@ -2489,6 +2631,12 @@ function underline(width, margin, stream) {
 ## DD-Month-YYYY or DD-Month-YY or DD/Month/YYYY or DD/Month/YY eg 14-Aug-18
 ## YYYY-MM-DD or YY-MM-DD or YYYY/MM/DD or YY/MM/DD eg 2018/08/14
 ##
+##
+## Regex to get initial modification to date string
+##  (20[01][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([0-3][0-9])
+##
+
+
 function read_date(date_string, hour,
                    date_fields, year, month, day, value) {
   # default time
@@ -2503,11 +2651,11 @@ function read_date(date_string, hour,
 
 
   # Split the input date
-  if (3 == split(trim(date_string), date_fields, "[-/ ]")) {
+  if (3 == split((date_string), date_fields, "[-/ ]")) {
     # The fields are YYYY MM DD
     # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
     # or             Mon DD YYYY
-    # or             DD MM YYYY if DD & YYYY are inconsistent with dates
+    # or             DD MM YYYY if DD & YYYY are consistent with dates
     # year-month-day, monthname/day/year, monthname-day-year
     if (month = (((date_fields[1]) in Lookup_Month)?( Lookup_Month[date_fields[1]]):( 0))) {
       day   = date_fields[2] + 0
@@ -2515,6 +2663,19 @@ function read_date(date_string, hour,
     } else if (month = (((date_fields[2]) in Lookup_Month)?( Lookup_Month[date_fields[2]]):( 0))) {
       year  = date_fields[1] + 0
       day   = date_fields[3] + 0
+
+      # Catch DD-Mon-YYYY
+      # Will not work unless YYYY >= 32
+      if (day > 31) {
+        if (year <= 31) {
+          day   = date_fields[1] + 0
+          year  = date_fields[3] + 0
+        } else {
+          Read_Date_Error = "Can't parse date <" date_string "> day number inconsistent with any month"
+          return (-1)
+        }
+      } # end of bad day number
+
     } else {
       day   = date_fields[3] + 0
       month = date_fields[2] + 0
@@ -2714,7 +2875,7 @@ function balance_journal(now, past, initial_allocation) {
 # Gains Reconciliation
 # Both Realized & Unrealized Gains
 #
-function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_time,
+function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_time, show_capital,
 
                                                             is_realized_flag, found_gains,
                                                             gains_event, current_price, p, a,
@@ -2747,7 +2908,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   is_detailed = ((is_detailed)?( is_detailed):( (0)))
 
   # A flag to discriminate realized and unrealized gains
-  is_realized_flag = ("Realized Gains" == gains_type)
+  is_realized_flag = (gains_type ~ "Realized")
 
   # A default sold time = the Future
   sold_time = ((sold_time)?( sold_time):( Future))
@@ -2759,6 +2920,9 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   # No header printed
   no_header_printed = (1)
 
+  # Capital or forex gains?
+  show_capital = (("" == show_capital)?( (1)):( show_capital))
+
   # Record accounting gains
   accounting_gains = 0
   sum_long_gains = sum_short_gains = sum_long_losses = sum_short_losses = 0 # Tax gains/losses summed here
@@ -2769,7 +2933,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
   # For each asset sold in the current period
   for (a in Leaf) {
-    if (((a) ~ /^ASSET\.CAPITAL[.:]/)) {
+    # Can choose between capital or forex gains
+    if ((show_capital && ((a) ~ /^ASSET\.CAPITAL[.:]/)) || (!show_capital && ((a) ~ /^ASSET\.CURRENT\.CURRENCY[.:]/))) {
       # Are we looking for realized gains?
       if (is_realized_flag) {
         # If any of these are non-zero there was a gains event
@@ -2828,7 +2993,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
               # Print the gains report
               if (no_header_printed) {
                 print Journal_Title > reports_stream
-                printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
+                printf "%s Report for Period Ending %s\n", gains_type, get_date(yesterday(now))  > reports_stream
               }
 
               # Two types of header
@@ -2857,7 +3022,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
             # Number of units
             units = Units_Held[a][p]
-            units_sold += units
 
             # Parcel sale times are tricky
             if ((Held_Until[a][ p] <= ( now)) && (Held_Until[a][ p] > ( past)))
@@ -2869,7 +3033,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
             # The held time (will be wrong when key is FALSE)
             held_time = get_held_time(key, Held_From[a][p])
-
 
             # Total gains (accounting gains)
             if ((Held_Until[a][ p] <= ( now))) {
@@ -2883,9 +3046,11 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             parcel_cost     =   get_cash_in(a, p, now)
             cost           += parcel_cost
             if (key) {
-              proceeds       += parcel_proceeds
+              # Sold parcels
+              proceeds      += parcel_proceeds
               reduced_cost  += get_parcel_cost(a, p, now)
               adjusted_cost += get_parcel_cost(a, p, now, (1))
+              units_sold    += units
             }
 
             # Keep track of accounting gains
@@ -3225,7 +3390,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("O" ~ /[cC]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3273,12 +3438,12 @@ function get_capital_gains(now, past, is_detailed,
     expense_short_losses = get_cost("*EXPENSE.LOSSES.SHORT", now) - get_cost("*EXPENSE.LOSSES.SHORT", past)
 
     # The long gains and losses first
-    capital_long_gains  = get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), past)
-    capital_long_losses = get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), past)
+    capital_long_gains  = get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), past)
+    capital_long_losses = get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), past)
 
     # short gains & losses
-    capital_short_gains   = get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), past)
-    capital_short_losses  = get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), past)
+    capital_short_gains   = get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), past)
+    capital_short_losses  = get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), ((now) - 1)) - get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), past)
 
     # The adjusted gains and losses
     printf "\n\tAdjusted Gains\n" > reports_stream
@@ -3355,8 +3520,8 @@ function get_capital_gains(now, past, is_detailed,
     # This is not strictly necessary in all cases but useful
     # Save net gains or losses
     # What happens when you manipulate a parent account?
-    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))),  ((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))))
-    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))))
+    adjusted_gains  = apply_losses(now, reports_stream, "Long",  capital_long_gains + income_long_gains,  capital_long_losses,  "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))),  ((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))))
+    adjusted_gains += apply_losses(now, reports_stream, "Short", capital_short_gains + income_short_gains, capital_short_losses, "*SPECIAL", ((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), ((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))))
 
     # Overall gains, losses and taxable gains
     underline(44, 8, reports_stream)
@@ -3401,8 +3566,12 @@ function get_capital_gains(now, past, is_detailed,
       # Now the income gains report
       print_income_gains(now, past, is_detailed, reports_stream)
 
-      # The Realized Gains
-      print_gains(now, past, is_detailed, "Realized Gains", reports_stream)
+      # The Realized Capital Gains
+      print_gains(now, past, is_detailed, "Realized Capital Gains", reports_stream)
+      delete Gains_Stack
+
+      # The Realized Foreign Exchange Gains/Losses
+      print_gains(now, past, is_detailed, "Realized Foreign Exchange Gains", reports_stream, Future, (0))
       delete Gains_Stack
     }
 }
@@ -3572,7 +3741,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("O" ~ /[oO]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3712,7 +3881,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("O" ~ /[bB]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3845,7 +4014,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("O" ~ /[mM]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -3866,9 +4035,6 @@ function depreciate_all(now,      a, current_depreciation) {
 
       # Balance accounts
       adjust_cost(DEPRECIATION, current_depreciation, now)
-
-      # Print the transaction
-      # print_transaction(now, "# Automatic Depreciation", a, DEPRECIATION, current_depreciation, "(I)")
     }
 
   # Restore defaults
@@ -3917,7 +4083,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("O" ~ /[dD]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4052,7 +4218,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("O" ~ /[qQ]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4192,7 +4358,7 @@ function print_account_class(stream, heading, selector, class_name, blocked_clas
       # The required name component is the last in the parent - watch out for
       # the leading "*" if only a single component
       subclass = get_name_component(Parent_Name[x], 0)
-      if (((subclass) ~ /^\*/))
+      if (((subclass) ~ ("*")))
         subclass = substr(subclass, 2)
 
       # Initialize sums
@@ -4368,7 +4534,7 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
 
     # Record the process
     # that adjusts the gains ONLY in this function
-    taxable_gains  = get_cost(((((("SPECIAL.TAXABLE")) ~ /^\*/))?( (("SPECIAL.TAXABLE"))):( (("*") (("SPECIAL.TAXABLE"))))), now)
+    taxable_gains  = get_cost(((((("SPECIAL.TAXABLE")) ~ ("*")))?( (("SPECIAL.TAXABLE"))):( (("*") (("SPECIAL.TAXABLE"))))), now)
     printf "\t%27s => %13s\n", "Write Back", get_date(now) > reports_stream
     printf "\t%27s => %14s\n", "Gains", print_cash(- taxable_gains) > reports_stream
 
@@ -4482,6 +4648,9 @@ BEGIN {
   if (!(Epoch in Foreign_Offset_Limit))
     Foreign_Offset_Limit[Epoch] = 1000.00
 
+  # Initially no LIC Deduction
+  LIC_Deduction[Epoch] = 0.0
+
   # The default tax band
   Tax_Bands[Epoch][0] = 0.15
 
@@ -4491,7 +4660,6 @@ BEGIN {
   # The default low and middle income offsets
   Low_Income_Offset[Epoch][0] = 0.00
   Middle_Income_Offset[Epoch][0] = 0.00
-
 
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
@@ -4579,7 +4747,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("O" ~ /[tT]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5030,25 +5198,42 @@ function income_tax_aud(now, past, benefits,
       # Yes so some losses will be extinguished
       # Which will reduce tax_owed to zero - so the effective reduction
       # in tax losses is the income that would produce tax equal to tax_owed
-      x = - get_taxable_income(now, tax_owed) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands, tax_owed) # This is effectively a gain - so make it negative
       tax_owed = 0
     } else if (((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0))) {
       # All losses extinguished
       tax_owed -= x
-      x = - get_taxable_income(now, x) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands, x) # This is effectively a gain - so make it negative
     }
 
     if (Show_Extra)
       printf "%48s %32s>\n\n", "<Tax Owed After Using Carried Tax Losses", print_cash(tax_owed) > write_stream
+  } else {
+    # No tax is owed
+    # Was this caused by refundable offsets?
+    if (!(((tax_owed + refundable_offsets) - ( Epsilon)) > 0)) {
+      # No - there are increased tax losses
+      # This is a bit tricky
+      # (unused) franking offsets may still be present here
+      # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
+      x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
+    } else
+      # Yes so zero new losses
+      x = 0
+  }
 
-    # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
-  } else if (!(((tax_owed + refundable_offsets) - ( Epsilon)) > 0)) { # Increase losses
-    # This is a bit tricky
-    # (unused) franking offsets may still be present here
-    # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-    x = - get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
-  } else
-    x = 0
+
+  #   # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
+  # } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
+  #   # This is a bit tricky
+  #   # (unused) franking offsets may still be present here
+  #   # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
+  #   x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
+  # } else if (below_zero(tax_owed)) { # Losses recorded this FY
+  #   x = - get_taxable_income(now, Tax_Bands, tax_owed)
+  #   tax_owed = 0
+  # } else # Zero losses
+  #   x = 0
 
   # Now we can update the carried tax losses at last
   tax_losses = get_carried_losses(now, Tax_Losses, x, 0, write_stream)
@@ -5209,9 +5394,9 @@ function get_taxable_gains_aud(now, losses,
   # This function computes the taxable gains
   # It works for partioned long & short gains
   # And also for deferred gains when all such gains are long
-  losses     += get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), now) + get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), now)
-  long_gains  = get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), now)
-  short_gains = get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ /^\*/))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), now)
+  losses     += get_cost(((((("SPECIAL.TAXABLE.LOSSES.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.LONG"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.LONG"))))), now) + get_cost(((((("SPECIAL.TAXABLE.LOSSES.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.LOSSES.SHORT"))):( (("*") (("SPECIAL.TAXABLE.LOSSES.SHORT"))))), now)
+  long_gains  = get_cost(((((("SPECIAL.TAXABLE.GAINS.LONG")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.LONG"))):( (("*") (("SPECIAL.TAXABLE.GAINS.LONG"))))), now)
+  short_gains = get_cost(((((("SPECIAL.TAXABLE.GAINS.SHORT")) ~ ("*")))?( (("SPECIAL.TAXABLE.GAINS.SHORT"))):( (("*") (("SPECIAL.TAXABLE.GAINS.SHORT"))))), now)
 
   # Suppress negligible losses
   losses      = (((((losses) - ( Epsilon)) > 0))?( (losses)):(  0))
@@ -5379,7 +5564,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("O" ~ /[iI]|[aA]/ && "O" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5842,7 +6027,7 @@ function process_member_benefits_smsf(now, array, amount,
 #    Original style
 #   2008 Apr 09, 604000, 776003,    200.000,    8382.00, BHP in specie transfer (200 units)
 #   became over time
-#   2008 Apr 09, CASH, BHP.ASX, 8382.00, 200, # (in specie transfer in fact)
+#   2008-Apr-09, CASH, BHP.ASX, 8382.00, 200, # (in specie transfer in fact)
 #
 # To Do =>
 #   ***in progress
@@ -5871,6 +6056,7 @@ BEGIN {
 
   # An array to hold document strings
   ((SUBSEP in Documents)?((1)):((0)))
+  ((SUBSEP in Time_Fields)?((1)):((0)))
 
   # A Document shortcut code
   Document_Shortcut = "[:+]"
@@ -5888,10 +6074,10 @@ BEGIN {
   Variable_Keys[0] = ""
 
   # Output Fields
-  OFS = ","
+  if ("" != Use_Separator)
+    OFS = Use_Separator
 
-  # MONTH_FORMAT = "%Y %b %d"
-  # ISO_FORMAT = "%F"
+  #
   if ("" == DATE_FORMAT)
     DATE_FORMAT = ("%Y %b %d") 
   LONG_FORMAT = (DATE_FORMAT " %H::%M::%S")
@@ -5968,7 +6154,7 @@ BEGIN {
   Tax_Losses[0][SUBSEP] = 0; delete Tax_Losses[0][SUBSEP]
 
   # This is a CSV file
-  read_csv_records()
+  read_csv_records(Use_CSV)
 
   # Transaction line defaults
   new_line()
@@ -5990,12 +6176,16 @@ BEGIN {
   Asset_Symbol = ""
 
   # Default import fields
-  Key_Field    = (1)
-  Value_Field  = (2)
-  Key_is_Date     = 1
-  Value_is_Date   = 0
+  Key_Field      = 1
+  Value_Field    = 2
+  Key_is_Date    = (1)
+  Value_is_Date  = (0)
+  Value_is_XRate = (0)
   Import_Zero  = (0)
   Import_Time  = (12)
+
+  # Default Import Settings
+  split((""), Time_Fields, " ")
 
   # Set special accounts
   set_special_accounts()
@@ -6046,33 +6236,63 @@ BEGIN {
   next
 }
 
+# State Record
+##
+## Read the listed fields from a delimited text file
+## For example
+## << Time_Fields  4 9 >>
+##
+## would result in each record yielding
+## An_Array[$1][read_date($4)][$7] => read_date($9)
+##
+##
+# This reads an array from human readable data
 # Program state can be given using a state pattern range
-# #
+#
 /^<</,/>>$/ {
+  # Set =
+  read_state_record($0 ~ /^<</, $0 ~ />>/)
+}
+
+function read_state_record(first_line, last_line) {
   # We need to establish if this is an array or a scalar
-  if ($0 ~ /^<</) {
-    Variable_Name = trim($2)
+  if (first_line) {
+    assert(NF > 1, "Syntax error <" $0 "> state record needs a variable name")
+    Variable_Name = ($2)
     assert(Variable_Name in SYMTAB, "<" Variable_Name "> is not declared")
+    delete Variable_Keys
 
-    # Scalar syntax
-    # <<,Variable_Name,Value>>
-    # Any more fields on this line?
-    if ($NF ~ />>/ && NF == 4) {
-      # This is a scalar - value in field 3
-      SYMTAB[Variable_Name] = read_value(trim($3))
+    # Special case if  this of the form << Array_Name >> then clear the array
+    first_line = 2
+    if (last_line && (first_line > NF - 2) && isarray(SYMTAB[Variable_Name])) {
+      clear_array(SYMTAB[Variable_Name])
 
-      # Logging
+      next
+    } else if (NF > 2 && "+=" == $3) {
+      Adjust_Value = 1
+      first_line = 3
+    } else if (NF > 2 && "-=" == $3) {
+      Adjust_Value = -1
+      first_line = 3
+    } else
+      Adjust_Value = 0
+  } else
+    first_line = 0
 
-    }
-  } else if ($0 !~ /^>>/)
-    # Could be array OR scalar
-    read_state(NF)
+  # Syntax is
+  # << Variable_Name Scalar Value >> or
+  # << Variable_Name Vector Key-1 Key-2 .... Key-M Value >> or
+  # << Variable_Name Vector
+  #    Key-1-1 Key-1-2 ... Key-1-M Value-1
+  #    ......
+  #    Key-N-1 Key-N-2 ... Key-N-M Value-N >>
+  read_state(Variable_Name, Adjust_Value, first_line + 1, NF - last_line)
 
   # Get the next record
   next
 }
 
-# Import data
+# Import Record
 # This imports an array
 # Array[Key] => Value
 # Need the following variables
@@ -6096,95 +6316,32 @@ BEGIN {
 
 
 
-
     # Prices are given a special import time
     if ("Price" == Import_Array_Name) {
       Import_Time = (16)
       Import_Zero = (0)
     } else
       Import_Time = (12)
-  } else
+  } else {
     # End of block
     # Reset asset default prefix
     Asset_Prefix = ("ASSET.CAPITAL.SHARES")
+  }
 
   # End of if importing
   next
 }
 
 1 == Import_Record {
-  import_csv_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
+  # identify the array or scalar being imported
+  #
+  import_data(SYMTAB[Import_Array_Name], Asset_Prefix ":" Asset_Symbol, Import_Array_Name)
   next
 }
 
-##
-## Imports CSV format
-## <<,Account_Code, XYZ.ABC,>>
-## <<,Key_Field, X,>>
-## <<,Value_Field, Y,>>
-## <<,Key_is_Date, 1,>>
-## <<,Import_Array_Name, XXX,>>
-##
-## So for CBA price Data
-## <<,Key_Field,1,>>
-## <<,Value_Field,5>>
-##
-## Yields
-## XXX[read_date($1)] => $5
-##
-## %%
-## field-1, field-2, ..., field-NF
-## ...
-## %%
 
-##
-##
-# This reads an array from csv data
-function import_csv_data(array, symbol, name,
-                         a, key, value) {
-
-
-  # Check syntax
-  assert(Key_Field <= NF && Value_Field <= NF, "Illegal import record syntax <" $0 ">")
-
-  # Ok
-  a = initialize_account(symbol)
-
-  # Get the key
-  if (Key_is_Date) {
-    key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
-    assert((-1) != key, Read_Date_Error)
-
-    # Skip dates before the epoch
-    if ((-2) == key)
-      return
-  } else
-    key = trim($Key_Field)
-
-  # Get the value
-  if (Value_is_Date) {
-    value = read_date(trim($Value_Field))
-    assert((-1) != value, Read_Date_Error)
-
-    # Skip dates before the epoch
-    if ((-2) == value)
-      return
-  } else {
-    value = trim($Value_Field)
-    if (!Import_Zero && ((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
-      return # Don't import zero values
-  }
-
-  # Logging
-
-
-  # Set the price
-  (array[a][ key] = ( value))
-
-  # Done
-}
-
-# Syntax is START_JOURNAL, Date
+# Start Record
+# Syntax is [Date] START_JOURNAL
 /START_JOURNAL/ {
 
   # Allow multiple calls
@@ -6192,7 +6349,7 @@ function import_csv_data(array, symbol, name,
     next
   else if (NF > 1)
     # Interpret the date at midnight
-    Start_Record = read_date($2, 0)
+    Start_Record = read_date($1, 0)
   else
     assert((0), "START_JOURNAL, Date: Date is required on first call of start journal")
 
@@ -6217,6 +6374,11 @@ function import_csv_data(array, symbol, name,
   Imputation_Report_Function      = "imputation_report_" tolower(Journal_Currency)
   Gross_Up_Gains_Function   = "gross_up_gains_" tolower(Journal_Currency)
   Get_Taxable_Gains_Function   = "get_taxable_gains_" tolower(Journal_Currency)
+
+  # Set translation rate for journal currency
+  initialize_account("ASSET.CURRENT.CURRENCY:" Journal_Currency)
+  (Price[Long_Name[Journal_Currency]][ Epoch] = ( 1.0))
+
 
   # These functions are not dependent on currency
   Balance_Profits_Function     = "balance_journal"
@@ -6275,6 +6437,92 @@ function import_csv_data(array, symbol, name,
   next
 }
 
+# Default record
+{
+  # Skip empty lines
+  if ("" == $0)
+    next
+
+ # Use a function so we can control scope of variables
+ read_input_record()
+ next
+}
+
+
+
+
+
+## Import Prices
+## The fields
+## These are the those needed for the Price import from the CBA (2019 format)
+# <<,  Key_Field, 1, >>
+# <<, Value_Field, 5, >>
+#
+# # The key field is a date
+# <<, Key_is_Date, 1,>>
+# <<,Value_is_Date ,  0,>>
+#
+# # These are price data
+# <<,Import_Array_Name , Price ,>>
+#
+# #
+
+
+# This asset is AAA.ASX
+## <<,Asset_Prefix, ASSET.CAPITAL.SHARES,>>
+## <<,Asset_Symbol, AAA.ASX,>>
+##
+##
+# This reads an array from human readable data
+function import_data(array, symbol, name,
+                         a, key, value) {
+
+
+  # Check syntax
+  assert(Key_Field <= NF && Value_Field <= NF, "Illegal import record syntax <" $0 ">")
+
+  # Ok
+  a = initialize_account(symbol)
+
+  # Get the key
+  if (Key_is_Date) {
+    key = read_date(($Key_Field)) # Default Hour overruled sometimes
+    assert((-1) != key, Read_Date_Error)
+
+    # Skip dates before the epoch
+    if ((-2) == key)
+      return
+  } else
+    key = ($Key_Field)
+
+  # Get the value
+  if (Value_is_Date) {
+    value = read_date(($Value_Field))
+    assert((-1) != value, Read_Date_Error)
+
+    # Skip dates before the epoch
+    if ((-2) == value)
+      return
+  } else {
+    value = ($Value_Field)
+    if (!Import_Zero && ((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
+      return # Don't import zero values
+
+    # Exchange rates are reciprocal prices
+    if (Value_is_XRate)
+      value = 1.0 / value
+  }
+
+  # Logging
+
+
+  # Set the price
+  (array[a][ key] = ( value))
+
+  # Done
+}
+
+
 function set_financial_year(now,   new_fy) {
   # Which Calendar year is this?
   FY_Year = (strftime("%Y", (now), UTC) + 0)
@@ -6295,35 +6543,6 @@ function set_financial_year(now,   new_fy) {
   FY_Length = (((( FY_Day) <= (60))?( ((((FY_Year) - 1) % 4 == 0 && ((FY_Year) - 1) % 100 != 0) || ((FY_Year) - 1) % 400 == 0)):( (((FY_Year) % 4 == 0 && (FY_Year) % 100 != 0) || (FY_Year) % 400 == 0))) + 365)
 }
 
-# Standard control function syntax is
-# FUNCTION, [ARGUMENT_1, ARGUMENT_2]
-# Control functions are:
-#  SET_ENTRY
-#  SET_BANDS
-#  SET
-#  CHECK
-#  SPLIT
-#  MERGE
-#  CHANGE
-#
-$1 ~  /^([[:space:]])*(ADJUST|CHECK|SET|SHOW|SPLIT|MERGE|CHANGE)/  {
- # Use a function so we can control scope of variables
- read_control_record()
- next
-}
-
-# Default record
-{
-  # Skip empty lines
-  if ("" == $0)
-    next
-
- # Use a function so we can control scope of variables
- read_input_record()
- next
-}
-
-
 
 ## Functions start here
 # Initialize read/write of state files
@@ -6333,14 +6552,14 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
       if (!index(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
-        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
+        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
         Scalar_Names[x] = Array_Names[x]
@@ -6350,108 +6569,19 @@ function initialize_state(    x) {
     # Use default read and write list
     Write_Variables = (0)
     MPX_Arrays = ("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
-    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
+    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
     split(MPX_Scalars, Scalar_Names, " ")
   }
 }
 
-#
-function read_control_record(       now, i, x, p, is_check){
-  # Clear initial values
-  new_line()
-
-  # Use the last recorded date
-  now = ((-1 != Last_Record)?( Last_Record):( Epoch))
-
-  # The control records - must be exact match
-  is_check = 0
-  x = trim($1)
-  switch (x) {
-    case "CHECK" :
-      is_check = 1
-    case "SHOW" :
-      if (!is_check)
-        is_check = -1
-    case "SET" :
-    case "ADJUST" :
-      # Syntax for check and set is
-      # CHECKSET, ACCOUNT, WHAT, X, # Comment
-      # We need to rebuild the line into something more standard
-      # DATE, ACCOUNT, WHAT, X, # Comment
-      #
-      # Some special accounts are needed
-
-      # Put DATE in 1st Field
-      $1 = get_date(now)
-
-      # Check amount is set
-      if (NF < 4) {
-        $4 = 0
-        NF = 4
-      }
-
-      # We can parse this line now
-      i = parse_line(now)
-
-      # Now either check or set the quantity
-      assert(2 == i, $0 " : Unknown syntax for CHECK/SET actions")
-      checkset(now, Account[1], Account[2], Real_Value[(0)], amount, is_check)
-      break
-
-    case "CHANGE"  :
-    case "MERGE" :
-    case "SPLIT" :
-      # SPLIT, ACCOUNT:SOURCE, ACCOUNT:TARGET, FACTOR, # Comment
-      # Put DATE in 1st Field
-      $1 = get_date(now)
-
-      # Copy?
-      if ("CHANGE" == x)
-        $4 = 1
-
-      # Parse the line
-      i = parse_line(now)
-
-      # Merge?
-      if ("MERGE" == x)
-        # The reciprocal of split
-        amount = ((amount)?( 1.0 / amount):( 1))
-
-      # Split Account[1] => Account[2] by factor amount - zero means copy
-      split_account(now, Account[1], Account[2], amount)
-      break
-
-    case "SET_BANDS" :
-      # Set banded thresholds
-      i = trim($2)
-      assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
-      set_array_bands(now, SYMTAB[i], NF)
-      break
-
-    case "SET_ENTRY" :
-      # Set a time-dependent array entry
-      i = trim($2)
-      assert(i in SYMTAB && isarray(SYMTAB[i]), "Variable <" i "> is not an array")
-      p = strtonum($3)
-      (SYMTAB[i][ now] = ( p))
-      break
-
-    default: # This should not happen
-      assert((0), "Unknown Control Record <" i ">")
-      break
-  }
-
-  # Get the next record
-  return
-}
 
 # A function to set banded arrays (like tax bands)
 function set_array_bands(now, bands, nf,     i, k) {
 
   # Negative threshold is required to force correct ordering
-  for (i = 3; i < nf; i += 2) {
+  for (i = 4; i < nf; i += 2) {
     k = strtonum($(i+1))
     bands[now][-k] = strtonum($i)
 
@@ -6460,7 +6590,7 @@ function set_array_bands(now, bands, nf,     i, k) {
   # Need to deal with case
   # %%,DATE,<ACTION>,15
   # i.e $(i+1) does not exist
-  if (3 == nf) {
+  if (4 == nf) {
     bands[now][0] = strtonum($nf)
 
   }
@@ -6506,8 +6636,12 @@ function read_input_record(   t, n, a, threshold) {
   } else # Check for semi-monotonicity
     assert(t == Last_Record, sprintf("Current entry %s is earlier than the previously recorded transaction %s", $0, get_date(Last_Record)))
 
-  # Modular form - parse the line
-  # returns number of accounts
+  # Parse the line
+  # First filter out any control actions (ADJUST|CHANGE|CHECK|MERGE|SET|SHOW|SPLIT)
+  if (control_action(t))
+    return
+
+  # Returns number of accounts
   n = parse_line(t)
 
   # There are n accounts in each transaction
@@ -6531,6 +6665,73 @@ function read_input_record(   t, n, a, threshold) {
   delete Account
 }
 
+## Apply a account control action
+function control_action(now,    i, is_check, x) {
+  #
+  # Trim the fields
+  for (i = 2; i <= NF; i ++)
+    # Need to remove white space from the fields
+    $i = ($i)
+
+  # Is this a control action?
+  # (ADJUST|CHANGE|CHECK|MERGE|SET|SHOW|SPLIT)
+  x = $2
+
+  # First deal with the case when X needs adjustment
+  is_check = 2
+  switch (x) {
+    case "CHANGE"  :
+      $5 = 1
+      break
+    case "MERGE"  : # Recirpocal of split
+      $5 = (($5)?( 1.0 / $5):( 1))
+      break
+    case "SPLIT"  :
+      $5 = (($5)?( $5):( 1))
+      break
+
+
+    # Checkset actions
+    case "CHECK" :
+      is_check = 1
+      break
+    case "SHOW" :
+      is_check = -1
+      break
+    case "SET" :
+    case "ADJUST" :
+      is_check = 0
+      break
+    default  :
+      return (0)
+  }
+
+  # Syntax for CONTROL is
+  # DATE CONTROL A B [X] [# Comment]
+  # We need to rebuild the line into something more standard
+  # DATE A B X [# Comment]
+  if (NF < 5) {
+    $5 = 0
+    NF = 5
+  }
+  for (i = 2; i < NF; i ++)
+    $i = $(i + 1)
+  NF --
+
+  # We can parse this line now
+  i = parse_line(now)
+  assert(2 == i, $0 " : Unknown syntax for CONTROL action <" x ">")
+
+  # Is this a CHANGE|MERGE|SPLIT action?
+  if (2 == is_check)
+    split_account(now, Account[1], Account[2], amount)
+  else
+    checkset(now, Account[1], Account[2], Real_Value[(0)], amount, is_check)
+
+  # Get the next record
+  return (1)
+}
+
 # Break out transaction parsing into a separate module
 function parse_transaction(now, a, b, amount,
                            units,
@@ -6540,6 +6741,7 @@ function parse_transaction(now, a, b, amount,
                            bought_parcel,
                            current_brokerage, gst,
                            correct_order, tax_credits,
+                           other_currency,
                            fields, number_fields) {
 
   # No swop
@@ -6550,6 +6752,10 @@ function parse_transaction(now, a, b, amount,
 
   # a list of output fields is needed
   ((SUBSEP in fields)?((1)):((0)))
+
+  # Just process the amount at this point - later consider other values (especially brokerage!)
+  if (Transaction_Currency)
+    amount *= Translation_Rate
 
   # Special franking provisions
   if (a == TAX) {
@@ -6598,7 +6804,7 @@ function parse_transaction(now, a, b, amount,
   if (((a) ~ ("^" ( "INCOME") "[.:]"))) {
     # Income accounts are caught to check for franking credits
     # Income must always be account a
-    tax_credits = Real_Value[(1)]
+    tax_credits = Translation_Rate * Real_Value[(1)]
     Real_Value[(1)] = 0
 
     # Get the underlying asset (if there is one)
@@ -6649,8 +6855,8 @@ function parse_transaction(now, a, b, amount,
     # Now LIC deduction if any
     if (((((Real_Value[(2)]) - ( Epsilon)) > 0) || (((Real_Value[(2)]) - ( -Epsilon)) < 0))) {
       # Record LIC Deduction to the listing
-      sum_entry(LIC_Deduction, - Real_Value[(2)], now)
-      fields[++ number_fields] = Real_Value[(2)]
+      sum_entry(LIC_Deduction, - Translation_Rate * Real_Value[(2)], now)
+      fields[++ number_fields] = Translation_Rate * Real_Value[(2)]
     }
 
     # Now check for a timestamp - this is the ex-dividend date if present
@@ -6722,17 +6928,17 @@ function parse_transaction(now, a, b, amount,
   # A sale transaction
   if (units < 0) {
     # The asset being sold must be "a" but if equity must be "b"
-    correct_order = (((( a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) && is_open( a, now)) || ((( b) ~ /^EQUITY[.:]/) && is_open( b, now)))
+    correct_order = (((( a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/) && is_open( a, now)) || ((( b) ~ /^EQUITY[.:]/) && is_open( b, now)))
     assert(correct_order, sprintf("%s => can't sell either %s or %s\n", $0, (Leaf[a]), (Leaf[b])))
 
     # If this is not an asset sale swop the accounts
-    if (!((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || (!is_open((a), ( now)))) {
+    if (!((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/) || (!is_open((a), ( now)))) {
       swop = a; a = b; b = swop
       amount = - amount
     }
 
     # Get brokerage (if any)
-    current_brokerage = Real_Value[(1)]
+    current_brokerage = Translation_Rate * Real_Value[(1)]
     Real_Value[(1)] = 0
 
     # Amount should be the consideration as recorded by the broker
@@ -6775,7 +6981,21 @@ function parse_transaction(now, a, b, amount,
     sell_units(now, a, -units, amount + g, Parcel_Name, Extra_Timestamp)
 
     # And simply adjust settlement account b by the
-    adjust_cost(b, amount, now)
+    if (Real_Value[(-1)] > 0) {
+      # This is a forex account - extra arguments fo not apply to complementary account
+      buy_units(now, b, Real_Value[(-1)], amount)
+
+      # Update parent entries for <b>
+      update_cost(b, amount, now)
+      Real_Value[(-1)] = 0
+    } else # Normal account
+      adjust_cost(b, amount, now)
+
+    # Buy units in asset (b) - this ignores impact of brokerage
+    bought_parcel = buy_units(now, b, units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
+
+    # Adjust the cost of this **parcel** for the impact of brokerage and GST
+    adjust_parcel_cost(b, bought_parcel, now, current_brokerage - g,  II, (0))
 
     # Did we swop? If so swop back
     if (b == swop) {
@@ -6801,11 +7021,11 @@ function parse_transaction(now, a, b, amount,
   } else if (units > 0) {
     # # For a purchase the asset must be account "b"
     # This must be a purchase
-    correct_order = ((( b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/) || ((a) ~ /^EQUITY[.:]/))
+    correct_order = ((( b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/) || ((a) ~ /^EQUITY[.:]/))
     assert(correct_order, sprintf("%s => can't buy asset %s\n", $0, (Leaf[b])))
 
     # If this is not an asset purchase swop the accounts
-    if (!((b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/)) {
+    if (!((b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/)) {
       swop = a; a = b; b = swop
       amount = - amount
     }
@@ -6831,12 +7051,17 @@ function parse_transaction(now, a, b, amount,
 
     # Allow for brokerage if required - note can't have brokerage with depreciation
     if (((((Real_Value[(1)]) - ( Epsilon)) > 0) || (((Real_Value[(1)]) - ( -Epsilon)) < 0))) {
-      current_brokerage = Real_Value[(1)]
+      current_brokerage = Translation_Rate * Real_Value[(1)]
       Real_Value[(1)] = 0
     }
 
-    # Simply adjust cost of <a> by the whole amount
-    adjust_cost(a, -amount, now)
+    # And simply adjust settlement account a by the
+    if ((((Real_Value[(-2)]) - ( -Epsilon)) < 0)) {
+      # This is a forex account - extra arguments fo not apply to complementary account
+      sell_units(now, a, - Real_Value[(-2)], amount)
+      Real_Value[(-2)] = 0
+    } else # Simply adjust cost of <a> by the whole amount
+      adjust_cost(a, -amount, now)
 
     # Impact of GST
     if (((((GST_Claimable) - ( Epsilon)) > 0) || (((GST_Claimable) - ( -Epsilon)) < 0))) {
@@ -6913,8 +7138,8 @@ function parse_transaction(now, a, b, amount,
 
     # One account must be unitized or term limited
     # This logic is opaque...
-    if (((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/) || ((b) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/)) {
-      assert(!((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/) ||  !((b) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/),
+    if (((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/) || ((b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/)) {
+      assert(!((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/) ||  !((b) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/),
                sprintf("%s Both %s and %s cannot be unitized when parcel timestamp [%s] is set",
                $0, (Leaf[a]), (Leaf[b]), get_date(Extra_Timestamp)))
       # Instalment purchase
@@ -7032,7 +7257,7 @@ function checkset(now, a, account, units, amount, is_check,
       case "VALUE" :
         quantity = get_value(account, now); break
       case "PRICE" :
-        assert(((account) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/), sprintf("CHECK/SHOW: Only assets or equities have a PRICE: not %s\n", (Leaf[account])))
+        assert(((account) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/), sprintf("CHECK/SHOW: Only assets or equities have a PRICE: not %s\n", (Leaf[account])))
         quantity = ((__MPX_KEY__ = find_key(Price[account],  now))?( Price[account][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[account][0]):( 0)))); break
 
       case "BALANCE" :
@@ -7044,12 +7269,10 @@ function checkset(now, a, account, units, amount, is_check,
     }
 
     # Is this a checkpoint?
-    if ((1) == is_check)
-      assert(((((amount - quantity) - ( Epsilon)) <= 0) && (((amount - quantity) - ( -Epsilon)) >= 0)), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
+    assert(((((amount - quantity) - ( Epsilon)) <= 0) && (((amount - quantity) - ( -Epsilon)) >= 0)), sprintf("%s fails checkpoint %s [%s] => %.4f != %.4f\n",
                                                  (Leaf[account]), action, get_date(now, LONG_FORMAT), quantity, amount))
-    else
-      # Show this
-      printf "## %s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
+    # Show this
+    printf "## %s %s %s => %s\n", get_date(now), account, action,  format_value(quantity)
   } else {
     # is a setter
     switch(action) {
@@ -7073,7 +7296,7 @@ function checkset(now, a, account, units, amount, is_check,
         adjust_cost(account, amount, now)
 
         # top level class
-        adjust_cost(((((get_name_component(account, 1)) ~ /^\*/))?( (get_name_component(account, 1))):( (("*") (get_name_component(account, 1))))), - amount, now)
+        adjust_cost(((((get_name_component(account, 1)) ~ ("*")))?( (get_name_component(account, 1))):( (("*") (get_name_component(account, 1))))), - amount, now)
         break
 
       default : assert((0), sprintf("ADJUST/SET: %s => Unkown action %s\n",
@@ -7139,7 +7362,7 @@ END {
     # The last line is (oddly enough) when the journal starts -
     # this allows initialization to occur when the file is read back in
     if (!Write_Variables)
-      printf "START_JOURNAL, %s\n", get_date(Start_Record) > Write_State
+      printf "%s%sSTART_JOURNAL\n", get_date(Start_Record, ("%F")       ), OFS > Write_State
   }
 
   # Log data about selected variables
@@ -7255,8 +7478,9 @@ function buy_units(now, a, u, x, parcel_tag, parcel_timestamp,
   p = x / u
 
 
-  # Set the new price
-  (Price[a][ now] = ( p))
+  # Set the new price - not when Translation_Rate is set or this is circular
+  if (!Translation_Currency)
+    (Price[a][ now] = ( p))
 
   # Return the parcel id
   return last_parcel
@@ -7304,6 +7528,9 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
 #  Sale receipts go to cash_out and happen at Held_Until
 #  At this point only the adjusted cost is made use of
 function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost, catch_up_depreciation, t) {
+  # Set a default parcel_timestamp
+  parcel_timestamp = (("" == parcel_timestamp)?( (-1)):( parcel_timestamp))
+
 
 
   # Try adjusting units now...
@@ -7361,8 +7588,9 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     # Both x & u are positive by design
     new_price = x / u
 
-    # Can set the price of a normal asset
-    (Price[ac][ now] = ( new_price))
+    # Can set the price of a normal asset - not when Transaction_Currency is set
+    if (Transaction_Currency)
+      (Price[ac][ now] = ( new_price))
   }
 
   # Default assumption is first-in-first-out (FIFO)
@@ -7456,8 +7684,12 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
 
   # Save realized gains
   if (((a) ~ /^ASSET\.FIXED[.:]/))
-    gains = sell_fixed_parcel(a, p, now, - amount_paid)
-  else
+    # A depreciating asset 
+    gains = save_parcel_income(a, p, now, - amount_paid,  SOLD_APPRECIATION, SOLD_DEPRECIATION)
+  else if (((a) ~ /^ASSET\.CURRENT\.CURRENCY[.:]/))
+    # This should be treated as income rather than as capital gains and losses
+    gains = save_parcel_income(a, p, now, - amount_paid,  FOREX_INCOME, FOREX_EXPENSE)
+  else # Normal capital gains
     gains = save_parcel_gain(a, p, now, - amount_paid)
 
   # Don't need to set the accounting cost to zero because get_cost will pick that up automatically
@@ -7475,29 +7707,29 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   return is_split
 } # End of if non-zero Parcel
 
-#
-# When a parcel of a fixed asset is sold
-# it changes the depreciation amounts
-function sell_fixed_parcel(a, p, now, gains,    cost) {
-  # A depreciating asset will neither have capital gains nor losses
+# Some parcels when sold are treated as income rather than gains
+# Namely fixed (depreciating) assets and foreign exchange
+function save_parcel_income(a, p, now, income, income_account, expense_account,   cost) {
   # Suppose current value => c  (c >= 0)
   # Proceeds received     => p  (p <= 0)
   #
   # After sale value      => 0
-  # Depreciation          => c + p <= 0
-  # Appreciation             c + p >  0
+  # Expenses              => c + p >= 0
+  # Income                => c + p <  0
 
-  gains += sum_cost_elements(Accounting_Cost[a][p], now)
+  income += sum_cost_elements(Accounting_Cost[a][p], now)
 
 
   # Any excess income or expenses are recorded
-  if ((((gains) - ( Epsilon)) > 0)) # This was a DEPRECIATION expense
-    adjust_cost(SOLD_DEPRECIATION, gains, now)
-  else if ((((gains) - ( -Epsilon)) < 0)) # This was APPRECIATION income
-    adjust_cost(SOLD_APPRECIATION, gains, now)
+  if ((((income) - ( Epsilon)) > 0)) # This was an expense
+    adjust_cost(expense_account, income, now)
+  else if ((((income) - ( -Epsilon)) < 0)) # This was income
+    adjust_cost(income_account, income, now)
+  else # Negligible income
+    income = 0
 
-  # return parcel gains
-  return gains
+  # return parcel income
+  return income
 }
 
 # Save a capital gain
@@ -7564,8 +7796,10 @@ function copy_parcel(a, p, b, q,     e, key) {
   Held_From[b][q] = Held_From[a][p]
   Held_Until[b][q] = Held_Until[a][p]
   Parcel_Proceeds[b][q] = Parcel_Proceeds[a][p]
-  if ((( ac in Parcel_Tag) && ( p in Parcel_Tag[ ac])))
+  if ((( a in Parcel_Tag) && ( p in Parcel_Tag[ a]))) {
     Parcel_Tag[b][q] = Parcel_Tag[a][p]
+    delete Parcel_Tag[a][p]
+  }
 
   # Copy all entries
   # Note keys will not match so need to delete old entries from parcel q
@@ -7577,9 +7811,6 @@ function copy_parcel(a, p, b, q,     e, key) {
   for (key in Tax_Adjustments[a][p])
     Tax_Adjustments[b][q][key]  = Tax_Adjustments[a][p][key]
 }
-
-
-
 
 function split_parcel(ac, p, du,   fraction_kept, e, key) {
   # Split partly sold parcel p into parcel p (all sold)

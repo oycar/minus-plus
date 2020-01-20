@@ -81,9 +81,12 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
 }
 
 # read csv records
-function read_csv_records() {
-  # This is a CSV file
-  FPAT = "([^,]*)|(\"[^\"]+\")"
+function read_csv_records(use_csv) {
+  # Set the separator
+  if (use_csv)
+    FPAT = "([^,]*)|(\"[^\"]+\")"
+  else
+    FPAT = "([^[:space:]]+)|(\"[^\"]+\")|(\\[[^]]+\\])|(#(.)*)"
 }
 
 # Abstract read value out
@@ -93,52 +96,83 @@ function read_value(x) {
   if (x ~ /^[0-9\.\-]+$/)
     return strtonum(x)
 
+  if (x ~ /^"([[:print:]])+"$/)
+    x = ctrim(x, "\"")
+
   # Just return the field
+  return x
+}
+
+# Read a state field
+function read_field(field, x) {
+  if (get_key(Time_Fields, field)) {
+    x = read_date(trim($field))
+    assert(DATE_ERROR != x, Read_Date_Error)
+  } else
+    x = trim($field)
+
   return x
 }
 
 
 # A somewhat generalized variable reading function
-function read_state(nf,    i, x, value) {
+##
+
+function read_state(name, adjust_value, first_field, last_field,    i, x, value) {
+  # The end of the input
+  if (first_field > last_field)
+    return "" # None read
+
   # The fields represent the keys & value
-  value = read_value($nf)
+  value = read_value($last_field)
 
   # Logging
 @ifeq LOG read_state
-  printf "%s", Variable_Name > STDERR
+  printf "%s => ", name > STDERR
 @endif
 
-  # Is this an array?
-  if (nf == 1) { # No
-    SYMTAB[Variable_Name] = value
+  # Is this a scalar?
+  if (first_field == last_field) {
+    # Yes
+    if (adjust_value)
+      SYMTAB[name] += adjust_value * value
+    else
+      SYMTAB[name]  = value
+
 @ifeq LOG read_state
-    # Logging
-    printf " => %s\n", value > STDERR
+      # Logging
+      printf " %s\n", value > STDERR
 @endif
+
   } else {
     # The rest of the keys
-    for (i = 1; i < nf; i ++)
+    for (i = first_field; i < last_field; i ++)
       # The code can minimize output file by
       # retaining the old key if the "ditto"
       # symbol is encountered;
       if (($i != DITTO) || !(i in Variable_Keys))
-        Variable_Keys[i] = $i
-
-@ifeq LOG read_state
-    # Logging
-    for (i = 1; i < nf; i++)
-      printf "[%s]", Variable_Keys[i] > STDERR
-    printf " => %s\n", value > STDERR
-@endif
+        Variable_Keys[i] = read_field(i)
 
     # Set the array value
-    set_array(SYMTAB[Variable_Name], Variable_Keys, 1, nf - 1, value, FALSE)
+    set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, adjust_value, FALSE)
+
+@ifeq LOG read_state
+    # Print the whole array out
+    walk_array(SYMTAB[name], 1, STDERR)
+@endif
   }
+
+  return value
+}
+
+# Delete an array
+function clear_array(array) {
+  delete array
 }
 
 # Set a multi-dimensional array value
 # This assumes array is correctly defined
-function set_array(array, keys, first_key, last_key, value, flag) {
+function set_array(array, keys, first_key, last_key, value, adjust_value, flag) {
   # The idea of deleting the a temporary scalar entry in this function was based on
   # Ed Morton's code found here => https://groups.google.com/forum/#!topic/comp.lang.awk/vKiSODr6Bds
   # Catch errors
@@ -153,10 +187,13 @@ function set_array(array, keys, first_key, last_key, value, flag) {
   }
 
   # Set the array recursively
-  if (first_key == last_key)
+  if (first_key == last_key) {
     # Set the value
-    set_entry(array, value, keys[first_key])
-  else {
+    if (adjust_value)
+      sum_entry(array, adjust_value * value, keys[first_key])
+    else
+      set_entry(array, value, keys[first_key])
+  } else {
     # Yikes
     # We need to ensure the subarray exists before calling set_array() otherwise
     # inside set_array() the entry would be a scalar, but then we need to delete
@@ -168,7 +205,7 @@ function set_array(array, keys, first_key, last_key, value, flag) {
     }
 
     # Recursively set the array elements
-    set_array(array[keys[first_key]], keys, first_key + 1, last_key, value, flag)
+    set_array(array[keys[first_key]], keys, first_key + 1, last_key, value, adjust_value, flag)
   }
 }
 
@@ -178,7 +215,7 @@ function write_state(array_names, scalar_names,    name) {
   # Keep track of keys written out
   for (name in array_names) {
     make_array(Key_Index)
-    printf "<<,%s\n", array_names[name] > Write_State
+    printf "<<%s%s\n", OFS, array_names[name] > Write_State
     walk_array(SYMTAB[array_names[name]], 1, Write_State)
     printf ">>\n" > Write_State
     delete Key_Index
@@ -186,7 +223,7 @@ function write_state(array_names, scalar_names,    name) {
 
   # The scalars - compact form
   for (name in scalar_names)
-    printf "<<,%s,%s,>>\n", scalar_names[name], format_value(SYMTAB[scalar_names[name]]) > Write_State
+    printf "<<%s%s%s%s%s>>\n", OFS, scalar_names[name], OFS, format_value(SYMTAB[scalar_names[name]]), OFS > Write_State
 }
 
 # This walks the array that we want to dump to file
@@ -216,13 +253,13 @@ function walk_array(arr, level, stream,    key, last_key, i) {
       # Finished at the base level
       # The output string
       for (i = 1; i < level; i++) {
-        printf "%s,", Key_Index[i] > stream
+        printf "%s%s", Key_Index[i], OFS > stream
         if (DITTO)
           Key_Index[i] = DITTO
       }
 
       # Complete the output - use special key for deepest level
-      printf "%s,%s\n", last_key, format_value(arr[key]) > stream
+      printf "%s%s%s\n", last_key, OFS, format_value(arr[key]) > stream
     }
   }
 }
@@ -239,6 +276,8 @@ function format_value(v) {
   }
 
   # Return the formatted value
+  if (v ~ /[[:space:]]/)
+    return ("\"" v "\"")
   return v
 }
 
@@ -438,7 +477,7 @@ function maximum_entry(array, start_bracket, end_bracket,
 # White space trimming
 function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
 function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
-function trim(s) { return rtrim(ltrim(s)); }
+#function trim(s) { return rtrim(ltrim(s)); }
 function to_number(s, default_value) {return "" == s ? default_value : strtonum(s)}
 
 # character trimming
@@ -459,7 +498,7 @@ function ctrim(s, left_c, right_c,      string) {
 # Clear global values ready to read a new input record
 function new_line(  key) {
   # Clear real values
-  for (key = 0; key < 3; key ++)
+  for (key in Real_Value)
     Real_Value[key] = 0
 
   Extra_Timestamp = DATE_ERROR
@@ -472,6 +511,8 @@ function new_line(  key) {
   Comments = ""
 
   Account[1] = Account[2] = ""
+  Transaction_Currency = FALSE
+  Translation_Rate = 1
 }
 
 # Accounting format printing
@@ -491,16 +532,13 @@ function print_cash(x,   precision) {
 # Journal styles (date format is somewhat flexible)
 #      2017 Aug 24, AMH.DIV, AMH.ASX, 2703.96, 3072, [1025.64,] [1655.49], # DRP & LIC
 function parse_line(now,    i, j, x, number_accounts) {
+
   #
   # The record may be
   #     Double Entry => two accounts
   #     Single Entry => one account
   #  or No Entry => zero accounts
-  for (i = 2; i <= NF; i ++)
-    # Need to remove white space from the fields
-    $i = trim($i)
-
-  # Get next one or two fields
+  #  Get next one or two fields
   for (i = 1; i < 3 && i < NF; i ++) {
     # The field id
     j = i + 1
@@ -530,14 +568,62 @@ function parse_line(now,    i, j, x, number_accounts) {
 
   #
   # The amount
-  # Must exist if number accounts > 0
-  if (number_accounts) {
+  # Must exist if number accounts == 2
+  if (2 == number_accounts) {
     i ++
-    j = 0
 
-    # Must ba number
-    assert($i ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax amount <" $i "> is not a number")
+    # The amount - usually in the default currency
+    # BUT may be prefixed by an ISO 4217 Currency Code (Three Uppercase Characters.)
+    amount = $i
+    if ($i ~ /^[[:upper:]]{3}$/) {
+      # Explicit currency given
+      if (Enforce_Qualification) {
+        assert($i in Long_Name, "Currency Code <" $i "> not defined - provide exchange rates")
+        Transaction_Currency = Long_Name[$i]
+      } else if ($i in Long_Name)
+        Transaction_Currency = Long_Name[$i]
+      else {
+        printf "## Warning Ignoring Unknown Currency Code %s - treating as Journal Currency %s\n", $i, Journal_Currency > STDERR
+        Transaction_Currency = Long_Name[Journal_Currency]
+      }
+
+
+      # Is this a simple currency translation -
+      j = i + 1
+      assert($j ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax: cash amount <" $j "> is not a number")
+
+      # is this a purchase or a sale of currency units?
+      if (Account[2] == Transaction_Currency)
+        Real_Value[BUY_FOREX_KEY] = $i = strtonum($j) # A purchase (of forex)
+      else if ((Account[1] == Transaction_Currency) && is_open(Account[1], now)) {
+        $i = strtonum($j) # A sale
+        Real_Value[SELL_FOREX_KEY] = $j = - $i # A sale (of forex)
+      } else { # Other cases
+        # Rebuild line - remove currency code and shuffle down fields
+        for (j = i; j < NF; j ++)
+          $j = $(j + 1)
+        NF --
+      }
+
+      # Get translation price
+      if (Transaction_Currency in Price)
+        Translation_Rate = find_entry(Price[Transaction_Currency], now)
+      else
+        Translation_Rate = ""
+
+      # Did we get a price?
+      assert("" != Translation_Rate, "No exchange rate available for <" Transaction_Currency "> at <" get_date(now) ">")
+    } else {
+      # Use default currency
+      Transaction_Currency = FALSE
+      Translation_Rate = 1
+    }
+
+    # Check that this is a number
     amount = strtonum($i)
+
+    # Zero j
+    j = ternary(Real_Value[BUY_FOREX_KEY] || Real_Value[SELL_FOREX_KEY], -1, 0)
   } else
     j = 1
 
@@ -583,13 +669,14 @@ function parse_line(now,    i, j, x, number_accounts) {
     # Shared code - save x if set
     if (x) { # x is not zero or ""
       # The zeroth case can be Units
-      if (0 == j) {
-        if (above_zero(x) && is_purchase(Account[1], Account[2]))
+      # If there is a non default transaction currency
+      if (0 >= j) {
+        if (above_zero(x) && is_purchase(Account[1], Account[2])) {
           # Interpret these as units
-          Real_Value[j] = x
-        else if (below_zero(x) && is_sale(now, Account[1], Account[2]))
-          Real_Value[j] = x
-        else # This is not Units so it is the next possible real value, index 1
+          Real_Value[UNITS_KEY] = x
+        } else if (below_zero(x) && is_sale(now, Account[1], Account[2])) {
+          Real_Value[UNITS_KEY] = x
+        } else # This is not Units so it is the next possible real value, index 1
           Real_Value[j = 1] = x
       } else
         Real_Value[j] = x
@@ -600,7 +687,7 @@ function parse_line(now,    i, j, x, number_accounts) {
 
       # Treat as a comment
       if (x)
-        Comments = add_field(Comments, x, ", ")
+        Comments = add_field(Comments, x, OFS)
     }
 
     # Increment i & j
@@ -608,9 +695,9 @@ function parse_line(now,    i, j, x, number_accounts) {
     j ++
   }
 
-  # Comments should be signified with an octothorpe
+  # Comments should be signified with an octothorp
   if (Comments !~ /^#/)
-    Comments = add_field("# ", Comments, ", ")
+    Comments = add_field("# ", Comments, OFS)
 
   # Documents can be added as comments
   # Some special document names are supported
@@ -622,7 +709,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     i = parse_document_name(x, now)
 
     # Add the parsed name to the comments
-    Comments = add_field(Comments, i, ", ")
+    Comments = add_field(Comments, i, OFS)
   }
 
   # All done - return record type
@@ -953,6 +1040,10 @@ function set_special_accounts() {
   SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
   SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
 
+  # When a foreign exchange asset is sold any profit or loss is booked as income/expense to these accounts
+  FOREX_INCOME  =  initialize_account("INCOME.FOREX:FOREX.GAINS")
+  FOREX_EXPENSE =  initialize_account("EXPENSE.FOREX:FOREX.LOSSES")
+
   # Built in TAX accounts - debtor like
   WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
   PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
@@ -1042,12 +1133,13 @@ function one_year(now, sense,     year, day, sum) {
 # Useful account filters
 function is_open(a, now,     p) {
   # An asset is open if there are unsold parcels at time 'now'
-  for (p = 0; p < Number_Parcels[a]; p ++) {
-    if (greater_than(Held_From[a][p], now))
-      break
-    if (is_unsold(a, p, now))
-      return TRUE
-  }
+  if (is_unitized(a))
+    for (p = 0; p < Number_Parcels[a]; p ++) {
+      if (greater_than(Held_From[a][p], now))
+        break
+      if (is_unsold(a, p, now))
+        return TRUE
+    }
   return FALSE
 }
 
@@ -1058,7 +1150,7 @@ function is_ancestor(a, b,    p) {
 
   # Check
   p = Parent_Name[b]
-  while ("" != p) {
+  while (STAR != p) {
     if (a == p) # Found
       return TRUE
     p = Parent_Name[p]
@@ -1084,13 +1176,6 @@ function held_to(ac, now,     p, latest_sale) {
 
   return latest_sale # returns the date the parcel was sold
 }
-
-# # Initialize cost element arrays
-# function set_array_entries(array, key,     e) {
-#   # Set all true cost elements to zero - ie elements I-V
-#   for (e in Elements)
-#     array[e][now] = 0
-# }
 
 # This splits up a branch name or a leaf name into dotted components
 function get_name_component(name, i, number_components, array,    name_length, s, dot) {
@@ -1213,9 +1298,11 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 @ifeq LOG adjust_cost
     printf "\tCurrent Total Cost   => %s\n", print_cash(get_cost(a, now)) > STDERR
 @endif # LOG
-  } else
+  } else if (a in Cost_Basis)
     # This is the corresponding account
     sum_entry(Cost_Basis[a], x, now)
+  else
+    Cost_Basis[a][now] = x
 
   # Balance costs
   update_cost(a, x, now)
@@ -1225,12 +1312,14 @@ function adjust_cost(a, x, now, tax_adjustment,     i, adjustment, flag) {
 function update_cost(a, x, now,      p) {
   # Now get the parent to this account
   p = Parent_Name[a]
-  if ("" == p)
+  if (STAR == p)
     return # Finished
 
   # Update the cost
-  assert(p in Cost_Basis, "Failed to find Cost_Basis of account  <" p ">")
-  sum_entry(Cost_Basis[p], x, now)
+  if (p in Cost_Basis)
+    sum_entry(Cost_Basis[p], x, now)
+  else
+    Cost_Basis[p][now] = x
 
   # Logging
 @ifeq LOG update_cost
@@ -1515,15 +1604,15 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
   # Is it not zero entry?
   if ("" != a)
     # At least single entry
-    string = string sprintf(", %13s, ", Leaf[a])
+    string = string sprintf("%s %13s ", OFS, Leaf[a])
 
   # Is it double entry?
   if ("" != b)
-    string = string sprintf("%13s, ", Leaf[b])
+    string = string sprintf("%13s%s ", Leaf[b], OFS)
 
   # Amount  and cost element and or units - if at least one entry
   if (a || b) {
-    string = string sprintf("%11.2f, ", amount)
+    string = string sprintf("%11.2f%s ", amount, OFS)
     if (element_string && element_string != COST_ELEMENT)
       string = string sprintf("%10s", element_string)
     else # Pretty print
@@ -1532,15 +1621,15 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf(", %14s", print_cash(get_cost(matched, now)))
+      string = string sprintf("%s %14s", OFS, print_cash(ternary(is_currency(matched), get_units(matched, now), get_cost(matched, now))))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)
-        string = string ", " fields[i]
+        string = string OFS " " fields[i]
   }
 
   # All done
-  print string ", " comments
+  print string OFS " " comments
 } # End of printing a transaction
 
 function initialize_account(account_name,    class_name, array, p, n,
@@ -1591,8 +1680,10 @@ function initialize_account(account_name,    class_name, array, p, n,
   if (class_name ~ RESERVED_CLASSES) {
     assert(2 == split(account_name, array, ":"), sprintf("<%s> Account name %s is not in branch_name:leaf_name format", $0, account_name))
     leaf_name = array[2]
-  } else
+  } else {
+    assert(!Enforce_Names, sprintf("<%s> Account name %s is not defined", $0, account_name))
     leaf_name = account_name
+  }
 
   # Finally an uninitialized long name
   # BUT there is another trap;
@@ -1610,7 +1701,7 @@ function initialize_account(account_name,    class_name, array, p, n,
   if ((leaf_name in Long_Name)) {
     if (Leaf[Long_Name[leaf_name]] == leaf_name) {
       # If the existing account is new (unused) it can be deleted
-      assert(is_new(Long_Name[leaf_name]), sprintf("Account name %s: Leaf name[%s] => %s is already taken", account_name, leaf_name, Long_Name[leaf_name]))
+      assert(!(Long_Name[leaf_name] in Cost_Basis), sprintf("Account name %s: Leaf name[%s] => %s is already taken", account_name, leaf_name, Long_Name[leaf_name]))
 
       # Must be a new (unused) name
       delete Long_Name[leaf_name]
@@ -1637,18 +1728,13 @@ function initialize_account(account_name,    class_name, array, p, n,
     # Stored (as sums) by parcel, cost element and time
     # eg Accounting_Cost[account][parcel][element][time]
 
-
     # p=-1 is not a real parcel
     Held_From[account_name][-1] = Epoch # This is needed by buy_units - otherwise write a macro to handle case of first parcel
     Parcel_Tag[account_name][SUBSEP] ; delete Parcel_Tag[account_name][SUBSEP] #
 
     # Keep track of units
     Total_Units[account_name][Epoch]     = Qualified_Units[account_name][Epoch] = 0
-
-    # Each account also has a number of parcels
-    set_key(Number_Parcels, account_name, 0)
-
-    # End of if ASSET
+    # End of if Unitized
   } else if (is_class(account_name, "INCOME")) {
     # Set an Underlying_Asset if the leaf name
     # is of the appropriate format
@@ -1670,25 +1756,19 @@ function initialize_account(account_name,    class_name, array, p, n,
     }
   }
 
-  # Initialize account with common entries
-  Cost_Basis[account_name][SUBSEP]; delete Cost_Basis[account_name][SUBSEP]
-
   # refer  to the parent item eg parent[A.B.C] => *A.B (long_name minus short_name with a distinguishing prefix)
-  p = Parent_Name[account_name] = "*" array[1]
+  p = Parent_Name[account_name] = STAR array[1]
 
   # How many components in the name "p"
   n = split(p, array, ".")
 
   # Initialize the cost bases for this account's parents
-  while (p && !(p in Parent_Name)) {
-    # a new meta-account - needs a cost-basis
-    Cost_Basis[p][Epoch] = 0
-
+  while (!(p in Parent_Name)) {
     # Get p's parent - lose the last name component
     if (n > 1)
       Parent_Name[p] = get_name_component(p, 1, --n, array)
     else
-      Parent_Name[p] = ""
+      Parent_Name[p] = STAR
 
     # Update p
     p = Parent_Name[p]
@@ -1833,7 +1913,7 @@ function filter_array(now, data_array, name, show_blocks,
                            stack, key, first_key,
                            earliest_key, latest_key, s) {
 
-  # Record the earlist and latest keys found
+  # Record the earliest and latest keys found
   if (show_blocks) {
     # Report on data held
     print Journal_Title > STDERR
@@ -2047,7 +2127,6 @@ function depreciate_now(a, now,       p, delta, sum_delta,
   return sum_delta
 }
 
-
 # get_tax payable on total income
 # can be used to get other banded quantities such as the low income tax offset & the medicare levy
 function get_tax(now, bands, total_income,
@@ -2056,8 +2135,26 @@ function get_tax(now, bands, total_income,
                       band_width,
                       current_key, last_threshold, threshold) {
 
-  # More than one tax band - much more tricky
+  # Tax bands can either be the bands themselves
+  # eg Band[T_0] => 0.20
+  #    Band[T_1] => 0.30
+  #    Band[T_2] => 0.40
+  #
+  #    and so on
+  #
+  #  Or the negative integral
+  #    Band[T_0] =>   0.00
+  #    Band[T_1] => - 0.20 * (T_1 - T_0)
+  #    Band[T_2] => - 0.20 * (T_1 - T_0) - 0.30 * (T_2 - T_1)
+  #
+
+  # Get the current tax band
   current_key = find_key(bands, now)
+
+  # Ensure bands are listed in decreasing order
+  invert_array(bands[current_key])
+
+  # Compute tax
   tax_payable = last_threshold = 0
   for (threshold in bands[current_key]) {
     # The last band's width
@@ -2086,29 +2183,33 @@ function get_tax(now, bands, total_income,
 
 # the inverse function
 # only uses tax bands - not levies
-function get_taxable_income(now, tax_left,
+function get_taxable_income(now, bands, tax_left,
                                  total_income, band_width, band_tax,
                                  current_key, last_threshold, threshold) {
-  # Now get the tax due on the whole sum
-  current_key = find_key(Tax_Bands, now)
-  last_threshold = 0
+
+  # Get the current tax band
+  current_key = find_key(bands, now)
+
+  # Ensure bands are listed in decreasing order
+  invert_array(bands[current_key])
 
   # When the tax left is zero or negative it must be the first band
+  last_threshold = 0
   if (!above_zero(tax_left)) {
     # If the first band has a zero rate no income is assumed
-    if (near_zero(Tax_Bands[current_key][last_threshold]))
+    if (near_zero(bands[current_key][last_threshold]))
       return 0
-    return tax_left / Tax_Bands[current_key][last_threshold]
+    return tax_left / bands[current_key][last_threshold]
   }
 
   # Now get the tax due on the whole sum
   total_income = 0
-  for (threshold in Tax_Bands[current_key]) {
+  for (threshold in bands[current_key]) {
     # The last band's width
     band_width = last_threshold - threshold # negative thresholds stored
 
     # The maximum tax due in this band
-    band_tax = band_width * Tax_Bands[current_key][last_threshold]
+    band_tax = band_width * bands[current_key][last_threshold]
 
     # Is the tax_payable above the amount paid?
     if (greater_than_or_equal(band_tax, tax_left)) {
@@ -2129,11 +2230,56 @@ function get_taxable_income(now, tax_left,
 
   # We can still have have tax unaccounted for here
   if (greater_than(tax_left, Epsilon))
-    total_income += tax_left / Tax_Bands[current_key][last_threshold]
+    total_income += tax_left / bands[current_key][last_threshold]
 
   # The minimum total income that would generate this much tax
   return total_income
 }
+
+# force an array to have indices stored in ascending order of magnitude
+# even when the indices actually descend in simple numerical value
+function invert_array(array,        key, last_key, value) {
+  last_key = ""
+  for (key in array)
+    if ("" == last_key)
+      last_key = key
+    else
+      break
+
+  # Did we find more than one key?
+  if ("" == last_key)
+    # No
+    return
+
+@ifeq LOG  invert_array
+  printf "Array Key Order\n" > STDERR
+  printf "First Key => %s\n", last_key > STDERR
+  printf "Next  Key => %s\n", key > STDERR
+@endif
+
+  # Yes - what order do these keys have?
+  if (less_than(abs_value(last_key), abs_value(key)))
+    # Desired order
+    return
+
+@ifeq LOG  invert_array
+  printf "Invert Array\n" > STDERR
+@endif
+
+  # Wrong order!
+  for (key in array)
+    if (above_zero(key)) {
+      # Reverse sign of keys to enforce required ordering
+      value = array[key]
+      delete array[key]
+      array[-key] = value
+@ifeq LOG  invert_array
+      printf "Invert  Array[%s] => %s\n",  key, format_value(value) > STDERR
+      printf "New Key Array[%s] => %s\n", -key, format_value(value) > STDERR
+@endif
+    }
+}
+
 
 
 # Initialize a url encoding lookup table
@@ -2204,6 +2350,12 @@ function underline(width, margin, stream) {
 ## DD-Month-YYYY or DD-Month-YY or DD/Month/YYYY or DD/Month/YY eg 14-Aug-18
 ## YYYY-MM-DD or YY-MM-DD or YYYY/MM/DD or YY/MM/DD eg 2018/08/14
 ##
+##
+## Regex to get initial modification to date string
+##  (20[01][0-9]) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([0-3][0-9])
+##
+
+
 function read_date(date_string, hour,
                    date_fields, year, month, day, value) {
   # default time
@@ -2222,7 +2374,7 @@ function read_date(date_string, hour,
     # The fields are YYYY MM DD
     # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
     # or             Mon DD YYYY
-    # or             DD MM YYYY if DD & YYYY are inconsistent with dates
+    # or             DD MM YYYY if DD & YYYY are consistent with dates
     # year-month-day, monthname/day/year, monthname-day-year
     if (month = get_month_number(date_fields[1])) {
       day   = date_fields[2] + 0
@@ -2230,6 +2382,19 @@ function read_date(date_string, hour,
     } else if (month = get_month_number(date_fields[2])) {
       year  = date_fields[1] + 0
       day   = date_fields[3] + 0
+
+      # Catch DD-Mon-YYYY
+      # Will not work unless YYYY >= 32
+      if (day > 31) {
+        if (year <= 31) {
+          day   = date_fields[1] + 0
+          year  = date_fields[3] + 0
+        } else {
+          Read_Date_Error = "Can't parse date <" date_string "> day number inconsistent with any month"
+          return DATE_ERROR
+        }
+      } # end of bad day number
+
     } else {
       day   = date_fields[3] + 0
       month = date_fields[2] + 0

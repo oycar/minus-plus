@@ -89,7 +89,7 @@ function balance_journal(now, past, initial_allocation) {
 # Gains Reconciliation
 # Both Realized & Unrealized Gains
 #
-function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_time,
+function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_time, show_capital,
 
                                                             is_realized_flag, found_gains,
                                                             gains_event, current_price, p, a,
@@ -122,7 +122,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   is_detailed = ternary(is_detailed, is_detailed, FALSE)
 
   # A flag to discriminate realized and unrealized gains
-  is_realized_flag = ("Realized Gains" == gains_type)
+  is_realized_flag = (gains_type ~ "Realized")
 
   # A default sold time = the Future
   sold_time = ternary(sold_time, sold_time, Future)
@@ -134,6 +134,9 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   # No header printed
   no_header_printed = TRUE
 
+  # Capital or forex gains?
+  show_capital = ternary("" == show_capital, TRUE, show_capital)
+
   # Record accounting gains
   accounting_gains = 0
   sum_long_gains = sum_short_gains = sum_long_losses = sum_short_losses = 0 # Tax gains/losses summed here
@@ -144,7 +147,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
   # For each asset sold in the current period
   for (a in Leaf) {
-    if (is_capital(a)) {
+    # Can choose between capital or forex gains
+    if ((show_capital && is_capital(a)) || (!show_capital && is_currency(a))) {
       # Are we looking for realized gains?
       if (is_realized_flag) {
         # If any of these are non-zero there was a gains event
@@ -203,7 +207,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
               # Print the gains report
               if (no_header_printed) {
                 print Journal_Title > reports_stream
-                printf "%s Report for Period Ending %s\n\n", gains_type, get_date(yesterday(now))  > reports_stream
+                printf "%s Report for Period Ending %s\n", gains_type, get_date(yesterday(now))  > reports_stream
               }
 
               # Two types of header
@@ -232,7 +236,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
             # Number of units
             units = Units_Held[a][p]
-            units_sold += units
 
             # Parcel sale times are tricky
             if (is_sold(a, p, now) && is_unsold(a, p, past))
@@ -244,7 +247,6 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
             # The held time (will be wrong when key is FALSE)
             held_time = get_held_time(key, Held_From[a][p])
-
 
             # Total gains (accounting gains)
             if (is_sold(a, p, now)) {
@@ -258,9 +260,11 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
             parcel_cost     =   get_cash_in(a, p, now)
             cost           += parcel_cost
             if (key) {
-              proceeds       += parcel_proceeds
+              # Sold parcels
+              proceeds      += parcel_proceeds
               reduced_cost  += get_parcel_cost(a, p, now)
               adjusted_cost += get_parcel_cost(a, p, now, TRUE)
+              units_sold    += units
             }
 
             # Keep track of accounting gains
@@ -779,8 +783,12 @@ function get_capital_gains(now, past, is_detailed,
       # Now the income gains report
       print_income_gains(now, past, is_detailed, reports_stream)
 
-      # The Realized Gains
-      print_gains(now, past, is_detailed, "Realized Gains", reports_stream)
+      # The Realized Capital Gains
+      print_gains(now, past, is_detailed, "Realized Capital Gains", reports_stream)
+      delete Gains_Stack
+
+      # The Realized Foreign Exchange Gains/Losses
+      print_gains(now, past, is_detailed, "Realized Foreign Exchange Gains", reports_stream, Future, FALSE)
       delete Gains_Stack
     }
 }
@@ -1244,9 +1252,6 @@ function depreciate_all(now,      a, current_depreciation) {
 
       # Balance accounts
       adjust_cost(DEPRECIATION, current_depreciation, now)
-
-      # Print the transaction
-      # print_transaction(now, "# Automatic Depreciation", a, DEPRECIATION, current_depreciation, "(I)")
     }
 
   # Restore defaults

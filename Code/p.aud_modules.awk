@@ -52,6 +52,9 @@ BEGIN {
   if (!(Epoch in Foreign_Offset_Limit))
     Foreign_Offset_Limit[Epoch] = 1000.00
 
+  # Initially no LIC Deduction
+  LIC_Deduction[Epoch] = 0.0
+
   # The default tax band
   Tax_Bands[Epoch][0] = 0.15
 
@@ -61,7 +64,6 @@ BEGIN {
   # The default low and middle income offsets
   Low_Income_Offset[Epoch][0] = 0.00
   Middle_Income_Offset[Epoch][0] = 0.00
-
 
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
@@ -616,25 +618,42 @@ function income_tax_aud(now, past, benefits,
       # Yes so some losses will be extinguished
       # Which will reduce tax_owed to zero - so the effective reduction
       # in tax losses is the income that would produce tax equal to tax_owed
-      x = - get_taxable_income(now, tax_owed) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands, tax_owed) # This is effectively a gain - so make it negative
       tax_owed = 0
     } else if (not_zero(x)) {
       # All losses extinguished
       tax_owed -= x
-      x = - get_taxable_income(now, x) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands, x) # This is effectively a gain - so make it negative
     }
 
     if (Show_Extra)
       printf "%48s %32s>\n\n", "<Tax Owed After Using Carried Tax Losses", print_cash(tax_owed) > write_stream
+  } else {
+    # No tax is owed
+    # Was this caused by refundable offsets?
+    if (!above_zero(tax_owed + refundable_offsets)) {
+      # No - there are increased tax losses
+      # This is a bit tricky
+      # (unused) franking offsets may still be present here
+      # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
+      x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
+    } else
+      # Yes so zero new losses
+      x = 0
+  }
 
-    # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
-  } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
-    # This is a bit tricky
-    # (unused) franking offsets may still be present here
-    # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-    x = - get_taxable_income(now, tax_owed + refundable_offsets - franking_offsets)
-  } else
-    x = 0
+
+  #   # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
+  # } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
+  #   # This is a bit tricky
+  #   # (unused) franking offsets may still be present here
+  #   # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
+  #   x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
+  # } else if (below_zero(tax_owed)) { # Losses recorded this FY
+  #   x = - get_taxable_income(now, Tax_Bands, tax_owed)
+  #   tax_owed = 0
+  # } else # Zero losses
+  #   x = 0
 
   # Now we can update the carried tax losses at last
   tax_losses = get_carried_losses(now, Tax_Losses, x, CARRY_FORWARD_TAX_LIMIT, write_stream)
