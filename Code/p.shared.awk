@@ -1040,6 +1040,10 @@ function set_special_accounts() {
   SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
   SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
 
+  # When a foreign exchange asset is sold any profit or loss is booked as income/expense to these accounts
+  FOREX_INCOME  =  initialize_account("INCOME.FOREX:FOREX.GAINS")
+  FOREX_EXPENSE =  initialize_account("EXPENSE.FOREX:FOREX.LOSSES")
+
   # Built in TAX accounts - debtor like
   WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
   PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")

@@ -1398,6 +1398,10 @@ function set_special_accounts() {
   SOLD_APPRECIATION = initialize_account("INCOME.APPRECIATION:APPRECIATION.SOLD")
   SOLD_DEPRECIATION = initialize_account("EXPENSE.DEPRECIATION:DEPRECIATION.SOLD")
 
+  # When a foreign exchange asset is sold any profit or loss is booked as income/expense to these accounts
+  FOREX_INCOME  =  initialize_account("INCOME.FOREX:FOREX.GAINS")
+  FOREX_EXPENSE =  initialize_account("EXPENSE.FOREX:FOREX.LOSSES")
+
   # Built in TAX accounts - debtor like
   WITHOLDING   = initialize_account("ASSET.CURRENT.TAX:TAX.WITHOLDING")
   PAYG         = initialize_account("ASSET.CURRENT.TAX:TAX.PAYG")
@@ -2871,7 +2875,7 @@ function balance_journal(now, past, initial_allocation) {
 # Gains Reconciliation
 # Both Realized & Unrealized Gains
 #
-function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_time,
+function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_time, show_capital,
 
                                                             is_realized_flag, found_gains,
                                                             gains_event, current_price, p, a,
@@ -2904,7 +2908,7 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   is_detailed = ((is_detailed)?( is_detailed):( (0)))
 
   # A flag to discriminate realized and unrealized gains
-  is_realized_flag = ("Realized Gains" == gains_type)
+  is_realized_flag = (gains_type ~ "Realized")
 
   # A default sold time = the Future
   sold_time = ((sold_time)?( sold_time):( Future))
@@ -2916,6 +2920,9 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
   # No header printed
   no_header_printed = (1)
 
+  # Capital or forex gains?
+  show_capital = (("" == show_capital)?( (1)):( show_capital))
+
   # Record accounting gains
   accounting_gains = 0
   sum_long_gains = sum_short_gains = sum_long_losses = sum_short_losses = 0 # Tax gains/losses summed here
@@ -2926,7 +2933,8 @@ function print_gains(now, past, is_detailed, gains_type, reports_stream, sold_ti
 
   # For each asset sold in the current period
   for (a in Leaf) {
-    if (((a) ~ /^ASSET\.CAPITAL[.:]/)) {
+    # Can choose between capital or forex gains
+    if ((show_capital && ((a) ~ /^ASSET\.CAPITAL[.:]/)) || (!show_capital && ((a) ~ /^ASSET\.CURRENT\.CURRENCY[.:]/))) {
       # Are we looking for realized gains?
       if (is_realized_flag) {
         # If any of these are non-zero there was a gains event
@@ -3382,7 +3390,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("MCTB" ~ /[cC]|[aA]/ && "MCTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("OTC" ~ /[cC]|[aA]/ && "OTC" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3558,8 +3566,12 @@ function get_capital_gains(now, past, is_detailed,
       # Now the income gains report
       print_income_gains(now, past, is_detailed, reports_stream)
 
-      # The Realized Gains
-      print_gains(now, past, is_detailed, "Realized Gains", reports_stream)
+      # The Realized Capital Gains
+      print_gains(now, past, is_detailed, "Realized Capital Gains", reports_stream)
+      delete Gains_Stack
+
+      # The Realized Foreign Exchange Gains/Losses
+      print_gains(now, past, is_detailed, "Realized Foreign Exchange Gains", reports_stream, Future, (0))
       delete Gains_Stack
     }
 }
@@ -3729,7 +3741,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("MCTB" ~ /[oO]|[aA]/ && "MCTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OTC" ~ /[oO]|[aA]/ && "OTC" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3869,7 +3881,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("MCTB" ~ /[bB]|[aA]/ && "MCTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OTC" ~ /[bB]|[aA]/ && "OTC" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -4002,7 +4014,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("MCTB" ~ /[mM]|[aA]/ && "MCTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("OTC" ~ /[mM]|[aA]/ && "OTC" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4071,7 +4083,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("MCTB" ~ /[dD]|[aA]/ && "MCTB" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OTC" ~ /[dD]|[aA]/ && "OTC" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4206,7 +4218,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("MCTB" ~ /[qQ]|[aA]/ && "MCTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OTC" ~ /[qQ]|[aA]/ && "OTC" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4735,7 +4747,7 @@ function income_tax_aud(now, past, benefits,
                                         medicare_levy, extra_levy, tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("MCTB" ~ /[tT]|[aA]/ && "MCTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("OTC" ~ /[tT]|[aA]/ && "OTC" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5538,7 +5550,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("MCTB" ~ /[iI]|[aA]/ && "MCTB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OTC" ~ /[iI]|[aA]/ && "OTC" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -7658,8 +7670,13 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
 
   # Save realized gains
   if (((a) ~ /^ASSET\.FIXED[.:]/))
-    gains = sell_fixed_parcel(a, p, now, - amount_paid)
-  else
+    gains = save_parcel_income(a, p, now, - amount_paid,  SOLD_APPRECIATION, SOLD_DEPRECIATION)
+  else if (((a) ~ /^ASSET\.CURRENT\.CURRENCY[.:]/)) {
+    # This should be treated as income rather than as capital gains and losses
+    # gains = save_parcel_gain(a, p, now, - amount_paid)
+    gains = save_parcel_income(a, p, now, - amount_paid,  FOREX_INCOME, FOREX_EXPENSE)
+
+  } else
     gains = save_parcel_gain(a, p, now, - amount_paid)
 
   # Don't need to set the accounting cost to zero because get_cost will pick that up automatically
@@ -7677,29 +7694,60 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   return is_split
 } # End of if non-zero Parcel
 
+# #
+# # When a parcel of a fixed asset is sold
+# # it changes the depreciation amounts
+# function sell_fixed_parcel(a, p, now, gains,    cost) {
+#   # A depreciating asset will neither have capital gains nor losses
+#   # Suppose current value => c  (c >= 0)
+#   # Proceeds received     => p  (p <= 0)
+#   #
+#   # After sale value      => 0
+#   # Depreciation          => c + p <= 0
+#   # Appreciation             c + p >  0
 #
-# When a parcel of a fixed asset is sold
-# it changes the depreciation amounts
-function sell_fixed_parcel(a, p, now, gains,    cost) {
-  # A depreciating asset will neither have capital gains nor losses
+#   gains += sum_cost_elements(Accounting_Cost[a][p], now)
+# @ifeq LOG sell_units
+#   if (above_zero(gains)) # This was a DEPRECIATION expense
+#     printf "\tDepreciation => %s\n", print_cash(gains) > STDERR
+#   else if (below_zero(gains)) # This was an APPRECIATION income
+#     printf "\tAppreciation => %s\n", print_cash(-gains) > STDERR
+#   else
+#     printf "\tZero Depreciation\n" > STDERR
+# @endif # LOG
+#
+#   # Any excess income or expenses are recorded
+#   if (above_zero(gains)) # This was a DEPRECIATION expense
+#     adjust_cost(SOLD_DEPRECIATION, gains, now)
+#   else if (below_zero(gains)) # This was APPRECIATION income
+#     adjust_cost(SOLD_APPRECIATION, gains, now)
+#
+#   # return parcel gains
+#   return gains
+# }
+#
+
+# Some parcels when sold are treated as income rather than gains
+# Namely fixed (depreciating) assets and foreign exchange
+function save_parcel_income(a, p, now, income, income_account, expense_account,   cost) {
   # Suppose current value => c  (c >= 0)
   # Proceeds received     => p  (p <= 0)
   #
   # After sale value      => 0
-  # Depreciation          => c + p <= 0
-  # Appreciation             c + p >  0
+  # Expenses              => c + p >= 0
+  # Income                => c + p <  0
 
-  gains += sum_cost_elements(Accounting_Cost[a][p], now)
+  income += sum_cost_elements(Accounting_Cost[a][p], now)
 
 
   # Any excess income or expenses are recorded
-  if ((((gains) - ( Epsilon)) > 0)) # This was a DEPRECIATION expense
-    adjust_cost(SOLD_DEPRECIATION, gains, now)
-  else if ((((gains) - ( -Epsilon)) < 0)) # This was APPRECIATION income
-    adjust_cost(SOLD_APPRECIATION, gains, now)
+  if ((((income) - ( Epsilon)) > 0)) # This was an expense
+    adjust_cost(expense_account, income, now)
+  else if ((((income) - ( -Epsilon)) < 0)) # This was income
+    adjust_cost(income_account, income, now)
 
-  # return parcel gains
-  return gains
+  # return parcel income
+  return income
 }
 
 # Save a capital gain
@@ -7781,9 +7829,6 @@ function copy_parcel(a, p, b, q,     e, key) {
   for (key in Tax_Adjustments[a][p])
     Tax_Adjustments[b][q][key]  = Tax_Adjustments[a][p][key]
 }
-
-
-
 
 function split_parcel(ac, p, du,   fraction_kept, e, key) {
   # Split partly sold parcel p into parcel p (all sold)

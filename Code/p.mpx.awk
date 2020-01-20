@@ -1799,8 +1799,13 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
 
   # Save realized gains
   if (is_fixed(a))
-    gains = sell_fixed_parcel(a, p, now, - amount_paid)
-  else
+    gains = save_parcel_income(a, p, now, - amount_paid,  SOLD_APPRECIATION, SOLD_DEPRECIATION)
+  else if (is_currency(a)) {
+    # This should be treated as income rather than as capital gains and losses
+    # gains = save_parcel_gain(a, p, now, - amount_paid)
+    gains = save_parcel_income(a, p, now, - amount_paid,  FOREX_INCOME, FOREX_EXPENSE)
+
+  } else
     gains = save_parcel_gain(a, p, now, - amount_paid)
 
   # Don't need to set the accounting cost to zero because get_cost will pick that up automatically
@@ -1825,36 +1830,67 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   return is_split
 } # End of if non-zero Parcel
 
+# #
+# # When a parcel of a fixed asset is sold
+# # it changes the depreciation amounts
+# function sell_fixed_parcel(a, p, now, gains,    cost) {
+#   # A depreciating asset will neither have capital gains nor losses
+#   # Suppose current value => c  (c >= 0)
+#   # Proceeds received     => p  (p <= 0)
+#   #
+#   # After sale value      => 0
+#   # Depreciation          => c + p <= 0
+#   # Appreciation             c + p >  0
 #
-# When a parcel of a fixed asset is sold
-# it changes the depreciation amounts
-function sell_fixed_parcel(a, p, now, gains,    cost) {
-  # A depreciating asset will neither have capital gains nor losses
+#   gains += sum_cost_elements(Accounting_Cost[a][p], now)
+# @ifeq LOG sell_units
+#   if (above_zero(gains)) # This was a DEPRECIATION expense
+#     printf "\tDepreciation => %s\n", print_cash(gains) > STDERR
+#   else if (below_zero(gains)) # This was an APPRECIATION income
+#     printf "\tAppreciation => %s\n", print_cash(-gains) > STDERR
+#   else
+#     printf "\tZero Depreciation\n" > STDERR
+# @endif # LOG
+#
+#   # Any excess income or expenses are recorded
+#   if (above_zero(gains)) # This was a DEPRECIATION expense
+#     adjust_cost(SOLD_DEPRECIATION, gains, now)
+#   else if (below_zero(gains)) # This was APPRECIATION income
+#     adjust_cost(SOLD_APPRECIATION, gains, now)
+#
+#   # return parcel gains
+#   return gains
+# }
+#
+
+# Some parcels when sold are treated as income rather than gains
+# Namely fixed (depreciating) assets and foreign exchange
+function save_parcel_income(a, p, now, income, income_account, expense_account,   cost) {
   # Suppose current value => c  (c >= 0)
   # Proceeds received     => p  (p <= 0)
   #
   # After sale value      => 0
-  # Depreciation          => c + p <= 0
-  # Appreciation             c + p >  0
+  # Expenses              => c + p >= 0
+  # Income                => c + p <  0
 
-  gains += sum_cost_elements(Accounting_Cost[a][p], now)
+  income += sum_cost_elements(Accounting_Cost[a][p], now)
 @ifeq LOG sell_units
-  if (above_zero(gains)) # This was a DEPRECIATION expense
-    printf "\tDepreciation => %s\n", print_cash(gains) > STDERR
-  else if (below_zero(gains)) # This was an APPRECIATION income
-    printf "\tAppreciation => %s\n", print_cash(-gains) > STDERR
+  if (above_zero(income)) # This was an expense
+    printf "\tExpense => %s\n", print_cash(income) > STDERR
+  else if (below_zero(income)) # This was income
+    printf "\tIncome => %s\n", print_cash(-income) > STDERR
   else
-    printf "\tZero Depreciation\n" > STDERR
+    printf "\tZero Income\n" > STDERR
 @endif # LOG
 
   # Any excess income or expenses are recorded
-  if (above_zero(gains)) # This was a DEPRECIATION expense
-    adjust_cost(SOLD_DEPRECIATION, gains, now)
-  else if (below_zero(gains)) # This was APPRECIATION income
-    adjust_cost(SOLD_APPRECIATION, gains, now)
+  if (above_zero(income)) # This was an expense
+    adjust_cost(expense_account, income, now)
+  else if (below_zero(income)) # This was income
+    adjust_cost(income_account, income, now)
 
-  # return parcel gains
-  return gains
+  # return parcel income
+  return income
 }
 
 # Save a capital gain
@@ -1936,9 +1972,6 @@ function copy_parcel(a, p, b, q,     e, key) {
   for (key in Tax_Adjustments[a][p])
     Tax_Adjustments[b][q][key]  = Tax_Adjustments[a][p][key]
 }
-
-
-
 
 function split_parcel(ac, p, du,   fraction_kept, e, key) {
   # Split partly sold parcel p into parcel p (all sold)
