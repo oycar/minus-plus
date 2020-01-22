@@ -138,24 +138,25 @@
 #
 # // Useful shorthands for various kinds of accounts
 # // @define is_currency(a)  ((a) ~ /\.CURRENCY:/)
-# // @define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]/ || is_currency(a))
-# // @define is_unitized(a) ((a) ~ /^(ASSET\.(CAPITAL|FIXED)|EQUITY)[.:]/ || is_currency(a))
-# // @define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/ || is_currency(a))
+# // @define is_unitized(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/)
+# // @define is_unitized(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/)
+# // @define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/)
+# // @define is_cash(a) ((a) ~ /^ASSET\.CURRENT[.:]/)
 
 
-@define is_currency(a) ((a) ~ /^ASSET\.CURRENT\.CURRENCY[.:]/)
-@define is_unitized(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|^EQUITY[.:]|\.CURRENCY:/)
+@define is_currency(a) ((a) ~ /^ASSET\.CURRENCY[.:]/)
+@define is_unitized(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED|CURRENCY)[.:]|^EQUITY[.:]/)
 @define is_capital(a) ((a) ~ /^ASSET\.CAPITAL[.:]/)
-@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED)[.:]|\.CURRENCY:/)
+@define is_asset(a) ((a) ~ /^ASSET\.(CAPITAL|FIXED|CURRENCY)[.:]/)
 @define is_equity(a) ((a) ~ /^EQUITY[.:]/)
 @define is_liability(a) ((a) ~ /^LIABILITY[.:]/)
-@define is_cash(a) ((a) ~ /^ASSET\.CURRENT[.:]/)
 
 # // Fixed asset
 @define is_fixed(a) ((a) ~ /^ASSET\.FIXED[.:]/)
 @define is_tax(a)  ((a) ~ /^(ASSET\.CURRENT|LIABILITY)\.TAX[.:]/)
 @define is_term(a) ((a) ~ /^(ASSET|LIABILITY)\.TERM[.:]/)
-@define is_current(a) ((a) ~ /^(ASSET|LIABILITY)\.CURRENT[.:]/)
+@define is_current(a) ((a) ~ /^(ASSET|LIABILITY)\.CURREN(T|CY)[.:]/)
+@define get_currency(a) ternary(is_currency(a), Long_Name[get_name_component(Leaf[a], 1)], "")
 #
 #
 # // Contribution

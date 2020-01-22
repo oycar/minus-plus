@@ -34,7 +34,7 @@
 #    Original style
 #   2008 Apr 09, 604000, 776003,    200.000,    8382.00, BHP in specie transfer (200 units)
 #   became over time
-#   2008-Apr-09, CASH, BHP.ASX, 8382.00, 200, # (in specie transfer in fact)
+#   2008-Apr-09  CREDITOR   BHP.ASX    8382.00         200 # BHP (in specie transfer)
 #
 # To Do =>
 #   ***in progress
@@ -44,9 +44,7 @@
 #   ***Fix up wiki files
 #   other tax_statement calculations (eg UK, US, NZ etc...)
 #
-#   Allow non-rectangular arrays, i.e. only have [a][p][e] for active elements
-#   Allow other currencies or commodities (eg USD, AU, AG, etc)
-#   Read single entry transactions
+#   Allow non-rectangular arrays, i.e. only have [a][p][e] for active elements???
 #   special notes for -l version
 #   describe gpp properly
 #   Short day-by-day performance summary (cost-value-etc.. estimated for EOFY)
@@ -392,7 +390,7 @@ function read_state_record(first_line, last_line) {
 
   # Set translation rate for journal currency
   initialize_account("ASSET.CURRENT.CURRENCY:" Journal_Currency)
-  set_entry(Price[Long_Name[Journal_Currency]], 1.0, Epoch)
+  set_entry(Price[Long_Name[Journal_Currency]], 1, Epoch)
 
 
   # These functions are not dependent on currency
@@ -1748,7 +1746,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
 @endif # LOG
 
   # Were all the requested units actually sold?
-  assert(near_zero(u), sprintf("sell_units: Failed to sell the requested %d units of %s", u, get_short_name(ac)))
+  assert(near_zero(u), sprintf("sell_units: Failed to sell the requested %f units of %s", u, get_short_name(ac)))
 
   # Update parent sums
   update_cost(ac, -x, now)
@@ -1799,7 +1797,7 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
 
   # Save realized gains
   if (is_fixed(a))
-    # A depreciating asset 
+    # A depreciating asset
     gains = save_parcel_income(a, p, now, - amount_paid,  SOLD_APPRECIATION, SOLD_DEPRECIATION)
   else if (is_currency(a))
     # This should be treated as income rather than as capital gains and losses
@@ -1877,7 +1875,7 @@ function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
     adjust_cost(REALIZED_LOSSES, gains, now)
 
     # Taxable losses are based on the reduced cost
-    if (held_time >= CGT_PERIOD) {
+    if (greater_than_or_equal(held_time, CGT_PERIOD)) {
       if (!(a in Long_Losses))
         Long_Losses[a] = initialize_account(LONG_LOSSES ":LL." Leaf[a])
       adjust_cost(Long_Losses[a], gains, now)
@@ -1900,7 +1898,7 @@ function save_parcel_gain(a, p, now, gains,   tax_gain, held_time) {
   # Taxable Gains are based on the adjusted cost
   if (below_zero(tax_gains)) {
     # Taxable losses are based on the reduced cost
-    if (held_time >= CGT_PERIOD) {
+    if (greater_than_or_equal(held_time, CGT_PERIOD)) {
       if (!(a in Long_Gains))
         Long_Gains[a] = initialize_account(LONG_GAINS ":LG." Leaf[a])
       adjust_cost(Long_Gains[a], tax_gains, now)

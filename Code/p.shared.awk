@@ -577,25 +577,18 @@ function parse_line(now,    i, j, x, number_accounts) {
     amount = $i
     if ($i ~ /^[[:upper:]]{3}$/) {
       # Explicit currency given
-      if (Enforce_Qualification) {
-        assert($i in Long_Name, "Currency Code <" $i "> not defined - provide exchange rates")
-        Transaction_Currency = Long_Name[$i]
-      } else if ($i in Long_Name)
-        Transaction_Currency = Long_Name[$i]
-      else {
-        printf "## Warning Ignoring Unknown Currency Code %s - treating as Journal Currency %s\n", $i, Journal_Currency > STDERR
-        Transaction_Currency = Long_Name[Journal_Currency]
-      }
-
+      # Just pretend it is defined...
+      initialize_account("ASSET.CURRENCY:" $i)
+      Transaction_Currency = Long_Name[$i]
 
       # Is this a simple currency translation -
       j = i + 1
       assert($j ~ /^[0-9\.\-]+$/, "<" $0 "> Unexpected syntax: cash amount <" $j "> is not a number")
 
       # is this a purchase or a sale of currency units?
-      if (Account[2] == Transaction_Currency)
+      if (get_currency(Account[2]) == Transaction_Currency)
         Real_Value[BUY_FOREX_KEY] = $i = strtonum($j) # A purchase (of forex)
-      else if ((Account[1] == Transaction_Currency) && is_open(Account[1], now)) {
+      else if (get_currency(Account[1]) == Transaction_Currency && is_open(Account[1], now)) {
         $i = strtonum($j) # A sale
         Real_Value[SELL_FOREX_KEY] = $j = - $i # A sale (of forex)
       } else { # Other cases
@@ -609,10 +602,9 @@ function parse_line(now,    i, j, x, number_accounts) {
       if (Transaction_Currency in Price)
         Translation_Rate = find_entry(Price[Transaction_Currency], now)
       else
-        Translation_Rate = ""
+        # No price is an error
+        assert(FALSE, "No exchange rate available for <" Transaction_Currency "> at <" get_date(now) ">")
 
-      # Did we get a price?
-      assert("" != Translation_Rate, "No exchange rate available for <" Transaction_Currency "> at <" get_date(now) ">")
     } else {
       # Use default currency
       Transaction_Currency = FALSE
