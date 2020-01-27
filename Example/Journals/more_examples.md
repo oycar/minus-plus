@@ -1,16 +1,15 @@
 ## Minus-Plus Usage ##
 
-Here are a number of examples of that extend the examples in the _example.jrn_
-file to demonstrate
-how different financial transactions can be accounted for using _Minus Plus_.
+Here are a number of examples of that extend those in the _example.jrn_
+file to demonstrate how different financial transactions can be accounted for using _Minus Plus_.
 
 # Handling Rent and Property Expenses #
 This is simple - just create appropriate **INCOME** and **EXPENSE** accounts
-These can be as fine grained as required; e.g. a single **EXPENSE** account or alternatively various accounts broken up into agency expenses, repairs, rates could be used.
+which can be as fine grained as required; e.g. a single **EXPENSE** account or various accounts broken up into agency expenses, repairs, rates could be used.
 In either case financial statements will be produced using the final component
-of the class name as a sub-header; so so if multiple properties were held
-then these could be collected up in one heading with accounts like **INCOME.FIRST.PROPERTY:FIRST.RENT**,
-**INCOME.PROPERTY.SECOND:SECOND.RENT**, and so on; alternatively account names like
+of the class name as a sub-header; so if multiple properties were held
+then these could be collected up in one heading with accounts like **INCOME.PROPERTY:FIRST.RENT**,
+**INCOME.PROPERTY:SECOND.RENT**, and so on; alternatively account names like
 **INCOME.PROPERTY.FIRST_PROPERTY:FIRST.RENT** would create different sub-headings for each property. (The _PROPERTY_ name component is not required.)
 
 ```
@@ -173,7 +172,7 @@ in this case the adjustments are made to cost element _I_, the purchase cost, di
   <li>Capital costs of preserving or defending your title or rights to your CGT asset</li>
 </ol>   
 
-_Minus Plus_ uses the Roman Numerals _I_, _II_, _III_, _IV_ or _V_ to indentify these.
+_Minus Plus_ uses the Roman Numerals _I_, _II_, _III_, _IV_ or _V_ to identify these.
 
 Thus
 

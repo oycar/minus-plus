@@ -148,6 +148,7 @@ BEGIN {
   make_array(Tax_Adjustments)
   make_array(Tax_Bands)
   make_array(Tax_Credits)
+  make_array(Tax_Offsets)
   make_array(Taxable_Income)
   make_array(Total_Units)
   make_array(Underlying_Asset)
