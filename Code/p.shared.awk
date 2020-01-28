@@ -2144,7 +2144,10 @@ function get_tax(now, bands, total_income,
   current_key = find_key(bands, now)
 
   # Ensure bands are listed in decreasing order
-  invert_array(bands[current_key])
+  if (current_key in bands)
+    invert_array(bands[current_key])
+  else # No entry
+    return 0
 
   # Compute tax
   tax_payable = last_threshold = 0

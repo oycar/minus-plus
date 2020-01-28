@@ -300,7 +300,7 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
     # This will change the LIABILITIES and EXPENSES equally
     if (target_account == member_account) {
       # This is a TAXABLE account
-      contribution_tax = get_tax(now, Tax_Bands, x) # Always one band so ok to ignore other income
+      contribution_tax = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], x) # Always one band so ok to ignore other income
 
       # Save the tax expenses and adjust the liability
       adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)

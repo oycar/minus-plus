@@ -27,9 +27,6 @@ BEGIN {
   make_array(GST_Rate)
   make_array(LIC_Allowance)
   make_array(LIC_Deduction)
-  make_array(Low_Income_Offset)
-  make_array(Middle_Income_Offset)
-  make_array(Medicare_Levy)
   make_array(Member_Liability)
   make_array(Pension_Liability)
   make_array(Reserve_Rate)
@@ -54,16 +51,6 @@ BEGIN {
 
   # Initially no LIC Deduction
   LIC_Deduction[Epoch] = 0.0
-
-  # The default tax band
-  Tax_Bands[Epoch][0] = 0.15
-
-  #  The Default Medicare Levy
-  Medicare_Levy[Epoch][0] = 0.00
-
-  # The default low and middle income offsets
-  Low_Income_Offset[Epoch][0] = 0.00
-  Middle_Income_Offset[Epoch][0] = 0.00
 
   # Kept apart to allow correct allocation of member benfits in an SMSF
   CONTRIBUTION_TAX = initialize_account("LIABILITY.TAX:CONTRIBUTION.TAX")
@@ -146,9 +133,9 @@ function income_tax_aud(now, past, benefits,
                                         franking_offsets, foreign_offsets, franking_balance,
                                         franking_deficit_offsets,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
-                                        low_income_offset, middle_income_offset,
+                                        low_income_offset, middle_income_offset, offset_name,
                                         taxable_income,
-                                        medicare_levy, extra_levy, tax_levy, x, header) {
+                                        tax_levy, levy_name, x, header) {
 
   # Print this out?
   write_stream = report_tax(eofy_stream(now))
@@ -313,18 +300,12 @@ function income_tax_aud(now, past, benefits,
   set_entry(Taxable_Income, taxable_income, now)
 
   # Keep the income tax on the taxable income - the actual amount owed may change due to tax offsets etc
-  income_tax = tax_owed = get_tax(now, Tax_Bands, taxable_income) # Just need total tax
+  income_tax = tax_owed = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], taxable_income) # Just need total tax
   printf "%48s %32s\n", "Income Tax on Taxable Income or Loss", print_cash(tax_owed) > write_stream
   underline(81, 0, write_stream)
 
   # Record this quantity
   set_entry(Income_Tax, income_tax, now)
-
-  # Also is a medicare levy payable?
-  if (is_individual)
-    medicare_levy = get_tax(now, Medicare_Levy, taxable_income)
-  else
-    medicare_levy = 0
 
   # Tax Offsets
   #  Apply in this order
@@ -429,9 +410,14 @@ function income_tax_aud(now, past, benefits,
       foreign_income   = - (get_cost("*INCOME.FOREIGN", now) - get_cost("*INCOME.FOREIGN", past))
       foreign_expenses = - (get_cost("*EXPENSE.FOREIGN", now) - get_cost("*EXPENSE.FOREIGN", past))
 
-      extra_tax = income_tax - get_tax(now, Tax_Bands, taxable_income - foreign_income + foreign_expenses)
-      if (is_individual)
-        extra_tax += get_tax(now, Medicare_Levy, taxable_income - foreign_income + foreign_expenses)
+      # Compute extra tax that would be due if foreign income and expenses were local income and expenses
+      extra_tax = income_tax - get_tax(now, Tax_Bands["Tax"]["Income_Tax"], taxable_income - foreign_income + foreign_expenses)
+
+      # Add levies (if any)
+      if ("Levy" in Tax_Bands)
+        for (levy_name in Tax_Bands["Levy"])
+          extra_tax += (x = get_tax(now, Tax_Bands["Levy"][levy_name], taxable_income))
+
       if (extra_tax < foreign_offsets)
         foreign_offsets = max(find_entry(Foreign_Offset_Limit, now), extra_tax)
 
@@ -450,30 +436,20 @@ function income_tax_aud(now, past, benefits,
   } else
     foreign_offsets = 0
 
+  # The following blocks should be made modular
   # No Carry Offsets (Class C)
-  # The low income and middle income tax offsets depend on income
-  if (is_individual) {
-    low_income_offset = get_tax(now, Low_Income_Offset, taxable_income)
-    middle_income_offset = get_tax(now, Middle_Income_Offset, taxable_income)
-
-    # This is an Australian no-carry offset computed from the taxable income
+  # Get defined no carry offsets
+  no_carry_offsets = -(find_entry(No_Carry_Offsets, now) - find_entry(No_Carry_Offsets, past))
+  if ("No_Carry" in Tax_Bands)
+    for (offset_name in Tax_Bands["No_Carry"]) {
+      no_carry_offsets += (x = get_tax(now, Tax_Bands["No_Carry"][offset_name], taxable_income))
 @ifeq LOG income_tax
-    if (not_zero(low_income_offset)) {
-      printf "%s\t%40s %32s\n", header, "Low Income Tax Offset", print_cash(low_income_offset) > write_stream
-      header = ""
-    }
-    if (not_zero(middle_income_offset)) {
-      printf "%s\t%40s %32s\n", header, "Middle Income Tax Offset", print_cash(middle_income_offset) > write_stream
-      header = ""
-    }
+      if (not_zero(x)) {
+        printf "%s\t%40s %32s\n", header, offset_name, print_cash(x) > write_stream
+        header = ""
+      }
 @endif
-
-    # Set the no_carry offsets
-    no_carry_offsets = low_income_offset + middle_income_offset
-    no_carry_offsets -= (find_entry(No_Carry_Offsets, now) - find_entry(No_Carry_Offsets, past))
-  } else
-    # Just get the total change in the offset
-    no_carry_offsets = -(find_entry(No_Carry_Offsets, now) - find_entry(No_Carry_Offsets, past))
+    }
 
   # Foreign offsets are no-carry offsets
   no_carry_offsets += foreign_offsets
@@ -487,6 +463,17 @@ function income_tax_aud(now, past, benefits,
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = -(find_entry(Carry_Offsets, now) - find_entry(Carry_Offsets, past))
+  if ("Carry" in Tax_Bands)
+    for (offset_name in Tax_Bands["Carry"]) {
+      carry_offsets += (x = get_tax(now, Tax_Bands["Carry"][offset_name], taxable_income))
+@ifeq LOG income_tax
+      if (not_zero(x)) {
+        printf "%s\t%40s %32s\n", header, offset_name, print_cash(x) > write_stream
+        header = ""
+      }
+@endif
+    }
+
   if (!near_zero(carry_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
@@ -494,6 +481,17 @@ function income_tax_aud(now, past, benefits,
 
   # The refundable offset (Class E)
   refundable_offsets = - (find_entry(Refundable_Offsets, now) - find_entry(Refundable_Offsets, past))
+  if ("Refundable" in Tax_Bands)
+    for (offset_name in Tax_Bands["Refundable"]) {
+      carry_offsets += (x = get_tax(now, Tax_Bands["Refundable"][offset_name], taxable_income))
+@ifeq LOG income_tax
+      if (not_zero(x)) {
+        printf "%s\t%40s %32s\n", header, offset_name, print_cash(x) > write_stream
+        header = ""
+      }
+@endif
+    }
+
   if (!near_zero(refundable_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
     header = ""
@@ -607,7 +605,7 @@ function income_tax_aud(now, past, benefits,
     # Tax losses available for use - and tax is owed - compute marginal tax change
     if (above_zero(tax_losses)) {
       # x is the tax that would be paid on the tax_losses
-      x = get_tax(now, Tax_Bands, tax_losses + taxable_income) - income_tax
+      x = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], tax_losses + taxable_income) - income_tax
     } else # No tax owed
       x = 0
 
@@ -618,12 +616,12 @@ function income_tax_aud(now, past, benefits,
       # Yes so some losses will be extinguished
       # Which will reduce tax_owed to zero - so the effective reduction
       # in tax losses is the income that would produce tax equal to tax_owed
-      x = - get_taxable_income(now, Tax_Bands, tax_owed) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed) # This is effectively a gain - so make it negative
       tax_owed = 0
     } else if (not_zero(x)) {
       # All losses extinguished
       tax_owed -= x
-      x = - get_taxable_income(now, Tax_Bands, x) # This is effectively a gain - so make it negative
+      x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], x) # This is effectively a gain - so make it negative
     }
 
     if (Show_Extra)
@@ -636,24 +634,11 @@ function income_tax_aud(now, past, benefits,
       # This is a bit tricky
       # (unused) franking offsets may still be present here
       # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-      x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
+      x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed + refundable_offsets - franking_offsets)
     } else
       # Yes so zero new losses
       x = 0
   }
-
-
-  #   # Tax owed is negative - so losses are increased but allow for refundable offsets which were returned
-  # } else if (!above_zero(tax_owed + refundable_offsets)) { # Increase losses
-  #   # This is a bit tricky
-  #   # (unused) franking offsets may still be present here
-  #   # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-  #   x = - get_taxable_income(now, Tax_Bands, tax_owed + refundable_offsets - franking_offsets)
-  # } else if (below_zero(tax_owed)) { # Losses recorded this FY
-  #   x = - get_taxable_income(now, Tax_Bands, tax_owed)
-  #   tax_owed = 0
-  # } else # Zero losses
-  #   x = 0
 
   # Now we can update the carried tax losses at last
   tax_losses = get_carried_losses(now, Tax_Losses, x, CARRY_FORWARD_TAX_LIMIT, write_stream)
@@ -673,18 +658,24 @@ function income_tax_aud(now, past, benefits,
   # And tax witheld
   tax_with = get_cost(WITHOLDING, just_before(now))
 
+  # Now compute any tax levies
+  #
   # If this is SMSF the levy is required
   if (is_smsf)
     printf "\t%40s %32s\n", "Supervisory Levy", print_cash(find_entry(ATO_Levy, now)) > write_stream
 
-  # Medicare levy (if any)
-  if (!near_zero(medicare_levy)) {
-    printf "\t%40s %32s\n", "Medicare Levy", print_cash(medicare_levy) > write_stream
-    tax_owed += medicare_levy
-  }
-
-  # Any other levys
+  # Add levies (if any)
   tax_levy = - get_cost("*LIABILITY.CURRENT.LEVY", just_before(now))
+  if ("Levy" in Tax_Bands)
+    for (levy_name in Tax_Bands["Levy"]) {
+      tax_levy += (x = get_tax(now, Tax_Bands["Levy"][levy_name], taxable_income))
+      if (not_zero(x)) {
+        printf "%s\t<%39s %32s>\n", header, levy_name, print_cash(x) > write_stream
+        header = ""
+      }
+    }
+
+  # Summarize levies
   if (not_zero(tax_levy)) {
     printf "\t%40s %32s\n", "Tax Levies", print_cash(tax_levy) > write_stream
     tax_owed += tax_levy
@@ -776,7 +767,7 @@ function income_tax_aud(now, past, benefits,
     # Gains are negative - losses are positive
     if (below_zero(deferred_gains))
       # Deferred tax losses can reduce future tax liability so are a deferred tax asset
-      deferred_tax = - get_tax(now, Tax_Bands, taxable_income - deferred_gains) - income_tax
+      deferred_tax = - get_tax(now, Tax_Bands["Tax"]["Income_Tax"], taxable_income - deferred_gains) - income_tax
     else
       deferred_tax = 0
 
