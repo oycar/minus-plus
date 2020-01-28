@@ -38,7 +38,7 @@
 ## Before actual transactions start we need to use START_JOURNAL
 ## It needs to include a start date within the first financial year of the journal
 ## So using the first day of the 2008 FY yields
-START_JOURNAL 2007-Jul-01
+2007-Jul-01 START_JOURNAL 
 
 ## Time varying variables can be set; to facilitate this the variable _Time_Fields_
 ## records which keys of an array represent time-stamps; by default no keys

@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Logic conventions
 
 
@@ -102,6 +104,8 @@ END {
 
 
 # // Default Reports
+
+
 
 
 
@@ -3384,7 +3388,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3735,7 +3739,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3875,7 +3879,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -4013,7 +4017,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4082,7 +4086,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4217,7 +4221,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4742,10 +4746,10 @@ function income_tax_aud(now, past, benefits,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
                                         low_income_offset, middle_income_offset, offset_name,
                                         taxable_income,
-                                        tax_levy, levy_name, x, header) {
+                                        tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -4945,9 +4949,6 @@ function income_tax_aud(now, past, benefits,
     # The franking deficit offsets
     franking_deficit_offsets = ((__MPX_KEY__ = find_key(Franking_Deficit_Offsets,  now))?( Franking_Deficit_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Franking_Deficit_Offsets[0]):( 0))))
 
-    if (!((((franking_deficit_offsets) - ( Epsilon)) <= 0) && (((franking_deficit_offsets) - ( -Epsilon)) >= 0)))
-      printf "%48s %32s\n\n", "Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
-
 
     # Need to check for franking deficit tax here
     if ((((franking_balance) - ( -Epsilon)) < 0)) {
@@ -5035,31 +5036,22 @@ function income_tax_aud(now, past, benefits,
     # The offsets
     printf "%s\t%40s %32s\n\n", header, "Foreign Offsets", print_cash(foreign_offsets) > write_stream
     header = ""
-
-    printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(((__MPX_KEY__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Foreign_Offset_Limit[0]):( 0))))) > write_stream
-    if ((((extra_tax) - ( Epsilon)) > 0))
-      printf "\t%40s %32s\n\n", "Extra Tax Paid on Foreign Earnings", print_cash(extra_tax) > write_stream
-
+    if (Show_Extra) {
+      printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(((__MPX_KEY__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Foreign_Offset_Limit[0]):( 0))))) > write_stream
+      if ((((extra_tax) - ( Epsilon)) > 0))
+        printf "\t%40s %32s\n\n", "Extra Tax Paid on Foreign Earnings", print_cash(extra_tax) > write_stream
+    }
   } else
     foreign_offsets = 0
 
   # The following blocks should be made modular
   # No Carry Offsets (Class C)
   # Get defined no carry offsets
-  no_carry_offsets = -(((__MPX_KEY__ = find_key(No_Carry_Offsets,  now))?( No_Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( No_Carry_Offsets[0]):( 0)))) - ((__MPX_KEY__ = find_key(No_Carry_Offsets,  past))?( No_Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( No_Carry_Offsets[0]):( 0)))))
-  if ("No_Carry" in Tax_Bands)
-    for (offset_name in Tax_Bands["No_Carry"]) {
-      no_carry_offsets += (x = get_tax(now, Tax_Bands["No_Carry"][offset_name], taxable_income))
-
-      if (((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0))) {
-        printf "%s\t%40s %32s\n", header, offset_name, print_cash(x) > write_stream
-        header = ""
-      }
-
-    }
-
   # Foreign offsets are no-carry offsets
-  no_carry_offsets += foreign_offsets
+  no_carry_offsets = foreign_offsets - (((__MPX_KEY__ = find_key(No_Carry_Offsets,  now))?( No_Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( No_Carry_Offsets[0]):( 0)))) - ((__MPX_KEY__ = find_key(No_Carry_Offsets,  past))?( No_Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( No_Carry_Offsets[0]):( 0)))))
+
+  # Add any extra defined offsets
+  no_carry_offsets += get_band_tax(now, no_carry_offsets, "No_Carry", taxable_income, write_stream)
 
   # The no-carry offset
   if (((((no_carry_offsets) - ( Epsilon)) > 0) || (((no_carry_offsets) - ( -Epsilon)) < 0))) {
@@ -5070,17 +5062,7 @@ function income_tax_aud(now, past, benefits,
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = -(((__MPX_KEY__ = find_key(Carry_Offsets,  now))?( Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Carry_Offsets[0]):( 0)))) - ((__MPX_KEY__ = find_key(Carry_Offsets,  past))?( Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Carry_Offsets[0]):( 0)))))
-  if ("Carry" in Tax_Bands)
-    for (offset_name in Tax_Bands["Carry"]) {
-      carry_offsets += (x = get_tax(now, Tax_Bands["Carry"][offset_name], taxable_income))
-
-      if (((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0))) {
-        printf "%s\t%40s %32s\n", header, offset_name, print_cash(x) > write_stream
-        header = ""
-      }
-
-    }
-
+  carry_offsets += get_band_tax(now, carry_offsets, "Carry", taxable_income, write_stream)
   if (!((((carry_offsets) - ( Epsilon)) <= 0) && (((carry_offsets) - ( -Epsilon)) >= 0))) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
@@ -5088,17 +5070,7 @@ function income_tax_aud(now, past, benefits,
 
   # The refundable offset (Class E)
   refundable_offsets = - (((__MPX_KEY__ = find_key(Refundable_Offsets,  now))?( Refundable_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Refundable_Offsets[0]):( 0)))) - ((__MPX_KEY__ = find_key(Refundable_Offsets,  past))?( Refundable_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Refundable_Offsets[0]):( 0)))))
-  if ("Refundable" in Tax_Bands)
-    for (offset_name in Tax_Bands["Refundable"]) {
-      carry_offsets += (x = get_tax(now, Tax_Bands["Refundable"][offset_name], taxable_income))
-
-      if (((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0))) {
-        printf "%s\t%40s %32s\n", header, offset_name, print_cash(x) > write_stream
-        header = ""
-      }
-
-    }
-
+  refundable_offsets += get_band_tax(now, refundable_offsets, "Refundable", taxable_income, write_stream)
   if (!((((refundable_offsets) - ( Epsilon)) <= 0) && (((refundable_offsets) - ( -Epsilon)) >= 0))) {
     printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
     header = ""
@@ -5272,15 +5244,8 @@ function income_tax_aud(now, past, benefits,
     printf "\t%40s %32s\n", "Supervisory Levy", print_cash(((__MPX_KEY__ = find_key(ATO_Levy,  now))?( ATO_Levy[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( ATO_Levy[0]):( 0))))) > write_stream
 
   # Add levies (if any)
-  tax_levy = - get_cost("*LIABILITY.CURRENT.LEVY", ((now) - 1))
-  if ("Levy" in Tax_Bands)
-    for (levy_name in Tax_Bands["Levy"]) {
-      tax_levy += (x = get_tax(now, Tax_Bands["Levy"][levy_name], taxable_income))
-      if (((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0))) {
-        printf "%s\t<%39s %32s>\n", header, levy_name, print_cash(x) > write_stream
-        header = ""
-      }
-    }
+  tax_levy  = - get_cost("*LIABILITY.CURRENT.LEVY", ((now) - 1))
+  tax_levy += get_band_tax(now, tax_levy, "Levy", taxable_income, write_stream)
 
   # Summarize levies
   if (((((tax_levy) - ( Epsilon)) > 0) || (((tax_levy) - ( -Epsilon)) < 0))) {
@@ -5392,7 +5357,21 @@ function income_tax_aud(now, past, benefits,
       adjust_cost(ALLOCATED, x, now)
     }
   }
+}
 
+#
+# Get a banded tax
+function get_band_tax(now, total, type, taxable_income, write_stream,    x, name) {
+  # Get any offsets
+  if (type in Tax_Bands)
+    for (name in Tax_Bands[type]) {
+      total += (x = get_tax(now, Tax_Bands[type][name], taxable_income))
+      if (Show_Extra && ((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0)))
+        printf "\t<%39s %32s>\n", name, print_cash(x) > write_stream
+    }
+
+  # Return the offset
+  return total
 }
 
 ## This should become jurisdiction specific
@@ -5582,7 +5561,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6568,13 +6547,13 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
-      if (!index(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
+      if (!index(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
         assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
@@ -6584,7 +6563,7 @@ function initialize_state(    x) {
   } else {
     # Use default read and write list
     Write_Variables = (0)
-    MPX_Arrays = ("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Low_Income_Offset Middle_Income_Offset Medicare_Levy Member_Liability Pension_Liability Reserve_Rate ")
+    MPX_Arrays = ("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate ")
     MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")

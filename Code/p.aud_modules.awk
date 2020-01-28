@@ -135,7 +135,7 @@ function income_tax_aud(now, past, benefits,
                                         no_carry_offsets, carry_offsets, refundable_offsets, no_refund_offsets,
                                         low_income_offset, middle_income_offset, offset_name,
                                         taxable_income,
-                                        tax_levy, levy_name, x, header) {
+                                        tax_levy, x, header) {
 
   # Print this out?
   write_stream = report_tax(eofy_stream(now))
@@ -428,31 +428,22 @@ function income_tax_aud(now, past, benefits,
     # The offsets
     printf "%s\t%40s %32s\n\n", header, "Foreign Offsets", print_cash(foreign_offsets) > write_stream
     header = ""
-@ifeq LOG income_tax
-    printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(find_entry(Foreign_Offset_Limit, now)) > write_stream
-    if (above_zero(extra_tax))
-      printf "\t%40s %32s\n\n", "Extra Tax Paid on Foreign Earnings", print_cash(extra_tax) > write_stream
-@endif
+    if (Show_Extra) {
+      printf "\t%40s %32s\n\n", "Foreign Offset Limit", print_cash(find_entry(Foreign_Offset_Limit, now)) > write_stream
+      if (above_zero(extra_tax))
+        printf "\t%40s %32s\n\n", "Extra Tax Paid on Foreign Earnings", print_cash(extra_tax) > write_stream
+    }
   } else
     foreign_offsets = 0
 
   # The following blocks should be made modular
   # No Carry Offsets (Class C)
   # Get defined no carry offsets
-  no_carry_offsets = -(find_entry(No_Carry_Offsets, now) - find_entry(No_Carry_Offsets, past))
-  if ("No_Carry" in Tax_Bands)
-    for (offset_name in Tax_Bands["No_Carry"]) {
-      no_carry_offsets += (x = get_tax(now, Tax_Bands["No_Carry"][offset_name], taxable_income))
-@ifeq LOG income_tax
-      if (not_zero(x)) {
-        printf "%s\t%40s %32s\n", header, offset_name, print_cash(x) > write_stream
-        header = ""
-      }
-@endif
-    }
-
   # Foreign offsets are no-carry offsets
-  no_carry_offsets += foreign_offsets
+  no_carry_offsets = foreign_offsets - (find_entry(No_Carry_Offsets, now) - find_entry(No_Carry_Offsets, past))
+
+  # Add any extra defined offsets
+  no_carry_offsets += get_band_tax(now, no_carry_offsets, "No_Carry", taxable_income, write_stream)
 
   # The no-carry offset
   if (not_zero(no_carry_offsets)) {
@@ -463,17 +454,7 @@ function income_tax_aud(now, past, benefits,
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = -(find_entry(Carry_Offsets, now) - find_entry(Carry_Offsets, past))
-  if ("Carry" in Tax_Bands)
-    for (offset_name in Tax_Bands["Carry"]) {
-      carry_offsets += (x = get_tax(now, Tax_Bands["Carry"][offset_name], taxable_income))
-@ifeq LOG income_tax
-      if (not_zero(x)) {
-        printf "%s\t%40s %32s\n", header, offset_name, print_cash(x) > write_stream
-        header = ""
-      }
-@endif
-    }
-
+  carry_offsets += get_band_tax(now, carry_offsets, "Carry", taxable_income, write_stream)
   if (!near_zero(carry_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
@@ -481,17 +462,7 @@ function income_tax_aud(now, past, benefits,
 
   # The refundable offset (Class E)
   refundable_offsets = - (find_entry(Refundable_Offsets, now) - find_entry(Refundable_Offsets, past))
-  if ("Refundable" in Tax_Bands)
-    for (offset_name in Tax_Bands["Refundable"]) {
-      carry_offsets += (x = get_tax(now, Tax_Bands["Refundable"][offset_name], taxable_income))
-@ifeq LOG income_tax
-      if (not_zero(x)) {
-        printf "%s\t%40s %32s\n", header, offset_name, print_cash(x) > write_stream
-        header = ""
-      }
-@endif
-    }
-
+  refundable_offsets += get_band_tax(now, refundable_offsets, "Refundable", taxable_income, write_stream)
   if (!near_zero(refundable_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
     header = ""
@@ -665,15 +636,8 @@ function income_tax_aud(now, past, benefits,
     printf "\t%40s %32s\n", "Supervisory Levy", print_cash(find_entry(ATO_Levy, now)) > write_stream
 
   # Add levies (if any)
-  tax_levy = - get_cost("*LIABILITY.CURRENT.LEVY", just_before(now))
-  if ("Levy" in Tax_Bands)
-    for (levy_name in Tax_Bands["Levy"]) {
-      tax_levy += (x = get_tax(now, Tax_Bands["Levy"][levy_name], taxable_income))
-      if (not_zero(x)) {
-        printf "%s\t<%39s %32s>\n", header, levy_name, print_cash(x) > write_stream
-        header = ""
-      }
-    }
+  tax_levy  = - get_cost("*LIABILITY.CURRENT.LEVY", just_before(now))
+  tax_levy += get_band_tax(now, tax_levy, "Levy", taxable_income, write_stream)
 
   # Summarize levies
   if (not_zero(tax_levy)) {
@@ -785,7 +749,21 @@ function income_tax_aud(now, past, benefits,
       adjust_cost(ALLOCATED, x, now)
     }
   }
+}
 
+#
+# Get a banded tax
+function get_band_tax(now, total, type, taxable_income, write_stream,    x, name) {
+  # Get any offsets
+  if (type in Tax_Bands)
+    for (name in Tax_Bands[type]) {
+      total += (x = get_tax(now, Tax_Bands[type][name], taxable_income))
+      if (Show_Extra && not_zero(x))
+        printf "\t<%39s %32s>\n", name, print_cash(x) > write_stream
+    }
+
+  # Return the offset
+  return total
 }
 
 ## This should become jurisdiction specific
