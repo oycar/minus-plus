@@ -46,8 +46,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Logic conventions
 
 
@@ -505,6 +503,8 @@ function read_state(name, adjust_value, first_field, last_field,    i, x, value)
 
   # Logging
 
+  printf "%s => ", name > "/dev/stderr"
+
 
   # Is this a scalar?
   if (first_field == last_field) {
@@ -514,6 +514,9 @@ function read_state(name, adjust_value, first_field, last_field,    i, x, value)
     else
       SYMTAB[name]  = value
 
+
+      # Logging
+      printf " %s\n", value > "/dev/stderr"
 
 
   } else {
@@ -528,6 +531,9 @@ function read_state(name, adjust_value, first_field, last_field,    i, x, value)
     # Set the array value
     set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, adjust_value, (0))
 
+
+    # Print the whole array out
+    walk_array(SYMTAB[name], 1, "/dev/stderr")
 
   }
 
@@ -6254,8 +6260,16 @@ function read_state_record(first_line, last_line) {
 
     # Special case if  this of the form << Array_Name >> then clear the array
     first_line = 2
-    if (last_line && (first_line > NF - 2) && isarray(SYMTAB[Variable_Name])) {
-      clear_array(SYMTAB[Variable_Name])
+    if (last_line && (first_line > NF - 2)) {
+      if (isarray(SYMTAB[Variable_Name])) {
+        clear_array(SYMTAB[Variable_Name])
+
+        # Logging
+        printf "Clear Array %s\n", Variable_Name > "/dev/stderr"
+
+      } else
+        # Not an array
+        SYMTAB[Variable_Name]  = ""
 
       next
     } else if (NF > 2 && "+=" == $3) {
@@ -6970,7 +6984,7 @@ function parse_transaction(now, a, b, amount,
     # Brokerage is treated as a cost so it can be applied to the units actually sold
     sell_units(now, a, -units, amount + g, Parcel_Name, Extra_Timestamp)
 
-    # And simply adjust settlement account b 
+    # And simply adjust settlement account b
     if (Real_Value[(-1)] > 0) {
       # This is a forex account - extra arguments fo not apply to complementary account
       buy_units(now, b, Real_Value[(-1)], amount)
