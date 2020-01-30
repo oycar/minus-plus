@@ -4,14 +4,10 @@
 ## Fund Type
 << Journal_Type IND >>
 
-## Remove Server Example
-## << Document_Protocol https:// >>
-## << Document_Root example.com/Documents/Example/ >>
 
 ## Before actual transactions start we need to use START_JOURNAL
 ## It needs to include a start date within the first financial year of the journal
 2016-Jul-01 START_JOURNAL
-
 
 
 2017-May-05 INCOME:POCKET.MONEY ASSET:MY.PIGGY.BANK 1.50 # Pay $1.50 from pocket money to my piggy bank

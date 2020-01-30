@@ -77,9 +77,6 @@ END {
 
 
 
-# // Default State Record - no time fields
-
-
 # // Constants for Real_Value keys
 
 
@@ -423,7 +420,7 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
-    if (value > now) {
+    if ((((discrepancy) - ( -Epsilon)) < 0)) {
       Read_Date_Error = "Payment date is later than current date"
       return ((Enforce_Qualification)?( (-1)):( (0)))
 
@@ -437,14 +434,15 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     #
     key = (__MPX_KEY__)
     while (key) {
-      value = ((__MPX_KEY__ = find_key(Dividend_Date[a],  ((key) - 1)))?( Dividend_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Dividend_Date[a][0]):( 0))))
-      if ((now - value) > discrepancy)
+      value = now - ((__MPX_KEY__ = find_key(Dividend_Date[a],  ((key) - 1)))?( Dividend_Date[a][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Dividend_Date[a][0]):( 0))))
+      if ((((value) - ( discrepancy)) > 0))
         # A worse match
         break
 
       # A better match
-      discrepancy = now - value
+      discrepancy = value
       if (((((discrepancy) - ( Epsilon)) <= 0) && (((discrepancy) - ( -Epsilon)) >= 0)))
+        # A good match
         return (__MPX_KEY__)
 
       # Save  this match
@@ -452,7 +450,7 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     }
 
     # Best match was key
-    if (discrepancy > 604800) {
+    if ((((discrepancy) - ( 604800)) > 0)) {
       Read_Date_Error = "Failed to find a payment date within one week of current date"
       return ((Enforce_Qualification)?( (-1)):( (0)))
     }
@@ -477,12 +475,18 @@ function read_csv_records(use_csv) {
 }
 
 # Abstract read value out
-function read_value(x) {
+function read_value(x,   value) {
   # Get the value first
+  value = read_date(x)
+  if ((-1) != value && (-2) != value)
+    # Treat as a date
+    return value
+
   # Is it a number?
   if (x ~ /^[0-9\.\-]+$/)
     return strtonum(x)
 
+  # Strip quotation marks if any
   if (x ~ /^"([[:print:]])+"$/)
     x = ctrim(x, "\"")
 
@@ -490,21 +494,7 @@ function read_value(x) {
   return x
 }
 
-# Read a state field
-function read_field(field, x) {
-  if ((( field in Time_Fields)?( Time_Fields[ field]):( ""))) {
-    x = read_date(($field))
-    assert((-1) != x, Read_Date_Error)
-  } else
-    x = ($field)
-
-  return x
-}
-
-
 # A somewhat generalized variable reading function
-##
-
 function read_state(name, adjust_value, first_field, last_field,    i, x, value) {
   # The end of the input
   if (first_field > last_field)
@@ -533,7 +523,7 @@ function read_state(name, adjust_value, first_field, last_field,    i, x, value)
       # retaining the old key if the "ditto"
       # symbol is encountered;
       if (($i != ("^")) || !(i in Variable_Keys))
-        Variable_Keys[i] = read_field(i)
+        Variable_Keys[i] = read_value($i)
 
     # Set the array value
     set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, adjust_value, (0))
@@ -653,7 +643,9 @@ function format_value(v) {
   }
 
   # Return the formatted value
-  if (v ~ /[[:space:]]/)
+  # (\"[^\"]+\")
+  # Protect internal white space with quotes if necessary
+  if (v ~ /[[:space:]]/ && v !~ /\"[^\"]+\"/)
     return ("\"" v "\"")
   return v
 }
@@ -4579,7 +4571,7 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
       }
 
       # This generates a change in the total income tax - the tax refund
-      tax_refund = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], ((__MPX_KEY__ = find_key(Taxable_Income,  now))?( Taxable_Income[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Taxable_Income[0]):( 0)))) + gains_written_back) - ((__MPX_KEY__ = find_key(Income_Tax,  now))?( Income_Tax[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Income_Tax[0]):( 0))))
+      tax_refund = get_band_tax(now, "Tax", ((__MPX_KEY__ = find_key(Taxable_Income,  now))?( Taxable_Income[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Taxable_Income[0]):( 0)))) + gains_written_back) - ((__MPX_KEY__ = find_key(Income_Tax,  now))?( Income_Tax[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Income_Tax[0]):( 0))))
 
       # Update taxable gains
       adjust_cost(WRITTEN_BACK, - gains_written_back, now)
@@ -4911,7 +4903,7 @@ function income_tax_aud(now, past, benefits,
   (Taxable_Income[ now] = ( taxable_income))
 
   # Keep the income tax on the taxable income - the actual amount owed may change due to tax offsets etc
-  income_tax = tax_owed = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], taxable_income) # Just need total tax
+  income_tax = tax_owed = get_band_tax(now, "Tax", taxable_income) # Just need total tax
   printf "%48s %32s\n", "Income Tax on Taxable Income or Loss", print_cash(tax_owed) > write_stream
   underline(81, 0, write_stream)
 
@@ -5019,12 +5011,10 @@ function income_tax_aud(now, past, benefits,
       foreign_expenses = - (get_cost("*EXPENSE.FOREIGN", now) - get_cost("*EXPENSE.FOREIGN", past))
 
       # Compute extra tax that would be due if foreign income and expenses were local income and expenses
-      extra_tax = income_tax - get_tax(now, Tax_Bands["Tax"]["Income_Tax"], taxable_income - foreign_income + foreign_expenses)
+      extra_tax = income_tax - get_band_tax(now, "Tax", taxable_income - foreign_income + foreign_expenses) # Just need total tax
 
       # Add levies (if any)
-      if ("Levy" in Tax_Bands)
-        for (levy_name in Tax_Bands["Levy"])
-          extra_tax += (x = get_tax(now, Tax_Bands["Levy"][levy_name], taxable_income))
+      extra_tax += get_band_tax(now, "Levy", taxable_income) # Is this correct - FixMe
 
       if (extra_tax < foreign_offsets)
         foreign_offsets = max(((__MPX_KEY__ = find_key(Foreign_Offset_Limit,  now))?( Foreign_Offset_Limit[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Foreign_Offset_Limit[0]):( 0)))), extra_tax)
@@ -5051,7 +5041,7 @@ function income_tax_aud(now, past, benefits,
   no_carry_offsets = foreign_offsets - (((__MPX_KEY__ = find_key(No_Carry_Offsets,  now))?( No_Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( No_Carry_Offsets[0]):( 0)))) - ((__MPX_KEY__ = find_key(No_Carry_Offsets,  past))?( No_Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( No_Carry_Offsets[0]):( 0)))))
 
   # Add any extra defined offsets
-  no_carry_offsets += get_band_tax(now, no_carry_offsets, "No_Carry", taxable_income, write_stream)
+  no_carry_offsets += get_band_tax(now, "No_Carry", taxable_income, write_stream)
 
   # The no-carry offset
   if (((((no_carry_offsets) - ( Epsilon)) > 0) || (((no_carry_offsets) - ( -Epsilon)) < 0))) {
@@ -5062,7 +5052,7 @@ function income_tax_aud(now, past, benefits,
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = -(((__MPX_KEY__ = find_key(Carry_Offsets,  now))?( Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Carry_Offsets[0]):( 0)))) - ((__MPX_KEY__ = find_key(Carry_Offsets,  past))?( Carry_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Carry_Offsets[0]):( 0)))))
-  carry_offsets += get_band_tax(now, carry_offsets, "Carry", taxable_income, write_stream)
+  carry_offsets += get_band_tax(now, "Carry", taxable_income, write_stream)
   if (!((((carry_offsets) - ( Epsilon)) <= 0) && (((carry_offsets) - ( -Epsilon)) >= 0))) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
@@ -5070,7 +5060,7 @@ function income_tax_aud(now, past, benefits,
 
   # The refundable offset (Class E)
   refundable_offsets = - (((__MPX_KEY__ = find_key(Refundable_Offsets,  now))?( Refundable_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Refundable_Offsets[0]):( 0)))) - ((__MPX_KEY__ = find_key(Refundable_Offsets,  past))?( Refundable_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Refundable_Offsets[0]):( 0)))))
-  refundable_offsets += get_band_tax(now, refundable_offsets, "Refundable", taxable_income, write_stream)
+  refundable_offsets += get_band_tax(now, "Refundable", taxable_income, write_stream)
   if (!((((refundable_offsets) - ( Epsilon)) <= 0) && (((refundable_offsets) - ( -Epsilon)) >= 0))) {
     printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
     header = ""
@@ -5184,7 +5174,8 @@ function income_tax_aud(now, past, benefits,
     # Tax losses available for use - and tax is owed - compute marginal tax change
     if ((((tax_losses) - ( Epsilon)) > 0)) {
       # x is the tax that would be paid on the tax_losses
-      x = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], tax_losses + taxable_income) - income_tax
+      x = get_band_tax(now, "Tax", tax_losses + taxable_income) - income_tax # Just need total tax
+
     } else # No tax owed
       x = 0
 
@@ -5195,12 +5186,16 @@ function income_tax_aud(now, past, benefits,
       # Yes so some losses will be extinguished
       # Which will reduce tax_owed to zero - so the effective reduction
       # in tax losses is the income that would produce tax equal to tax_owed
-      x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed) # This is effectively a gain - so make it negative
+      if ("Tax" in Tax_Bands)
+        x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed) # This is effectively a gain - so make it negative
+      else
+        x = 0
       tax_owed = 0
     } else if (((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0))) {
       # All losses extinguished
       tax_owed -= x
-      x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], x) # This is effectively a gain - so make it negative
+      if ("Tax" in Tax_Bands)
+        x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], x) # This is effectively a gain - so make it negative
     }
 
     if (Show_Extra)
@@ -5213,7 +5208,10 @@ function income_tax_aud(now, past, benefits,
       # This is a bit tricky
       # (unused) franking offsets may still be present here
       # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-      x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed + refundable_offsets - franking_offsets)
+      if ("Tax" in Tax_Bands)
+        x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed + refundable_offsets - franking_offsets)
+      else
+        x = 0
     } else
       # Yes so zero new losses
       x = 0
@@ -5245,7 +5243,7 @@ function income_tax_aud(now, past, benefits,
 
   # Add levies (if any)
   tax_levy  = - get_cost("*LIABILITY.CURRENT.LEVY", ((now) - 1))
-  tax_levy += get_band_tax(now, tax_levy, "Levy", taxable_income, write_stream)
+  tax_levy += get_band_tax(now, "Levy", taxable_income, write_stream)
 
   # Summarize levies
   if (((((tax_levy) - ( Epsilon)) > 0) || (((tax_levy) - ( -Epsilon)) < 0))) {
@@ -5339,7 +5337,7 @@ function income_tax_aud(now, past, benefits,
     # Gains are negative - losses are positive
     if ((((deferred_gains) - ( -Epsilon)) < 0))
       # Deferred tax losses can reduce future tax liability so are a deferred tax asset
-      deferred_tax = - get_tax(now, Tax_Bands["Tax"]["Income_Tax"], taxable_income - deferred_gains) - income_tax
+      deferred_tax = - get_band_tax(now, "Tax", taxable_income - deferred_gains) - income_tax
     else
       deferred_tax = 0
 
@@ -5361,12 +5359,13 @@ function income_tax_aud(now, past, benefits,
 
 #
 # Get a banded tax
-function get_band_tax(now, total, type, taxable_income, write_stream,    x, name) {
+function get_band_tax(now, type, taxable_income, write_stream,    total, x, name) {
   # Get any offsets
+  total = 0
   if (type in Tax_Bands)
     for (name in Tax_Bands[type]) {
       total += (x = get_tax(now, Tax_Bands[type][name], taxable_income))
-      if (Show_Extra && ((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0)))
+      if (write_Stream && Show_Extra && ((((x) - ( Epsilon)) > 0) || (((x) - ( -Epsilon)) < 0)))
         printf "\t<%39s %32s>\n", name, print_cash(x) > write_stream
     }
 
@@ -5882,7 +5881,7 @@ function get_member_name(a, now, x,   member_name, member_account, target_accoun
     # This will change the LIABILITIES and EXPENSES equally
     if (target_account == member_account) {
       # This is a TAXABLE account
-      contribution_tax = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], x) # Always one band so ok to ignore other income
+      contribution_tax = get_band_tax(now, "Tax", x) # Always one band so ok to ignore other income
 
       # Save the tax expenses and adjust the liability
       adjust_cost(CONTRIBUTION_TAX, -contribution_tax, now)
@@ -6051,7 +6050,6 @@ BEGIN {
 
   # An array to hold document strings
   ((SUBSEP in Documents)?((1)):((0)))
-  ((SUBSEP in Time_Fields)?((1)):((0)))
 
   # A Document shortcut code
   Document_Shortcut = "[:+]"
@@ -6179,9 +6177,6 @@ BEGIN {
   Import_Zero  = (0)
   Import_Time  = (12)
 
-  # Default Import Settings
-  split((""), Time_Fields, " ")
-
   # Set special accounts
   set_special_accounts()
 
@@ -6235,10 +6230,10 @@ BEGIN {
 ##
 ## Read the listed fields from a delimited text file
 ## For example
-## << Time_Fields  4 9 >>
+## << Date_Hints  4 TRUE >>
 ##
 ## would result in each record yielding
-## An_Array[$1][read_date($4)][$7] => read_date($9)
+## An_Array[$1][read_date($4)][$7] => $9
 ##
 ##
 # This reads an array from human readable data
@@ -6975,7 +6970,7 @@ function parse_transaction(now, a, b, amount,
     # Brokerage is treated as a cost so it can be applied to the units actually sold
     sell_units(now, a, -units, amount + g, Parcel_Name, Extra_Timestamp)
 
-    # And simply adjust settlement account b by the
+    # And simply adjust settlement account b 
     if (Real_Value[(-1)] > 0) {
       # This is a forex account - extra arguments fo not apply to complementary account
       buy_units(now, b, Real_Value[(-1)], amount)
@@ -6985,12 +6980,6 @@ function parse_transaction(now, a, b, amount,
       Real_Value[(-1)] = 0
     } else # Normal account
       adjust_cost(b, amount, now)
-
-    # Buy units in asset (b) - this ignores impact of brokerage
-    bought_parcel = buy_units(now, b, units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
-
-    # Adjust the cost of this **parcel** for the impact of brokerage and GST
-    adjust_parcel_cost(b, bought_parcel, now, current_brokerage - g,  II, (0))
 
     # Did we swop? If so swop back
     if (b == swop) {

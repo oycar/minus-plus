@@ -49,9 +49,6 @@
 @define BUY ("BUY")
 @define SELL ("SELL")
 
-# // Default State Record - no time fields
-@define TIME_FIELDS ("")
-
 # // Constants for Real_Value keys
 @define SELL_FOREX_KEY    (-2)
 @define BUY_FOREX_KEY     (-1)

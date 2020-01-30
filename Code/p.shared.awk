@@ -36,7 +36,7 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     discrepancy = now - value
 
     # The value cannot be later than the current time "now"
-    if (value > now) {
+    if (below_zero(discrepancy)) {
       Read_Date_Error = "Payment date is later than current date"
       return ternary(Enforce_Qualification, DATE_ERROR, FALSE)
 
@@ -50,14 +50,15 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     #
     key = found_key
     while (key) {
-      value = find_entry(Dividend_Date[a], just_before(key))
-      if ((now - value) > discrepancy)
+      value = now - find_entry(Dividend_Date[a], just_before(key))
+      if (greater_than(value, discrepancy))
         # A worse match
         break
 
       # A better match
-      discrepancy = now - value
+      discrepancy = value
       if (near_zero(discrepancy))
+        # A good match
         return found_key
 
       # Save  this match
@@ -65,7 +66,7 @@ function get_exdividend_date(a, now,   value, key, discrepancy) {
     }
 
     # Best match was key
-    if (discrepancy > ONE_WEEK) {
+    if (greater_than(discrepancy, ONE_WEEK)) {
       Read_Date_Error = "Failed to find a payment date within one week of current date"
       return ternary(Enforce_Qualification, DATE_ERROR, FALSE)
     }
@@ -90,12 +91,18 @@ function read_csv_records(use_csv) {
 }
 
 # Abstract read value out
-function read_value(x) {
+function read_value(x,   value) {
   # Get the value first
+  value = read_date(x)
+  if (DATE_ERROR != value && BEFORE_EPOCH != value)
+    # Treat as a date
+    return value
+
   # Is it a number?
   if (x ~ /^[0-9\.\-]+$/)
     return strtonum(x)
 
+  # Strip quotation marks if any
   if (x ~ /^"([[:print:]])+"$/)
     x = ctrim(x, "\"")
 
@@ -103,21 +110,7 @@ function read_value(x) {
   return x
 }
 
-# Read a state field
-function read_field(field, x) {
-  if (get_key(Time_Fields, field)) {
-    x = read_date(trim($field))
-    assert(DATE_ERROR != x, Read_Date_Error)
-  } else
-    x = trim($field)
-
-  return x
-}
-
-
 # A somewhat generalized variable reading function
-##
-
 function read_state(name, adjust_value, first_field, last_field,    i, x, value) {
   # The end of the input
   if (first_field > last_field)
@@ -151,7 +144,7 @@ function read_state(name, adjust_value, first_field, last_field,    i, x, value)
       # retaining the old key if the "ditto"
       # symbol is encountered;
       if (($i != DITTO) || !(i in Variable_Keys))
-        Variable_Keys[i] = read_field(i)
+        Variable_Keys[i] = read_value($i)
 
     # Set the array value
     set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, adjust_value, FALSE)
@@ -276,7 +269,9 @@ function format_value(v) {
   }
 
   # Return the formatted value
-  if (v ~ /[[:space:]]/)
+  # (\"[^\"]+\")
+  # Protect internal white space with quotes if necessary
+  if (v ~ /[[:space:]]/ && v !~ /\"[^\"]+\"/)
     return ("\"" v "\"")
   return v
 }

@@ -1812,7 +1812,7 @@ function write_back_losses(future_time, now, limit, available_losses, reports_st
       }
 
       # This generates a change in the total income tax - the tax refund
-      tax_refund = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], find_entry(Taxable_Income, now) + gains_written_back) - find_entry(Income_Tax, now)
+      tax_refund = get_band_tax(now, "Tax", find_entry(Taxable_Income, now) + gains_written_back) - find_entry(Income_Tax, now)
 
       # Update taxable gains
       adjust_cost(WRITTEN_BACK, - gains_written_back, now)

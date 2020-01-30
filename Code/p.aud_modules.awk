@@ -300,7 +300,7 @@ function income_tax_aud(now, past, benefits,
   set_entry(Taxable_Income, taxable_income, now)
 
   # Keep the income tax on the taxable income - the actual amount owed may change due to tax offsets etc
-  income_tax = tax_owed = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], taxable_income) # Just need total tax
+  income_tax = tax_owed = get_band_tax(now, "Tax", taxable_income) # Just need total tax
   printf "%48s %32s\n", "Income Tax on Taxable Income or Loss", print_cash(tax_owed) > write_stream
   underline(81, 0, write_stream)
 
@@ -411,12 +411,10 @@ function income_tax_aud(now, past, benefits,
       foreign_expenses = - (get_cost("*EXPENSE.FOREIGN", now) - get_cost("*EXPENSE.FOREIGN", past))
 
       # Compute extra tax that would be due if foreign income and expenses were local income and expenses
-      extra_tax = income_tax - get_tax(now, Tax_Bands["Tax"]["Income_Tax"], taxable_income - foreign_income + foreign_expenses)
+      extra_tax = income_tax - get_band_tax(now, "Tax", taxable_income - foreign_income + foreign_expenses) # Just need total tax
 
       # Add levies (if any)
-      if ("Levy" in Tax_Bands)
-        for (levy_name in Tax_Bands["Levy"])
-          extra_tax += (x = get_tax(now, Tax_Bands["Levy"][levy_name], taxable_income))
+      extra_tax += get_band_tax(now, "Levy", taxable_income) # Is this correct - FixMe
 
       if (extra_tax < foreign_offsets)
         foreign_offsets = max(find_entry(Foreign_Offset_Limit, now), extra_tax)
@@ -443,7 +441,7 @@ function income_tax_aud(now, past, benefits,
   no_carry_offsets = foreign_offsets - (find_entry(No_Carry_Offsets, now) - find_entry(No_Carry_Offsets, past))
 
   # Add any extra defined offsets
-  no_carry_offsets += get_band_tax(now, no_carry_offsets, "No_Carry", taxable_income, write_stream)
+  no_carry_offsets += get_band_tax(now, "No_Carry", taxable_income, write_stream)
 
   # The no-carry offset
   if (not_zero(no_carry_offsets)) {
@@ -454,7 +452,7 @@ function income_tax_aud(now, past, benefits,
   # Other offsets
   # The carry offset (Class D)
   carry_offsets = -(find_entry(Carry_Offsets, now) - find_entry(Carry_Offsets, past))
-  carry_offsets += get_band_tax(now, carry_offsets, "Carry", taxable_income, write_stream)
+  carry_offsets += get_band_tax(now, "Carry", taxable_income, write_stream)
   if (!near_zero(carry_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Carry Offsets", print_cash(carry_offsets) > write_stream
     header = ""
@@ -462,7 +460,7 @@ function income_tax_aud(now, past, benefits,
 
   # The refundable offset (Class E)
   refundable_offsets = - (find_entry(Refundable_Offsets, now) - find_entry(Refundable_Offsets, past))
-  refundable_offsets += get_band_tax(now, refundable_offsets, "Refundable", taxable_income, write_stream)
+  refundable_offsets += get_band_tax(now, "Refundable", taxable_income, write_stream)
   if (!near_zero(refundable_offsets)) {
     printf "%s\t%40s %32s\n", header, "Total Refundable Offsets", print_cash(refundable_offsets) > write_stream
     header = ""
@@ -576,7 +574,8 @@ function income_tax_aud(now, past, benefits,
     # Tax losses available for use - and tax is owed - compute marginal tax change
     if (above_zero(tax_losses)) {
       # x is the tax that would be paid on the tax_losses
-      x = get_tax(now, Tax_Bands["Tax"]["Income_Tax"], tax_losses + taxable_income) - income_tax
+      x = get_band_tax(now, "Tax", tax_losses + taxable_income) - income_tax # Just need total tax
+
     } else # No tax owed
       x = 0
 
@@ -587,12 +586,16 @@ function income_tax_aud(now, past, benefits,
       # Yes so some losses will be extinguished
       # Which will reduce tax_owed to zero - so the effective reduction
       # in tax losses is the income that would produce tax equal to tax_owed
-      x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed) # This is effectively a gain - so make it negative
+      if ("Tax" in Tax_Bands)
+        x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed) # This is effectively a gain - so make it negative
+      else
+        x = 0
       tax_owed = 0
     } else if (not_zero(x)) {
       # All losses extinguished
       tax_owed -= x
-      x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], x) # This is effectively a gain - so make it negative
+      if ("Tax" in Tax_Bands)
+        x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], x) # This is effectively a gain - so make it negative
     }
 
     if (Show_Extra)
@@ -605,7 +608,10 @@ function income_tax_aud(now, past, benefits,
       # This is a bit tricky
       # (unused) franking offsets may still be present here
       # plus the actual tax owed is modifiable by any refundable offsets (which will be refunded)
-      x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed + refundable_offsets - franking_offsets)
+      if ("Tax" in Tax_Bands)
+        x = - get_taxable_income(now, Tax_Bands["Tax"]["Income_Tax"], tax_owed + refundable_offsets - franking_offsets)
+      else
+        x = 0
     } else
       # Yes so zero new losses
       x = 0
@@ -637,7 +643,7 @@ function income_tax_aud(now, past, benefits,
 
   # Add levies (if any)
   tax_levy  = - get_cost("*LIABILITY.CURRENT.LEVY", just_before(now))
-  tax_levy += get_band_tax(now, tax_levy, "Levy", taxable_income, write_stream)
+  tax_levy += get_band_tax(now, "Levy", taxable_income, write_stream)
 
   # Summarize levies
   if (not_zero(tax_levy)) {
@@ -731,7 +737,7 @@ function income_tax_aud(now, past, benefits,
     # Gains are negative - losses are positive
     if (below_zero(deferred_gains))
       # Deferred tax losses can reduce future tax liability so are a deferred tax asset
-      deferred_tax = - get_tax(now, Tax_Bands["Tax"]["Income_Tax"], taxable_income - deferred_gains) - income_tax
+      deferred_tax = - get_band_tax(now, "Tax", taxable_income - deferred_gains) - income_tax
     else
       deferred_tax = 0
 
@@ -753,12 +759,13 @@ function income_tax_aud(now, past, benefits,
 
 #
 # Get a banded tax
-function get_band_tax(now, total, type, taxable_income, write_stream,    x, name) {
+function get_band_tax(now, type, taxable_income, write_stream,    total, x, name) {
   # Get any offsets
+  total = 0
   if (type in Tax_Bands)
     for (name in Tax_Bands[type]) {
       total += (x = get_tax(now, Tax_Bands[type][name], taxable_income))
-      if (Show_Extra && not_zero(x))
+      if (write_Stream && Show_Extra && not_zero(x))
         printf "\t<%39s %32s>\n", name, print_cash(x) > write_stream
     }
 

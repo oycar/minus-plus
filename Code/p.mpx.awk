@@ -61,7 +61,6 @@ BEGIN {
 
   # An array to hold document strings
   make_array(Documents)
-  make_array(Time_Fields)
 
   # A Document shortcut code
   Document_Shortcut = "[:+]"
@@ -189,9 +188,6 @@ BEGIN {
   Import_Zero  = FALSE
   Import_Time  = HOUR
 
-  # Default Import Settings
-  split(TIME_FIELDS, Time_Fields, " ")
-
   # Set special accounts
   set_special_accounts()
 
@@ -245,10 +241,10 @@ BEGIN {
 ##
 ## Read the listed fields from a delimited text file
 ## For example
-## << Time_Fields  4 9 >>
+## << Date_Hints  4 TRUE >>
 ##
 ## would result in each record yielding
-## An_Array[$1][read_date($4)][$7] => read_date($9)
+## An_Array[$1][read_date($4)][$7] => $9
 ##
 ##
 # This reads an array from human readable data
@@ -999,7 +995,7 @@ function parse_transaction(now, a, b, amount,
     # Brokerage is treated as a cost so it can be applied to the units actually sold
     sell_units(now, a, -units, amount + g, Parcel_Name, Extra_Timestamp)
 
-    # And simply adjust settlement account b by the
+    # And simply adjust settlement account b 
     if (Real_Value[BUY_FOREX_KEY] > 0) {
       # This is a forex account - extra arguments fo not apply to complementary account
       buy_units(now, b, Real_Value[BUY_FOREX_KEY], amount)
@@ -1009,12 +1005,6 @@ function parse_transaction(now, a, b, amount,
       Real_Value[BUY_FOREX_KEY] = 0
     } else # Normal account
       adjust_cost(b, amount, now)
-
-    # Buy units in asset (b) - this ignores impact of brokerage
-    bought_parcel = buy_units(now, b, units, amount - current_brokerage, Parcel_Name, Extra_Timestamp)
-
-    # Adjust the cost of this **parcel** for the impact of brokerage and GST
-    adjust_parcel_cost(b, bought_parcel, now, current_brokerage - g,  II, FALSE)
 
     # Did we swop? If so swop back
     if (b == swop) {
