@@ -157,7 +157,6 @@ END {
 
 
 
-
 #
 # // Useful shorthands for various kinds of accounts
 # // @define is_currency(a)  ((a) ~ /\.CURRENCY:/)
@@ -245,6 +244,9 @@ END {
 
 
 
+
+
+# // Force a decimal number
 
 
 
@@ -476,20 +478,17 @@ function read_csv_records(use_csv) {
 function read_value(x,   value) {
   # Get the value first
   value = read_date(x)
-  if ((-1) != value && (-2) != value)
+  if ((-1) != value)
     # Treat as a date
+    # This can return BEFORE_EPOCH
     return value
 
   # Is it a number?
-  if (x ~ /^[0-9\.\-]+$/)
-    return strtonum(x)
+  if (x ~ /^[0-9\.\-\+]+$/)
+    return ((x) + 0)
 
   # Strip quotation marks if any
-  if (x ~ /^"([[:print:]])+"$/)
-    x = ctrim(x, "\"")
-
-  # Just return the field
-  return x
+  return gensub(/^"([^\"]+)"$/, "\\1", 1, x)
 }
 
 # A somewhat generalized variable reading function
@@ -503,8 +502,6 @@ function read_state(name, adjust_value, first_field, last_field,    i, x, value)
 
   # Logging
 
-  printf "%s => ", name > "/dev/stderr"
-
 
   # Is this a scalar?
   if (first_field == last_field) {
@@ -514,9 +511,6 @@ function read_state(name, adjust_value, first_field, last_field,    i, x, value)
     else
       SYMTAB[name]  = value
 
-
-      # Logging
-      printf " %s\n", value > "/dev/stderr"
 
 
   } else {
@@ -531,9 +525,6 @@ function read_state(name, adjust_value, first_field, last_field,    i, x, value)
     # Set the array value
     set_array(SYMTAB[name], Variable_Keys, first_field, last_field - 1, value, adjust_value, (0))
 
-
-    # Print the whole array out
-    walk_array(SYMTAB[name], 1, "/dev/stderr")
 
   }
 
@@ -831,29 +822,7 @@ function maximum_entry(array, start_bracket, end_bracket,
   return max
 }
 
-
 # Some extras
-# White space trimming
-function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
-function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
-#function trim(s) { return rtrim(ltrim(s)); }
-function to_number(s, default_value) {return "" == s ? default_value : strtonum(s)}
-
-# character trimming
-function ctrim(s, left_c, right_c,      string) {
-  # Different chars can be trimmed from left and right
-  right_c = ("" == right_c) ? left_c : right_c
-
-  # The left trim
-  string = "^\\" left_c
-  sub(string, "", s)
-
-  # The right trim
-  string = "\\" right_c "$"
-  sub(string, "", s)
-  return s
-}
-
 # Clear global values ready to read a new input record
 function new_line(  key) {
   # Clear real values
@@ -946,9 +915,9 @@ function parse_line(now,    i, j, x, number_accounts) {
 
       # is this a purchase or a sale of currency units?
       if (((((Account[2]) ~ /^ASSET\.CURRENCY[.:]/))?( Long_Name[get_name_component(Leaf[Account[2]], 1)]):( "")) == Transaction_Currency)
-        Real_Value[(-1)] = $i = strtonum($j) # A purchase (of forex)
+        Real_Value[(-1)] = $i = (($j) + 0)  # A purchase (of forex)
       else if (((((Account[1]) ~ /^ASSET\.CURRENCY[.:]/))?( Long_Name[get_name_component(Leaf[Account[1]], 1)]):( "")) == Transaction_Currency && is_open(Account[1], now)) {
-        $i = strtonum($j) # A sale
+        $i = (($j) + 0) # A sale
         Real_Value[(-2)] = $j = - $i # A sale (of forex)
       } else { # Other cases
         # Rebuild line - remove currency code and shuffle down fields
@@ -971,7 +940,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     }
 
     # Check that this is a number
-    amount = strtonum($i)
+    amount = (($i) + 0)
 
     # Zero j
     j = ((Real_Value[(-1)] || Real_Value[(-2)])?( -1):( 0))
@@ -1249,7 +1218,7 @@ function parse_optional_value(field,     value) {
   }
 
   # Next - is it a numerical value?
-  value = strtonum(field)
+  value = ((field) + 0)
 
   # This is a value
   if (((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
@@ -1281,7 +1250,7 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
   if (field ~ /^\((.)+\)$/) {
     # bracketed
     len = length(field)
-    field = (toupper(substr(field, 2, len - 2)))
+    field = toupper(substr(field, 2, len - 2))
     if (field ~ /D/) {
       Tax_Adjustment = Automatic_Depreciation = (1)
       Cost_Element = I
@@ -1330,7 +1299,8 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
   }
 
   # The string can be a document name enclosed in square brackets
-  string = ctrim(field, "[", "]")
+  string = gensub(/(^\[)([[:print:]]+)(\]$)/, "\\2", 1, field)
+
   if (string == field) {
     # Parcel names are enclosed by single quotes
     if (field ~ /^"([[:print:]])+"$/) {
@@ -2205,6 +2175,8 @@ function filter_data(now, variable_names, show_details,    array_names, name) {
 
   # Should we log
 
+   show_details = (1)
+
 
   # Filter the data arrays
   for (name in array_names)
@@ -2272,7 +2244,10 @@ function filter_array(now, data_array, name, show_blocks,
         if (Show_Extra && show_blocks)
           printf "\n" > "/dev/stderr"
 
-        # Copy the kept items back
+        # Delete the array
+        delete data_array[a]
+
+        # But put the kept items back
         for (key in stack) {
           data_array[a][key] = stack[key]
 
@@ -2647,7 +2622,7 @@ function read_date(date_string, hour,
 
 
   # Split the input date
-  if (3 == split((date_string), date_fields, "[-/ ]")) {
+  if (3 == split(date_string, date_fields, "[-/ ]")) {
     # The fields are YYYY MM DD
     # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
     # or             Mon DD YYYY
@@ -2695,11 +2670,11 @@ function read_date(date_string, hour,
     if (year < 1000)
       year += (2000)
 
-    # If still before the EPOCH this is an error
-    if (year < (2000)) {
-      Read_Date_Error = "Date <" date_string "> is before epoch start <" get_date(Epoch) ">"
-      return (-2)
-    }
+    # # If still before the EPOCH this is a potential error
+    # if (year < EPOCH_START) {
+    #   Read_Date_Error = "Date <" date_string "> is before epoch start <" get_date(EPOCH_START) ">"
+    #   return BEFORE_EPOCH
+    # }
   } else {
     Read_Date_Error = "Can't parse date <" date_string "> wrong number of fields"
     return (-1)
@@ -6254,7 +6229,7 @@ function read_state_record(first_line, last_line) {
   # We need to establish if this is an array or a scalar
   if (first_line) {
     assert(NF > 1, "Syntax error <" $0 "> state record needs a variable name")
-    Variable_Name = ($2)
+    Variable_Name = $2
     assert(Variable_Name in SYMTAB, "<" Variable_Name "> is not declared")
     delete Variable_Keys
 
@@ -6263,9 +6238,6 @@ function read_state_record(first_line, last_line) {
     if (last_line && (first_line > NF - 2)) {
       if (isarray(SYMTAB[Variable_Name])) {
         clear_array(SYMTAB[Variable_Name])
-
-        # Logging
-        printf "Clear Array %s\n", Variable_Name > "/dev/stderr"
 
       } else
         # Not an array
@@ -6489,33 +6461,51 @@ function import_data(array, symbol, name,
   a = initialize_account(symbol)
 
   # Get the key
-  if (Key_is_Date) {
-    key = read_date(($Key_Field)) # Default Hour overruled sometimes
-    assert((-1) != key, Read_Date_Error)
-
-    # Skip dates before the epoch
-    if ((-2) == key)
-      return
-  } else
-    key = ($Key_Field)
+  key = read_date($Key_Field)
+  if ((-1) == key)
+    key = read_value($Key_Field)
 
   # Get the value
-  if (Value_is_Date) {
-    value = read_date(($Value_Field))
-    assert((-1) != value, Read_Date_Error)
+  value = read_date($Value_Field)
+  if ((-1) == value)
+    value = read_value($Value_Field)
 
-    # Skip dates before the epoch
-    if ((-2) == value)
-      return
-  } else {
-    value = ($Value_Field)
-    if (!Import_Zero && ((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
-      return # Don't import zero values
+  if (!Import_Zero && ((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
+    return # Don't import zero values
 
-    # Exchange rates are reciprocal prices
-    if (Value_is_XRate)
-      value = 1.0 / value
-  }
+  # Exchange rates are reciprocal prices
+  if (Value_is_XRate)
+    value = 1.0 / value
+
+  # if (Key_is_Date) {
+  #   key = read_date($Key_Field) # Default Hour overruled sometimes
+  #   assert(DATE_ERROR != key, Read_Date_Error)
+  #   #
+  #   # # Skip dates before the epoch
+  #   # if (BEFORE_EPOCH == key)
+  #   #   return
+  # } else
+  #   key = $Key_Field
+  #
+  # key = return
+  #
+  # # Get the value
+  # if (Value_is_Date) {
+  #   value = read_date($Value_Field)
+  #   assert(DATE_ERROR != value, Read_Date_Error)
+  #
+  #   # Skip dates before the epoch
+  #   if (BEFORE_EPOCH == value)
+  #     return
+  # } else {
+  #   value = $Value_Field
+  #   if (!Import_Zero && near_zero(value))
+  #     return # Don't import zero values
+  #
+  #   # Exchange rates are reciprocal prices
+  #   if (Value_is_XRate)
+  #     value = 1.0 / value
+  # }
 
   # Logging
 
@@ -6586,8 +6576,8 @@ function set_array_bands(now, bands, nf,     i, k) {
 
   # Negative threshold is required to force correct ordering
   for (i = 4; i < nf; i += 2) {
-    k = strtonum($(i+1))
-    bands[now][-k] = strtonum($i)
+    k = (($(i+1)) + 0)
+    bands[now][-k] = (($i) + 0)
 
   }
 
@@ -6595,7 +6585,7 @@ function set_array_bands(now, bands, nf,     i, k) {
   # %%,DATE,<ACTION>,15
   # i.e $(i+1) does not exist
   if (4 == nf) {
-    bands[now][0] = strtonum($nf)
+    bands[now][0] = (($nf) + 0)
 
   }
 }
@@ -6671,11 +6661,6 @@ function read_input_record(   t, n, a, threshold) {
 
 ## Apply a account control action
 function control_action(now,    i, is_check, x) {
-  #
-  # Trim the fields
-  for (i = 2; i <= NF; i ++)
-    # Need to remove white space from the fields
-    $i = ($i)
 
   # Is this a control action?
   # (ADJUST|CHANGE|CHECK|MERGE|SET|SHOW|SPLIT)

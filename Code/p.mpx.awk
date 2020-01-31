@@ -259,7 +259,7 @@ function read_state_record(first_line, last_line) {
   # We need to establish if this is an array or a scalar
   if (first_line) {
     assert(NF > 1, "Syntax error <" $0 "> state record needs a variable name")
-    Variable_Name = trim($2)
+    Variable_Name = $2
     assert(Variable_Name in SYMTAB, "<" Variable_Name "> is not declared")
     delete Variable_Keys
 
@@ -499,33 +499,51 @@ function import_data(array, symbol, name,
   a = initialize_account(symbol)
 
   # Get the key
-  if (Key_is_Date) {
-    key = read_date(trim($Key_Field)) # Default Hour overruled sometimes
-    assert(DATE_ERROR != key, Read_Date_Error)
-
-    # Skip dates before the epoch
-    if (BEFORE_EPOCH == key)
-      return
-  } else
-    key = trim($Key_Field)
+  key = read_date($Key_Field)
+  if (DATE_ERROR == key)
+    key = read_value($Key_Field)
 
   # Get the value
-  if (Value_is_Date) {
-    value = read_date(trim($Value_Field))
-    assert(DATE_ERROR != value, Read_Date_Error)
+  value = read_date($Value_Field)
+  if (DATE_ERROR == value)
+    value = read_value($Value_Field)
 
-    # Skip dates before the epoch
-    if (BEFORE_EPOCH == value)
-      return
-  } else {
-    value = trim($Value_Field)
-    if (!Import_Zero && near_zero(value))
-      return # Don't import zero values
+  if (!Import_Zero && near_zero(value))
+    return # Don't import zero values
 
-    # Exchange rates are reciprocal prices
-    if (Value_is_XRate)
-      value = 1.0 / value
-  }
+  # Exchange rates are reciprocal prices
+  if (Value_is_XRate)
+    value = 1.0 / value
+
+  # if (Key_is_Date) {
+  #   key = read_date($Key_Field) # Default Hour overruled sometimes
+  #   assert(DATE_ERROR != key, Read_Date_Error)
+  #   #
+  #   # # Skip dates before the epoch
+  #   # if (BEFORE_EPOCH == key)
+  #   #   return
+  # } else
+  #   key = $Key_Field
+  #
+  # key = return
+  #
+  # # Get the value
+  # if (Value_is_Date) {
+  #   value = read_date($Value_Field)
+  #   assert(DATE_ERROR != value, Read_Date_Error)
+  #
+  #   # Skip dates before the epoch
+  #   if (BEFORE_EPOCH == value)
+  #     return
+  # } else {
+  #   value = $Value_Field
+  #   if (!Import_Zero && near_zero(value))
+  #     return # Don't import zero values
+  #
+  #   # Exchange rates are reciprocal prices
+  #   if (Value_is_XRate)
+  #     value = 1.0 / value
+  # }
 
   # Logging
 @ifeq LOG import_record
@@ -598,8 +616,8 @@ function set_array_bands(now, bands, nf,     i, k) {
 
   # Negative threshold is required to force correct ordering
   for (i = 4; i < nf; i += 2) {
-    k = strtonum($(i+1))
-    bands[now][-k] = strtonum($i)
+    k = make_decimal($(i+1))
+    bands[now][-k] = make_decimal($i)
 @ifeq LOG checkset
     printf "[%s] => %11.2f\n\t", k, bands[now][-k] > STDERR
 @endif
@@ -609,7 +627,7 @@ function set_array_bands(now, bands, nf,     i, k) {
   # %%,DATE,<ACTION>,15
   # i.e $(i+1) does not exist
   if (4 == nf) {
-    bands[now][0] = strtonum($nf)
+    bands[now][0] = make_decimal($nf)
 @ifeq LOG checkset
     printf "0 => %11.2f\n", bands[now][0] > STDERR
 @endif
@@ -687,11 +705,6 @@ function read_input_record(   t, n, a, threshold) {
 
 ## Apply a account control action
 function control_action(now,    i, is_check, x) {
-  #
-  # Trim the fields
-  for (i = 2; i <= NF; i ++)
-    # Need to remove white space from the fields
-    $i = trim($i)
 
   # Is this a control action?
   # (ADJUST|CHANGE|CHECK|MERGE|SET|SHOW|SPLIT)

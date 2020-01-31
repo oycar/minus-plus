@@ -94,20 +94,17 @@ function read_csv_records(use_csv) {
 function read_value(x,   value) {
   # Get the value first
   value = read_date(x)
-  if (DATE_ERROR != value && BEFORE_EPOCH != value)
+  if (DATE_ERROR != value)
     # Treat as a date
+    # This can return BEFORE_EPOCH
     return value
 
   # Is it a number?
-  if (x ~ /^[0-9\.\-]+$/)
-    return strtonum(x)
+  if (x ~ /^[0-9\.\-\+]+$/)
+    return make_decimal(x)
 
   # Strip quotation marks if any
-  if (x ~ /^"([[:print:]])+"$/)
-    x = ctrim(x, "\"")
-
-  # Just return the field
-  return x
+  return gensub(/^"([^\"]+)"$/, "\\1", 1, x)
 }
 
 # A somewhat generalized variable reading function
@@ -467,29 +464,7 @@ function maximum_entry(array, start_bracket, end_bracket,
   return max
 }
 
-
 # Some extras
-# White space trimming
-function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
-function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
-#function trim(s) { return rtrim(ltrim(s)); }
-function to_number(s, default_value) {return "" == s ? default_value : strtonum(s)}
-
-# character trimming
-function ctrim(s, left_c, right_c,      string) {
-  # Different chars can be trimmed from left and right
-  right_c = ("" == right_c) ? left_c : right_c
-
-  # The left trim
-  string = "^\\" left_c
-  sub(string, "", s)
-
-  # The right trim
-  string = "\\" right_c "$"
-  sub(string, "", s)
-  return s
-}
-
 # Clear global values ready to read a new input record
 function new_line(  key) {
   # Clear real values
@@ -582,9 +557,9 @@ function parse_line(now,    i, j, x, number_accounts) {
 
       # is this a purchase or a sale of currency units?
       if (get_currency(Account[2]) == Transaction_Currency)
-        Real_Value[BUY_FOREX_KEY] = $i = strtonum($j) # A purchase (of forex)
+        Real_Value[BUY_FOREX_KEY] = $i = make_decimal($j)  # A purchase (of forex)
       else if (get_currency(Account[1]) == Transaction_Currency && is_open(Account[1], now)) {
-        $i = strtonum($j) # A sale
+        $i = make_decimal($j) # A sale
         Real_Value[SELL_FOREX_KEY] = $j = - $i # A sale (of forex)
       } else { # Other cases
         # Rebuild line - remove currency code and shuffle down fields
@@ -607,7 +582,7 @@ function parse_line(now,    i, j, x, number_accounts) {
     }
 
     # Check that this is a number
-    amount = strtonum($i)
+    amount = make_decimal($i)
 
     # Zero j
     j = ternary(Real_Value[BUY_FOREX_KEY] || Real_Value[SELL_FOREX_KEY], -1, 0)
@@ -885,7 +860,7 @@ function parse_optional_value(field,     value) {
   }
 
   # Next - is it a numerical value?
-  value = strtonum(field)
+  value = make_decimal(field)
 
   # This is a value
   if (near_zero(value))
@@ -917,7 +892,7 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
   if (field ~ /^\((.)+\)$/) {
     # bracketed
     len = length(field)
-    field = trim(toupper(substr(field, 2, len - 2)))
+    field = toupper(substr(field, 2, len - 2))
     if (field ~ /D/) {
       Tax_Adjustment = Automatic_Depreciation = TRUE
       Cost_Element = I
@@ -966,7 +941,8 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
   }
 
   # The string can be a document name enclosed in square brackets
-  string = ctrim(field, "[", "]")
+  string = gensub(/(^\[)([[:print:]]+)(\]$)/, "\\2", 1, field)
+
   if (string == field) {
     # Parcel names are enclosed by single quotes
     if (field ~ /^"([[:print:]])+"$/) {
@@ -1955,7 +1931,10 @@ function filter_array(now, data_array, name, show_blocks,
         if (Show_Extra && show_blocks)
           printf "\n" > STDERR
 
-        # Copy the kept items back
+        # Delete the array
+        delete data_array[a]
+
+        # But put the kept items back
         for (key in stack) {
           data_array[a][key] = stack[key]
 
@@ -2360,7 +2339,7 @@ function read_date(date_string, hour,
 
 
   # Split the input date
-  if (3 == split(trim(date_string), date_fields, "[-/ ]")) {
+  if (3 == split(date_string, date_fields, "[-/ ]")) {
     # The fields are YYYY MM DD
     # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
     # or             Mon DD YYYY
@@ -2408,11 +2387,11 @@ function read_date(date_string, hour,
     if (year < 1000)
       year += EPOCH_START
 
-    # If still before the EPOCH this is an error
-    if (year < EPOCH_START) {
-      Read_Date_Error = "Date <" date_string "> is before epoch start <" get_date(Epoch) ">"
-      return BEFORE_EPOCH
-    }
+    # # If still before the EPOCH this is a potential error
+    # if (year < EPOCH_START) {
+    #   Read_Date_Error = "Date <" date_string "> is before epoch start <" get_date(EPOCH_START) ">"
+    #   return BEFORE_EPOCH
+    # }
   } else {
     Read_Date_Error = "Can't parse date <" date_string "> wrong number of fields"
     return DATE_ERROR

@@ -131,7 +131,6 @@
 
 @define found_key  (__MPX_KEY__)
 @define is_class(a, b) ((a) ~ ("^" (b) "[.:]"))
-@define trim(s) (s)
 #
 # // Useful shorthands for various kinds of accounts
 # // @define is_currency(a)  ((a) ~ /\.CURRENCY:/)
@@ -220,6 +219,9 @@
 @define less_than(x, y)    (((x) - (y)) < 0)
 @define greater_than_or_equal(x, y) (((x) - (y)) >= 0)
 @define less_than_or_equal(x, y)    (((x) - (y)) <= 0)
+
+# // Force a decimal number
+@define make_decimal(x)    ((x) + 0)
 
 @define account_closed(x, now) ((x) in Account_Closed && less_than(Account_Closed[x], (now)))
 @define is_closed(a, now) (!is_open((a), (now)))
