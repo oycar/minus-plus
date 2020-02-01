@@ -182,11 +182,11 @@
 
 ## DATE                             CREDIT ACCOUNT                DEBIT ACCOUNT     AUD AMOUNT  GBP AMOUNT       COMMENTS
 ##__________________________________________________________________________________________________________________________________________________________________________________________________
-2008-May-02                                 CASH          ASSET.CURRENCY:GBP     20000.00     9430.00    # Explicit Conversion, 1.0000 AUD translates to 0.4715 GBP
+2008-May-02                                 CASH          ASSET.CURRENCY:GBP.CBA     20000.00     9430.00    # Explicit Conversion, 1.0000 AUD translates to 0.4715 GBP
 
 ## Alternatively if a sum of AUD is converted to $500 US Dollars in cash we could also use predefined market rates (provided via a state file or imported data file)
 ## In this case an ISO 4217 currency code is needed instead of providing the AUD amount. (In fact the ISO 4217 code could be provided for transactions that occur
-## in the default currency, i.e. in this case AUD but it is not needed so can be omitted)
+## in the default currency, i.e. in this case AUD, but it is a redundant entry so may be safely omitted.)
 
 ## DATE                             CREDIT ACCOUNT                DEBIT ACCOUNT    CURRENCY  USD AMOUNT          COMMENTS
 ##__________________________________________________________________________________________________________________________________________________________________________________________________
@@ -198,10 +198,7 @@
 ##
 ## DATE                  CREDIT ACCOUNT                DEBIT ACCOUNT              CURRENCY  GBP AMOUNT      UNITS       BROKERAGE      CONTRACT     HOLDING STATEMENT           COMMENTS
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008-May-06                 GBP           ASSET.CAPITAL.SHARES:BHP.FTSE        GBP       7236.00       4.000         36.00          [B]             [H]            # BHP Shares (London Market)
-##2008-May-06                 GBP                         CASH                     GBP 5112.78       4.000  75.19          [B]             [H]            # BHP Shares (London Market)
-##2008-May-06                 CASH           ASSET.CAPITAL.SHARES:BHP.FTSE              5112.78       4.000  75.19          [B]             [H]            # BHP Shares (London Market)
-
+2008-May-06                 GBP.CBA           ASSET.CAPITAL.SHARES:BHP.FTSE        GBP       7236.00       4.000         36.00          [B]             [H]            # BHP Shares (London Market)
 
 ##
 ## The accounts can record real property too - again the name component PROPERTY is not required it could be ASSET.CAPITAL.REAL_ESTATE or even just ASSET.CAPITAL
@@ -209,7 +206,12 @@
 2008-May-06                                 CASH      ASSET.CAPITAL.PROPERTY:FARM.990       48500.00          1.000 # Down payment on Farm
 
 
-2008-May-09                            EMMA.WORK                                 CASH       14183.06 # Employer Contribution
+##
+## DATE                     CREDIT ACCOUNT                 DEBIT ACCOUNT   CURRENCY  AUD AMOUNT       COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2008-May-09                       EMMA.WORK                   CASH           AUD    14183.06         # Employer Contribution and an example of a redundant AUD currency specification
+
+
 2008-May-10                                 CASH                               ESAVER       14200.00 # Transfer to ESAVER
 2008-May-12                          WILKINS.NON                               ESAVER       37500.00 # Contribution
 2008-May-12                          WILKINS.CON                               ESAVER       12500.00 # Contribution
