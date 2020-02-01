@@ -113,6 +113,8 @@ END {
 
 
 
+
+
 # // The stream to write reports to
 
 
@@ -3357,7 +3359,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("A" ~ /[cC]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3708,7 +3710,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[oO]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3848,7 +3850,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[bB]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3986,7 +3988,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("A" ~ /[mM]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4055,7 +4057,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[dD]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4190,7 +4192,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("A" ~ /[qQ]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4718,7 +4720,7 @@ function income_tax_aud(now, past, benefits,
                                         tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("A" ~ /[tT]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5537,7 +5539,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("A" ~ /[iI]|[aA]/ && "A" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6271,24 +6273,19 @@ function read_state_record(first_line, last_line) {
 #
 ##
 /^%%/  {
+
   #
   Import_Record = !Import_Record
   if (Import_Record) {
     # Filter data
     # Currently importing Import_Array
-    if (!index(Filter_Data, Import_Array_Name))
-      # Catch exchange rates
-      if ("XRate" == Import_Array_Name) {
-        Import_Array_Name = "Price"
-        Is_Reciprocal = (1)
-      } else
-        Is_Reciprocal = (0)
-
+    if (!index(Filter_Data, Import_Array_Name)) {
       # Make sure this array will be filtered
       if ("" != Filter_Data)
         Filter_Data = Filter_Data "," Import_Array_Name
       else
         Filter_Data = Import_Array_Name
+    }
 
 
 
@@ -6426,21 +6423,24 @@ function read_state_record(first_line, last_line) {
 }
 
 
-## Import Prices
+## Import Data from white space separated data (eg TSV data)
 ## The fields
 ## These are the those needed for the Price import from the CBA (2019 format)
-# <<,  Key_Field, 1, >>
-# <<, Value_Field, 5, >>
+# <<  Key_Field 1 >>
+# << Value_Field 5 >>
 #
 # # These are price data
-# <<,Import_Array_Name , Price ,>>
+# << Import_Array_Name  Price >>
 #
-# #
+# Reciprocal data can be read
+# using
+# << Reciprocal_Value X >>
+
 
 
 # This asset is AAA.ASX
-## <<,Asset_Prefix, ASSET.CAPITAL.SHARES,>>
-## <<,Asset_Symbol, AAA.ASX,>>
+## << Asset_Prefix ASSET.CAPITAL.SHARES >>
+## << Asset_Symbol AAA.ASX >>
 ##
 ##
 # This reads an array from human readable data
@@ -6460,16 +6460,15 @@ function import_data(array, symbol, name,
     key = read_value($Key_Field)
 
   # Get the value
-  value = read_date($Value_Field)
-  if ((-1) == value)
-    value = read_value($Value_Field)
+  if (!Reciprocal_Value) {
+    value = read_date($Value_Field)
+    if ((-1) == value)
+      value = read_value($Value_Field)
+  } else # Reciprocal Value
+    value = 1.0 / read_value($Value_Field)
 
   if (!Import_Zero && ((((value) - ( Epsilon)) <= 0) && (((value) - ( -Epsilon)) >= 0)))
     return # Don't import zero values
-
-  # Exchange rates are reciprocal prices
-  if (Is_Reciprocal)
-    value = 1.0 / value
 
   # Logging
 

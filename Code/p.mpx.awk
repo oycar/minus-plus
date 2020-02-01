@@ -308,30 +308,25 @@ function read_state_record(first_line, last_line) {
 #
 ##
 /^%%/  {
+
   #
   Import_Record = !Import_Record
   if (Import_Record) {
     # Filter data
     # Currently importing Import_Array
-    if (!index(Filter_Data, Import_Array_Name))
-      # Catch exchange rates
-      if ("XRate" == Import_Array_Name) {
-        Import_Array_Name = "Price"
-        Is_Reciprocal = TRUE
-      } else
-        Is_Reciprocal = FALSE
-
+    if (!index(Filter_Data, Import_Array_Name)) {
       # Make sure this array will be filtered
       if ("" != Filter_Data)
         Filter_Data = Filter_Data "," Import_Array_Name
       else
         Filter_Data = Import_Array_Name
+    }
 
 @ifeq LOG import_record
-      printf "Import %s\n",  Import_Array_Name > STDERR
-      printf "Filter %s\n",  Filter_Data > STDERR
-      if (Asset_Symbol)
-        printf "\t%s\n", Asset_Symbol > STDERR
+    printf "Import %s\n",  Import_Array_Name > STDERR
+    printf "Filter %s\n",  Filter_Data > STDERR
+    if (Asset_Symbol)
+      printf "\t%s\n", Asset_Symbol > STDERR
 @endif
 
     # Prices are given a special import time
@@ -468,21 +463,24 @@ function read_state_record(first_line, last_line) {
 }
 
 
-## Import Prices
+## Import Data from white space separated data (eg TSV data)
 ## The fields
 ## These are the those needed for the Price import from the CBA (2019 format)
-# <<,  Key_Field, 1, >>
-# <<, Value_Field, 5, >>
+# <<  Key_Field 1 >>
+# << Value_Field 5 >>
 #
 # # These are price data
-# <<,Import_Array_Name , Price ,>>
+# << Import_Array_Name  Price >>
 #
-# #
+# Reciprocal data can be read
+# using
+# << Reciprocal_Value X >>
+
 
 
 # This asset is AAA.ASX
-## <<,Asset_Prefix, ASSET.CAPITAL.SHARES,>>
-## <<,Asset_Symbol, AAA.ASX,>>
+## << Asset_Prefix ASSET.CAPITAL.SHARES >>
+## << Asset_Symbol AAA.ASX >>
 ##
 ##
 # This reads an array from human readable data
@@ -502,16 +500,15 @@ function import_data(array, symbol, name,
     key = read_value($Key_Field)
 
   # Get the value
-  value = read_date($Value_Field)
-  if (DATE_ERROR == value)
-    value = read_value($Value_Field)
+  if (!Reciprocal_Value) {
+    value = read_date($Value_Field)
+    if (DATE_ERROR == value)
+      value = read_value($Value_Field)
+  } else # Reciprocal Value
+    value = 1.0 / read_value($Value_Field)
 
   if (!Import_Zero && near_zero(value))
     return # Don't import zero values
-
-  # Exchange rates are reciprocal prices
-  if (Is_Reciprocal)
-    value = 1.0 / value
 
   # Logging
 @ifeq LOG import_record
