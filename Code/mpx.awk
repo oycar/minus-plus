@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Logic conventions
 
 
@@ -99,8 +101,6 @@ END {
 
 
 # // Default Reports
-
-
 
 
 
@@ -926,7 +926,7 @@ function parse_line(now,    i, j, x, number_accounts) {
         NF --
       }
 
-      # Get translation price
+      # Get translation price 
       if (Transaction_Currency in Price)
         Translation_Rate = ((__MPX_KEY__ = find_key(Price[Transaction_Currency],  now))?( Price[Transaction_Currency][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[Transaction_Currency][0]):( 0))))
       else
@@ -2175,8 +2175,6 @@ function filter_data(now, variable_names, show_details,    array_names, name) {
 
   # Should we log
 
-   show_details = (1)
-
 
   # Filter the data arrays
   for (name in array_names)
@@ -2614,15 +2612,13 @@ function read_date(date_string, hour,
   hour = (("" == hour)?( (12)):( hour))
 
   # default is YYYY-MM-DD
-
   if ("" == date_string) {
     Read_Date_Error = "Empty string"
     return (-1)
   }
 
-
   # Split the input date
-  if (3 == split(date_string, date_fields, "[-/ ]")) {
+  if (3 == split(date_string, date_fields, "[- ]")) {
     # The fields are YYYY MM DD
     # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
     # or             Mon DD YYYY
@@ -3361,7 +3357,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("CB" ~ /[cC]|[aA]/ && "CB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3712,7 +3708,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CB" ~ /[oO]|[aA]/ && "CB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3852,7 +3848,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CB" ~ /[bB]|[aA]/ && "CB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3990,7 +3986,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("CB" ~ /[mM]|[aA]/ && "CB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4059,7 +4055,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CB" ~ /[dD]|[aA]/ && "CB" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4194,7 +4190,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CB" ~ /[qQ]|[aA]/ && "CB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4722,7 +4718,7 @@ function income_tax_aud(now, past, benefits,
                                         tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("CB" ~ /[tT]|[aA]/ && "CB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5541,7 +5537,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CB" ~ /[iI]|[aA]/ && "CB" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6057,7 +6053,7 @@ BEGIN {
   LONG_FORMAT = (DATE_FORMAT " %H::%M::%S")
 
   # Import Record is Off
-  Import_Record = (0)
+  Import_Record = Is_Reciprocal = (0)
   Filter_Data = ""
 
   # Suppress rounding errors
@@ -6152,9 +6148,6 @@ BEGIN {
   # Default import fields
   Key_Field      = 1
   Value_Field    = 2
-  Key_is_Date    = (1)
-  Value_is_Date  = (0)
-  Value_is_XRate = (0)
   Import_Zero  = (0)
   Import_Time  = (12)
 
@@ -6284,6 +6277,13 @@ function read_state_record(first_line, last_line) {
     # Filter data
     # Currently importing Import_Array
     if (!index(Filter_Data, Import_Array_Name))
+      # Catch exchange rates
+      if ("XRate" == Import_Array_Name) {
+        Import_Array_Name = "Price"
+        Is_Reciprocal = (1)
+      } else
+        Is_Reciprocal = (0)
+
       # Make sure this array will be filtered
       if ("" != Filter_Data)
         Filter_Data = Filter_Data "," Import_Array_Name
@@ -6302,6 +6302,7 @@ function read_state_record(first_line, last_line) {
     # End of block
     # Reset asset default prefix
     Asset_Prefix = ("ASSET.CAPITAL.SHARES")
+    Is_Reciprocal = (0)
   }
 
   # End of if importing
@@ -6425,18 +6426,11 @@ function read_state_record(first_line, last_line) {
 }
 
 
-
-
-
 ## Import Prices
 ## The fields
 ## These are the those needed for the Price import from the CBA (2019 format)
 # <<,  Key_Field, 1, >>
 # <<, Value_Field, 5, >>
-#
-# # The key field is a date
-# <<, Key_is_Date, 1,>>
-# <<,Value_is_Date ,  0,>>
 #
 # # These are price data
 # <<,Import_Array_Name , Price ,>>
@@ -6457,7 +6451,7 @@ function import_data(array, symbol, name,
   # Check syntax
   assert(Key_Field <= NF && Value_Field <= NF, "Illegal import record syntax <" $0 ">")
 
-  # Ok
+  # Is this a reciprocal
   a = initialize_account(symbol)
 
   # Get the key
@@ -6474,38 +6468,8 @@ function import_data(array, symbol, name,
     return # Don't import zero values
 
   # Exchange rates are reciprocal prices
-  if (Value_is_XRate)
+  if (Is_Reciprocal)
     value = 1.0 / value
-
-  # if (Key_is_Date) {
-  #   key = read_date($Key_Field) # Default Hour overruled sometimes
-  #   assert(DATE_ERROR != key, Read_Date_Error)
-  #   #
-  #   # # Skip dates before the epoch
-  #   # if (BEFORE_EPOCH == key)
-  #   #   return
-  # } else
-  #   key = $Key_Field
-  #
-  # key = return
-  #
-  # # Get the value
-  # if (Value_is_Date) {
-  #   value = read_date($Value_Field)
-  #   assert(DATE_ERROR != value, Read_Date_Error)
-  #
-  #   # Skip dates before the epoch
-  #   if (BEFORE_EPOCH == value)
-  #     return
-  # } else {
-  #   value = $Value_Field
-  #   if (!Import_Zero && near_zero(value))
-  #     return # Don't import zero values
-  #
-  #   # Exchange rates are reciprocal prices
-  #   if (Value_is_XRate)
-  #     value = 1.0 / value
-  # }
 
   # Logging
 
@@ -7572,7 +7536,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     new_price = x / u
 
     # Can set the price of a normal asset - not when Transaction_Currency is set
-    if (Transaction_Currency)
+    if (!Transaction_Currency)
       (Price[ac][ now] = ( new_price))
   }
 

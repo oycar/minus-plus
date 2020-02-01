@@ -38,16 +38,7 @@
 ## Before actual transactions start we need to use START_JOURNAL
 ## It needs to include a start date within the first financial year of the journal
 ## So using the first day of the 2008 FY yields
-2007-Jul-01 START_JOURNAL 
-
-## Time varying variables can be set; to facilitate this the variable _Time_Fields_
-## records which keys of an array represent time-stamps; by default no keys
-## are interpreted as timestamps but the setting
-
-<< Time_Fields 1 1 >>
-
-## indicates that the first field (key) found in subsequent records will be treated as a
-## time stamp
+2007-Jul-01 START_JOURNAL
 
 ## Tax rates
 ## These depend on the type of journal and the date

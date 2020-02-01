@@ -87,7 +87,7 @@ BEGIN {
   LONG_FORMAT = (DATE_FORMAT " %H::%M::%S")
 
   # Import Record is Off
-  Import_Record = FALSE
+  Import_Record = Is_Reciprocal = FALSE
   Filter_Data = ""
 
   # Suppress rounding errors
@@ -182,9 +182,6 @@ BEGIN {
   # Default import fields
   Key_Field      = 1
   Value_Field    = 2
-  Key_is_Date    = TRUE
-  Value_is_Date  = FALSE
-  Value_is_XRate = FALSE
   Import_Zero  = FALSE
   Import_Time  = HOUR
 
@@ -317,6 +314,13 @@ function read_state_record(first_line, last_line) {
     # Filter data
     # Currently importing Import_Array
     if (!index(Filter_Data, Import_Array_Name))
+      # Catch exchange rates
+      if ("XRate" == Import_Array_Name) {
+        Import_Array_Name = "Price"
+        Is_Reciprocal = TRUE
+      } else
+        Is_Reciprocal = FALSE
+
       # Make sure this array will be filtered
       if ("" != Filter_Data)
         Filter_Data = Filter_Data "," Import_Array_Name
@@ -324,10 +328,10 @@ function read_state_record(first_line, last_line) {
         Filter_Data = Import_Array_Name
 
 @ifeq LOG import_record
-    printf "Import %s\n",  Import_Array_Name > STDERR
-    printf "Filter %s\n",  Filter_Data > STDERR
-    if (Asset_Symbol)
-      printf "\t%s\n", Asset_Symbol > STDERR
+      printf "Import %s\n",  Import_Array_Name > STDERR
+      printf "Filter %s\n",  Filter_Data > STDERR
+      if (Asset_Symbol)
+        printf "\t%s\n", Asset_Symbol > STDERR
 @endif
 
     # Prices are given a special import time
@@ -340,6 +344,7 @@ function read_state_record(first_line, last_line) {
     # End of block
     # Reset asset default prefix
     Asset_Prefix = ASSET_PREFIX
+    Is_Reciprocal = FALSE
   }
 
   # End of if importing
@@ -463,18 +468,11 @@ function read_state_record(first_line, last_line) {
 }
 
 
-
-
-
 ## Import Prices
 ## The fields
 ## These are the those needed for the Price import from the CBA (2019 format)
 # <<,  Key_Field, 1, >>
 # <<, Value_Field, 5, >>
-#
-# # The key field is a date
-# <<, Key_is_Date, 1,>>
-# <<,Value_is_Date ,  0,>>
 #
 # # These are price data
 # <<,Import_Array_Name , Price ,>>
@@ -495,7 +493,7 @@ function import_data(array, symbol, name,
   # Check syntax
   assert(Key_Field <= NF && Value_Field <= NF, "Illegal import record syntax <" $0 ">")
 
-  # Ok
+  # Is this a reciprocal
   a = initialize_account(symbol)
 
   # Get the key
@@ -512,38 +510,8 @@ function import_data(array, symbol, name,
     return # Don't import zero values
 
   # Exchange rates are reciprocal prices
-  if (Value_is_XRate)
+  if (Is_Reciprocal)
     value = 1.0 / value
-
-  # if (Key_is_Date) {
-  #   key = read_date($Key_Field) # Default Hour overruled sometimes
-  #   assert(DATE_ERROR != key, Read_Date_Error)
-  #   #
-  #   # # Skip dates before the epoch
-  #   # if (BEFORE_EPOCH == key)
-  #   #   return
-  # } else
-  #   key = $Key_Field
-  #
-  # key = return
-  #
-  # # Get the value
-  # if (Value_is_Date) {
-  #   value = read_date($Value_Field)
-  #   assert(DATE_ERROR != value, Read_Date_Error)
-  #
-  #   # Skip dates before the epoch
-  #   if (BEFORE_EPOCH == value)
-  #     return
-  # } else {
-  #   value = $Value_Field
-  #   if (!Import_Zero && near_zero(value))
-  #     return # Don't import zero values
-  #
-  #   # Exchange rates are reciprocal prices
-  #   if (Value_is_XRate)
-  #     value = 1.0 / value
-  # }
 
   # Logging
 @ifeq LOG import_record
@@ -1679,7 +1647,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     new_price = x / u
 
     # Can set the price of a normal asset - not when Transaction_Currency is set
-    if (Transaction_Currency)
+    if (!Transaction_Currency)
       set_entry(Price[ac], new_price, now)
   }
 

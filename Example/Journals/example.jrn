@@ -140,9 +140,9 @@
 ## Then balance checks can be carried out - for example this verifies that the account CASH
 ## indeed has a balance of $29,378.10 and so on
 2008-Mar-21                     [CUA Statement:]                # CUA Bank Statements
-      CHECK                                   COST                               CASH           0.03
-      CHECK                                   COST                             ESAVER       29378.10
-      CHECK                                   COST                         TERM00.CUA       70000.00
+2008-Mar-21      CHECK                   BALANCE                                 CASH           0.03
+2008-Mar-21      CHECK                   BALANCE                               ESAVER       29378.10
+2008-Mar-21      CHECK                   BALANCE                           TERM00.CUA       70000.00
 ##
 2008-Mar-28                                  ANZ                                 CASH          50.00 # Transfer to CUA
 2008-Mar-29                                 CASH                               ESAVER          50.00 # Transfer to ESAVER
@@ -174,11 +174,39 @@
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
 2008-May-01        INCOME.DIVIDEND:DIV.BENPA.ASX                    CASH         460.74         197.46         2008-Apr-14        [D]   # BENPA Interim Dividend
 
+## Transactions can handle foreign currency too, that is currencies other than the Journal Currency
+## Since foreign currency transactions are taxed in the default currency exchange rates are needed
+## They can be provided as part of the transaction; for example suppose $20000 is paid into a GB Pound
+## Sterling account ASSET.CURRENCY:GBP.CBA  (The first component of the leaf name needs to be the ISO
+## 4217 currency code)
+
+## DATE                             CREDIT ACCOUNT                DEBIT ACCOUNT     AUD AMOUNT  GBP AMOUNT       COMMENTS
+##__________________________________________________________________________________________________________________________________________________________________________________________________
+2008-May-02                                 CASH          ASSET.CURRENCY:GBP     20000.00     9430.00    # Explicit Conversion, 1.0000 AUD translates to 0.4715 GBP
+
+## Alternatively if a sum of AUD is converted to $500 US Dollars in cash we could also use predefined market rates (provided via a state file or imported data file)
+## In this case an ISO 4217 currency code is needed instead of providing the AUD amount. (In fact the ISO 4217 code could be provided for transactions that occur
+## in the default currency, i.e. in this case AUD but it is not needed so can be omitted)
+
+## DATE                             CREDIT ACCOUNT                DEBIT ACCOUNT    CURRENCY  USD AMOUNT          COMMENTS
+##__________________________________________________________________________________________________________________________________________________________________________________________________
+2008-May-02                                 CASH              ASSET.CURRENCY:USD     USD       500.00        # Market Conversion
+
+
+## Foreign assets can be bought and sold in their local currency, although for tax purposes Minus Plus will track the journal currency automatically
+
+##
+## DATE                  CREDIT ACCOUNT                DEBIT ACCOUNT              CURRENCY  GBP AMOUNT      UNITS       BROKERAGE      CONTRACT     HOLDING STATEMENT           COMMENTS
+##___________________________________________________________________________________________________________________________________________________________________________________________________
+2008-May-06                 GBP           ASSET.CAPITAL.SHARES:BHP.FTSE        GBP       7236.00       4.000         36.00          [B]             [H]            # BHP Shares (London Market)
+##2008-May-06                 GBP                         CASH                     GBP 5112.78       4.000  75.19          [B]             [H]            # BHP Shares (London Market)
+##2008-May-06                 CASH           ASSET.CAPITAL.SHARES:BHP.FTSE              5112.78       4.000  75.19          [B]             [H]            # BHP Shares (London Market)
+
 
 ##
 ## The accounts can record real property too - again the name component PROPERTY is not required it could be ASSET.CAPITAL.REAL_ESTATE or even just ASSET.CAPITAL
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008-May-05                                 CASH      ASSET.CAPITAL.PROPERTY:FARM.990       48500.00          1.000 # Down payment on Farm
+2008-May-06                                 CASH      ASSET.CAPITAL.PROPERTY:FARM.990       48500.00          1.000 # Down payment on Farm
 
 
 2008-May-09                            EMMA.WORK                                 CASH       14183.06 # Employer Contribution
@@ -191,7 +219,16 @@
 2008-May-12   LIABILITY.MEMBER.EMMA:EMMA.TAXABLE                                 CASH      313539.01 # Emma's Rollin
 2008-May-20        INCOME.DIVIDEND:DIV.SGBPD.ASX                                 CASH         171.06          73.31    2008-May-04            [D] # Dividends (SGBPD)
 2008-May-21                                 CASH                               ESAVER         190.00 # Transfer to ESAVER
-2008 May 31                              ESA.INT                               ESAVER        1557.40 # Interest (ESaver)
+2008-May-31                              ESA.INT                               ESAVER        1557.40 # Interest (ESaver)
+
+
+## Foreign currency can (obviously) be converted back to the Journal currency; gains and losses in foreign capital assets will be capital gains
+## but gains and losses due to foreign exchange movements will be treated as foreign income and foreign losses, i.e. as income not capital
+
+## DATE                             CREDIT ACCOUNT                         DEBIT ACCOUNT    CURRENCY     USD AMOUNT          COMMENTS
+##__________________________________________________________________________________________________________________________________________________________________________________________________
+2008-Jun-02                                USD                                   CASH            USD       500.00        # Market Conversion - AUD will be credited to the debit account
+
 2008-Jun-06                            EMMA.WORK                                 CASH       14022.36 # Employer Contribution
 2008-Jun-07                                 CASH                               ESAVER       14023.00 # Transfer to ESAVER
 2008-Jun-12           INCOME.INTEREST:TERM00.INT                               ESAVER        1314.47 # Interest (CUA Term Deposit)
@@ -232,8 +269,8 @@
 
 ## DATE                     CREDIT ACCOUNT                DEBIT ACCOUNT      AMOUNT    COST ELEMENT      EFFECTIVE DATE    COMMENTS
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008-Jun-26                     CASH                      FARM.990      436401.85       I            2008-May-05     # Farm Final Installment
-2008-Jun-26                     CASH                      FARM.990           5.00       I            2008-May-05     # Bank Charges for Bank Cheque
+2008-Jun-26                     CASH                      FARM.990      436401.85       I            2008-May-06     # Farm Final Installment
+2008-Jun-26                     CASH                      FARM.990           5.00       I            2008-May-06     # Bank Charges for Bank Cheque
 
 
 
@@ -247,7 +284,7 @@
 ## Foreign income (and offsets) are of interest to the tax office; therefore segregate it into account INCOME.FOREIGN; also foreign tax credits can
 ## be recorded in an optional field in the same way as franking credits are in INCOME.DIVIDEND or INCOME.DISTRIBUTION payments
 ##___________________________________________________________________________________________________________________________________________________________________________________________________
-2008 Jun 30         INCOME.FOREIGN:FOR.PXUPA.ASX                                 CASH         726.63 [PXUPA Distribution:] # PXUPA distribution
+2008-Jun-30         INCOME.FOREIGN:FOR.PXUPA.ASX                                 CASH         726.63 [PXUPA Distribution:] # PXUPA distribution
 
 
 ## If a document is linked to a transaction it will be default file type ".pdf"
@@ -263,17 +300,17 @@
 ## whilst [E+ Extra Text] is [Expense 2008 Extra Text]
 ##
 ##
-2008 Jun 30             INCOME.INTEREST:CASH.INT                                 CASH           3.44 # Cash A/C Interest
-2008 Jun 30                            EMMA.WORK                                 CASH       12576.00 # Employer Contribution
-2008 Jun 30                            EMMA.WORK                                 CASH        1607.06 # Employer Contribution
-2008 Jun 30                              ESA.INT                               ESAVER        2252.98 # Interest (ESaver)
+2008-Jun-30             INCOME.INTEREST:CASH.INT                                 CASH           3.44 # Cash A/C Interest
+2008-Jun-30                            EMMA.WORK                                 CASH       12576.00 # Employer Contribution
+2008-Jun-30                            EMMA.WORK                                 CASH        1607.06 # Employer Contribution
+2008-Jun-30                              ESA.INT                               ESAVER        2252.98 # Interest (ESaver)
 ##
 ## Missing Prices
 ## Two different (but verbose) ways of setting security prices
-        SET                                  PRICE                              BENPA.ASX         88.00
-        SET                                  VALUE                              FARM.990              0  #  Giving zero here sets the value to cost here 484906.85
+2008-Jun-30        SET                     PRICE                            BENPA.ASX           88.00
+2008-Jun-30        SET                     VALUE                             FARM.990            0  #  Giving zero here sets the value to cost namely 484906.85
 ##
 ## (If you really want to set zero value in this way instead use PRICE instead)
-##     SET                                  PRICE                               FARM.990              0  #  This really does give zero value!
+##     SET                                  PRICE                            FARM.990            0  #  This really does give zero value!
 ##
 ## This is the End Of The Financial Year

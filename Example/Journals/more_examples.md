@@ -309,7 +309,6 @@ No second element costs were incurred because each cost corresponded to a new se
 adjustments to earlier work. This could have equally been accounted for as five different assets with different names, but this
 approach is more elegant. If the stages of the project had (for some reason) different lifetimes or were depreciated in a different
 way (eg prime cost rather than diminishing value) then it would be necessary to use separate accounts for those that differed.
-0
 
 In Australia depreciating items can be pooled if they are of low value; in this case each member of the
 pool is a separate parcel (so each represents at least one unit). The method name is POOL and the effective

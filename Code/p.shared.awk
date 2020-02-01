@@ -568,7 +568,7 @@ function parse_line(now,    i, j, x, number_accounts) {
         NF --
       }
 
-      # Get translation price
+      # Get translation price 
       if (Transaction_Currency in Price)
         Translation_Rate = find_entry(Price[Transaction_Currency], now)
       else
@@ -2331,15 +2331,13 @@ function read_date(date_string, hour,
   hour = ternary("" == hour, HOUR, hour)
 
   # default is YYYY-MM-DD
-
   if ("" == date_string) {
     Read_Date_Error = "Empty string"
     return DATE_ERROR
   }
 
-
   # Split the input date
-  if (3 == split(date_string, date_fields, "[-/ ]")) {
+  if (3 == split(date_string, date_fields, "[- ]")) {
     # The fields are YYYY MM DD
     # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
     # or             Mon DD YYYY
