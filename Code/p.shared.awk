@@ -568,7 +568,7 @@ function parse_line(now,    i, j, x, number_accounts) {
         NF --
       }
 
-      # Get translation price 
+      # Get translation price
       if (Transaction_Currency in Price)
         Translation_Rate = find_entry(Price[Transaction_Currency], now)
       else
@@ -771,7 +771,7 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
       case "T": # Annual Tax Statement
         account_name = get_name_component(Leaf[Account[2]], 1)
         prefix = "Annual Tax Statement" show_date(now, YEAR_FORMAT)
-        break;;
+        break
 
       default: # no match - assume this is a literal string
         # When a distinct suffix is present add the date
@@ -779,7 +779,7 @@ function parse_document_name(name, now,    prefix, suffix, account_name, array, 
           prefix = add_field(prefix, show_date(now, use_format))
 
         account_name = ""
-        break;;
+        break
     } # End of switch
 
     # We have at this point
