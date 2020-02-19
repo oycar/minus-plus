@@ -893,7 +893,7 @@ function parse_transaction(now, a, b, amount,
       # The transaction itself will be posted later a => b
       # Need to adjust amount transacted
       amount -= (g = GST_Claimable * gst_proportion(now) * amount)
-      print_transaction(now, ("# GST " Leaf[b]), GST, b, g)
+      print_transaction(now, ("# GST Collected " Leaf[b]), GST, b, g)
 
       # GST claimed
       GST_Claimable = 0
@@ -951,10 +951,11 @@ function parse_transaction(now, a, b, amount,
         # A, B, -U,  (1 - g) * x
         # G, B,  0,        g * x
         g = - GST_Claimable * gst_proportion(now) * amount
+        adjust_cost(GST, g, now)
 
         # This must be recorded
         # This reduces GST liability
-        print_transaction(now, ("# GST " Leaf[a]), GST, b, -g)
+        print_transaction(now, ("# GST Sell " Leaf[a]), GST, b, -g)
         assert(FALSE, "GST Was levied on whole SELL transaction <" $0 ">")
       } else {
         # Brokerage Present => Adjust Brokerage
@@ -962,13 +963,13 @@ function parse_transaction(now, a, b, amount,
         # Produce A, B, -U, x - (1 - g) * x, # Note sign change with other case
         #         B, G,  0,           g * x, # Sign change engenders sense change in accounts
         g = GST_Claimable * gst_proportion(now) * current_brokerage
+        adjust_cost(GST, g, now)
 
         # This must be recorded
-        print_transaction(now, ("# GST " Leaf[a]), b, GST, g)
+        print_transaction(now, ("# GST Sell <Brokerage> " Leaf[a]), b, GST, g)
       }
 
-      # Non-zero GST to be paid
-      adjust_cost(GST, g, now)
+      # Zero GST 
       GST_Claimable = 0
     } else
       g = 0
@@ -1074,10 +1075,13 @@ function parse_transaction(now, a, b, amount,
       adjust_cost(GST, g, now)
 
       # This must be recorded
-      Cost_Element = II
-      print_transaction(now, ("# GST " Leaf[b]), a, GST, g)
       if (near_zero(current_brokerage))
         assert(FALSE, "GST Was levied on whole BUY transaction <" $0 ">")
+
+      Cost_Element = II
+      print_transaction(now, ("# GST Buy <Brokerage> " Leaf[b]), a, GST, g)
+
+
       GST_Claimable = 0
     } else
       g = 0
@@ -1167,7 +1171,7 @@ function parse_transaction(now, a, b, amount,
       adjust_cost(b,   -g, now)
 
       # Record GST
-      print_transaction(now, ("# GST " Leaf[a]), b, GST, g)
+      print_transaction(now, ("# GST Paid " Leaf[a]), b, GST, g)
       GST_Claimable = 0
     }
 

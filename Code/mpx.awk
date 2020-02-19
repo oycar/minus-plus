@@ -1901,7 +1901,7 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf("%s %14s", OFS, print_cash(((((matched) ~ /^ASSET\.CURRENCY[.:]/))?( ((matched in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[matched],   now))?( Total_Units[matched][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[matched][0]):( 0))))):( 0))):( get_cost(matched, now)))))
+      string = string sprintf("%s %14s", OFS, print_cash(((((matched) ~ /^ASSET\.CURRENCY[.:]/))?( ((matched in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[matched],   ((now) + 1)))?( Total_Units[matched][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[matched][0]):( 0))))):( 0))):( get_cost(matched, ((now) + 1))))))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)
@@ -2612,22 +2612,26 @@ function read_date(date_string, hour,
   hour = (("" == hour)?( (12)):( hour))
 
   # default is YYYY-MM-DD
-  if ("" == date_string) {
-    Read_Date_Error = "Empty string"
+  # Formats are YYYY-MM-DD
+  #             DD-MM-YYYY
+  #             YYYY-Mon-DD
+  #             Mon-DD-YYYY
+  #             DD-Mon-YYYY
+  #
+  if (date_string !~ /[[:alnum:]]+[- ][[:alnum:]]+[- ][[:digit:]]+/) {
+    Read_Date_Error = "Illegal date string format"
     return (-1)
   }
 
   # Split the input date
   if (3 == split(date_string, date_fields, "[- ]")) {
-    # The fields are YYYY MM DD
-    # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
-    # or             Mon DD YYYY
-    # or             DD MM YYYY if DD & YYYY are consistent with dates
-    # year-month-day, monthname/day/year, monthname-day-year
+    # Which format
     if (month = (((date_fields[1]) in Lookup_Month)?( Lookup_Month[date_fields[1]]):( 0))) {
+      # Mon-DD-YYYY
       day   = date_fields[2] + 0
       year  = date_fields[3] + 0
     } else if (month = (((date_fields[2]) in Lookup_Month)?( Lookup_Month[date_fields[2]]):( 0))) {
+      # YYYY-Mon-DD
       year  = date_fields[1] + 0
       day   = date_fields[3] + 0
 
@@ -2644,6 +2648,7 @@ function read_date(date_string, hour,
       } # end of bad day number
 
     } else {
+      # YYYY-MM-DD
       day   = date_fields[3] + 0
       month = date_fields[2] + 0
       year  = date_fields[1] + 0
@@ -2665,12 +2670,6 @@ function read_date(date_string, hour,
     # In practice this means the 3rd Millenium
     if (year < 1000)
       year += (2000)
-
-    # # If still before the EPOCH this is a potential error
-    # if (year < EPOCH_START) {
-    #   Read_Date_Error = "Date <" date_string "> is before epoch start <" get_date(EPOCH_START) ">"
-    #   return BEFORE_EPOCH
-    # }
   } else {
     Read_Date_Error = "Can't parse date <" date_string "> wrong number of fields"
     return (-1)
@@ -3357,7 +3356,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("OT" ~ /[cC]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3708,7 +3707,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OT" ~ /[oO]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3848,7 +3847,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OT" ~ /[bB]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3986,7 +3985,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("OT" ~ /[mM]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4055,7 +4054,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OT" ~ /[dD]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4190,7 +4189,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OT" ~ /[qQ]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4718,7 +4717,7 @@ function income_tax_aud(now, past, benefits,
                                         tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("OT" ~ /[tT]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5537,7 +5536,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("OT" ~ /[iI]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -6845,7 +6844,7 @@ function parse_transaction(now, a, b, amount,
       # The transaction itself will be posted later a => b
       # Need to adjust amount transacted
       amount -= (g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount)
-      print_transaction(now, ("# GST " Leaf[b]), GST, b, g)
+      print_transaction(now, ("# GST Collected " Leaf[b]), GST, b, g)
 
       # GST claimed
       GST_Claimable = 0
@@ -6903,10 +6902,11 @@ function parse_transaction(now, a, b, amount,
         # A, B, -U,  (1 - g) * x
         # G, B,  0,        g * x
         g = - GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * amount
+        adjust_cost(GST, g, now)
 
         # This must be recorded
         # This reduces GST liability
-        print_transaction(now, ("# GST " Leaf[a]), GST, b, -g)
+        print_transaction(now, ("# GST Sell " Leaf[a]), GST, b, -g)
         assert((0), "GST Was levied on whole SELL transaction <" $0 ">")
       } else {
         # Brokerage Present => Adjust Brokerage
@@ -6914,13 +6914,13 @@ function parse_transaction(now, a, b, amount,
         # Produce A, B, -U, x - (1 - g) * x, # Note sign change with other case
         #         B, G,  0,           g * x, # Sign change engenders sense change in accounts
         g = GST_Claimable * ((__MPX_H_TEMP__ = ((__MPX_KEY__ = find_key(GST_Rate, now))?( GST_Rate[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( GST_Rate[0]):( 0)))))?( __MPX_H_TEMP__ / (1.0 + __MPX_H_TEMP__)):( 0)) * current_brokerage
+        adjust_cost(GST, g, now)
 
         # This must be recorded
-        print_transaction(now, ("# GST " Leaf[a]), b, GST, g)
+        print_transaction(now, ("# GST Sell <Brokerage> " Leaf[a]), b, GST, g)
       }
 
-      # Non-zero GST to be paid
-      adjust_cost(GST, g, now)
+      # Zero GST 
       GST_Claimable = 0
     } else
       g = 0
@@ -7026,10 +7026,13 @@ function parse_transaction(now, a, b, amount,
       adjust_cost(GST, g, now)
 
       # This must be recorded
-      Cost_Element = II
-      print_transaction(now, ("# GST " Leaf[b]), a, GST, g)
       if (((((current_brokerage) - ( Epsilon)) <= 0) && (((current_brokerage) - ( -Epsilon)) >= 0)))
         assert((0), "GST Was levied on whole BUY transaction <" $0 ">")
+
+      Cost_Element = II
+      print_transaction(now, ("# GST Buy <Brokerage> " Leaf[b]), a, GST, g)
+
+
       GST_Claimable = 0
     } else
       g = 0
@@ -7119,7 +7122,7 @@ function parse_transaction(now, a, b, amount,
       adjust_cost(b,   -g, now)
 
       # Record GST
-      print_transaction(now, ("# GST " Leaf[a]), b, GST, g)
+      print_transaction(now, ("# GST Paid " Leaf[a]), b, GST, g)
       GST_Claimable = 0
     }
 

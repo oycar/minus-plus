@@ -1584,7 +1584,7 @@ function print_transaction(now, comments, a, b, amount, element_string, fields, 
     # Do we need to show the balance?
     if (matched)
       # From the start of the ledger
-      string = string sprintf("%s %14s", OFS, print_cash(ternary(is_currency(matched), get_units(matched, now), get_cost(matched, now))))
+      string = string sprintf("%s %14s", OFS, print_cash(ternary(is_currency(matched), get_units(matched, just_after(now)), get_cost(matched, just_after(now)))))
     else
       # Optional Fields
       for (i = 1; i <= n_fields; i ++)
@@ -2331,22 +2331,26 @@ function read_date(date_string, hour,
   hour = ternary("" == hour, HOUR, hour)
 
   # default is YYYY-MM-DD
-  if ("" == date_string) {
-    Read_Date_Error = "Empty string"
+  # Formats are YYYY-MM-DD
+  #             DD-MM-YYYY
+  #             YYYY-Mon-DD
+  #             Mon-DD-YYYY
+  #             DD-Mon-YYYY
+  #
+  if (date_string !~ /[[:alnum:]]+[- ][[:alnum:]]+[- ][[:digit:]]+/) {
+    Read_Date_Error = "Illegal date string format"
     return DATE_ERROR
   }
 
   # Split the input date
   if (3 == split(date_string, date_fields, "[- ]")) {
-    # The fields are YYYY MM DD
-    # or             YYYY Mon DD where Mon is a three char month abbreviation or a month name in English
-    # or             Mon DD YYYY
-    # or             DD MM YYYY if DD & YYYY are consistent with dates
-    # year-month-day, monthname/day/year, monthname-day-year
+    # Which format
     if (month = get_month_number(date_fields[1])) {
+      # Mon-DD-YYYY
       day   = date_fields[2] + 0
       year  = date_fields[3] + 0
     } else if (month = get_month_number(date_fields[2])) {
+      # YYYY-Mon-DD
       year  = date_fields[1] + 0
       day   = date_fields[3] + 0
 
@@ -2363,6 +2367,7 @@ function read_date(date_string, hour,
       } # end of bad day number
 
     } else {
+      # YYYY-MM-DD
       day   = date_fields[3] + 0
       month = date_fields[2] + 0
       year  = date_fields[1] + 0
@@ -2384,12 +2389,6 @@ function read_date(date_string, hour,
     # In practice this means the 3rd Millenium
     if (year < 1000)
       year += EPOCH_START
-
-    # # If still before the EPOCH this is a potential error
-    # if (year < EPOCH_START) {
-    #   Read_Date_Error = "Date <" date_string "> is before epoch start <" get_date(EPOCH_START) ">"
-    #   return BEFORE_EPOCH
-    # }
   } else {
     Read_Date_Error = "Can't parse date <" date_string "> wrong number of fields"
     return DATE_ERROR
