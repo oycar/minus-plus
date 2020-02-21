@@ -561,7 +561,9 @@ function income_tax_aud(now, past, benefits,
   # Tax Losses
   #
   # The carried tax losses should be computed using the carried losses function
-  tax_losses = get_carried_losses(now, Tax_Losses, 0, CARRY_FORWARD_TAX_LIMIT, write_stream)
+  #
+  # First check if the taxable income was actually a loss this year
+  tax_losses = get_carried_losses(now, Tax_Losses, - yield_negative(taxable_income, 0), CARRY_FORWARD_TAX_LIMIT, write_stream)
 
   # Losses can either be extinguished or (if there are new losses) carried forward
   # We can reduce tax_owed to zero, but not increase or generate a loss
@@ -685,7 +687,7 @@ function income_tax_aud(now, past, benefits,
     report_losses(now, Capital_Losses, "Capital Losses", write_stream)
     x = carry_losses(Capital_Losses, past)
     if (greater_than(capital_losses, x))
-      printf "\t%40s %32s\n", "Capital Losses Generated", print_cash(x - capital_losses) > write_stream
+      printf "\t%40s %32s\n", "Capital Losses Generated", print_cash(capital_losses - x) > write_stream
     else if (less_than(capital_losses, x))
       printf "\t%40s %32s\n", "Capital Losses Extinguished", print_cash(capital_losses - x) > write_stream
   }
@@ -698,7 +700,7 @@ function income_tax_aud(now, past, benefits,
     report_losses(now, Tax_Losses, "Tax Losses", write_stream)
     x = carry_losses(Tax_Losses, past)
     if (greater_than(tax_losses, x))
-      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(x - tax_losses) > write_stream
+      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - x) > write_stream
     else if (less_than(tax_losses, x))
       printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(tax_losses - x) > write_stream
   }
@@ -706,7 +708,7 @@ function income_tax_aud(now, past, benefits,
     printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > write_stream
 
   # Franking
-  if (!near_zero(get_cost(FRANKING, now)))
+  if (is_company && !near_zero(get_cost(FRANKING, now)))
     printf "\t%40s %32s\n", "Franking Balance Carried Forward", print_cash(get_cost(FRANKING, now)) > write_stream
 
   # Franking Deficit

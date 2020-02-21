@@ -46,8 +46,6 @@ END {
 # // Control Logging
 
 
-
-
 # // Logic conventions
 
 
@@ -3356,7 +3354,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("OT" ~ /[cC]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3691,7 +3689,7 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
       losses_array[now][now] = losses
   }
 
-  # Return the value of the income long gains
+  # Return the carried losses
   return (( now in losses_array)?( ((__MPX_KEY__ = first_key(losses_array[ now]))?( losses_array[ now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( losses_array[ now][0]):( 0))))):( 0))
 }
 
@@ -3707,7 +3705,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("OT" ~ /[oO]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3847,7 +3845,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("OT" ~ /[bB]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3985,7 +3983,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("OT" ~ /[mM]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4054,7 +4052,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("OT" ~ /[dD]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4189,7 +4187,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("OT" ~ /[qQ]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4717,7 +4715,7 @@ function income_tax_aud(now, past, benefits,
                                         tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("OT" ~ /[tT]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -4916,6 +4914,9 @@ function income_tax_aud(now, past, benefits,
 
     # The franking deficit offsets
     franking_deficit_offsets = ((__MPX_KEY__ = find_key(Franking_Deficit_Offsets,  now))?( Franking_Deficit_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Franking_Deficit_Offsets[0]):( 0))))
+
+    if (!((((franking_deficit_offsets) - ( Epsilon)) <= 0) && (((franking_deficit_offsets) - ( -Epsilon)) >= 0)))
+      printf "%48s %32s\n\n", "Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
 
 
     # Need to check for franking deficit tax here
@@ -5137,7 +5138,9 @@ function income_tax_aud(now, past, benefits,
   # Tax Losses
   #
   # The carried tax losses should be computed using the carried losses function
-  tax_losses = get_carried_losses(now, Tax_Losses, 0, 0, write_stream)
+  #
+  # First check if the taxable income was actually a loss this year
+  tax_losses = get_carried_losses(now, Tax_Losses, - (((((taxable_income) - ( -Epsilon)) < 0))?( (taxable_income)):(  0)), 0, write_stream)
 
   # Losses can either be extinguished or (if there are new losses) carried forward
   # We can reduce tax_owed to zero, but not increase or generate a loss
@@ -5261,7 +5264,7 @@ function income_tax_aud(now, past, benefits,
     report_losses(now, Capital_Losses, "Capital Losses", write_stream)
     x = (( past in Capital_Losses)?( ((__MPX_KEY__ = first_key(Capital_Losses[ past]))?( Capital_Losses[ past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Capital_Losses[ past][0]):( 0))))):( 0))
     if ((((capital_losses) - ( x)) > 0))
-      printf "\t%40s %32s\n", "Capital Losses Generated", print_cash(x - capital_losses) > write_stream
+      printf "\t%40s %32s\n", "Capital Losses Generated", print_cash(capital_losses - x) > write_stream
     else if ((((capital_losses) - ( x)) < 0))
       printf "\t%40s %32s\n", "Capital Losses Extinguished", print_cash(capital_losses - x) > write_stream
   }
@@ -5274,7 +5277,7 @@ function income_tax_aud(now, past, benefits,
     report_losses(now, Tax_Losses, "Tax Losses", write_stream)
     x = (( past in Tax_Losses)?( ((__MPX_KEY__ = first_key(Tax_Losses[ past]))?( Tax_Losses[ past][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Losses[ past][0]):( 0))))):( 0))
     if ((((tax_losses) - ( x)) > 0))
-      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(x - tax_losses) > write_stream
+      printf "\t%40s %32s\n", "Tax Losses Generated", print_cash(tax_losses - x) > write_stream
     else if ((((tax_losses) - ( x)) < 0))
       printf "\t%40s %32s\n", "Tax Losses Extinguished", print_cash(tax_losses - x) > write_stream
   }
@@ -5282,7 +5285,7 @@ function income_tax_aud(now, past, benefits,
     printf "\t%40s %32s\n", "Tax Losses Carried Forward", print_cash(tax_losses) > write_stream
 
   # Franking
-  if (!((((get_cost(FRANKING, now)) - ( Epsilon)) <= 0) && (((get_cost(FRANKING, now)) - ( -Epsilon)) >= 0)))
+  if ((Journal_Type ~ /^(PTY|CORP|LTD)$/) && !((((get_cost(FRANKING, now)) - ( Epsilon)) <= 0) && (((get_cost(FRANKING, now)) - ( -Epsilon)) >= 0)))
     printf "\t%40s %32s\n", "Franking Balance Carried Forward", print_cash(get_cost(FRANKING, now)) > write_stream
 
   # Franking Deficit
@@ -5536,7 +5539,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("OT" ~ /[iI]|[aA]/ && "OT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

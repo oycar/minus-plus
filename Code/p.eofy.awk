@@ -942,7 +942,7 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
       losses_array[now][now] = losses
   }
 
-  # Return the value of the income long gains
+  # Return the carried losses
   return carry_losses(losses_array, now)
 }
 
