@@ -392,6 +392,7 @@ function read_state_record(first_line, last_line) {
   # Set translation rate for journal currency
   initialize_account("ASSET.CURRENCY:" Journal_Currency)
   set_entry(Price[Long_Name[Journal_Currency]], 1, Epoch)
+  Number_Parcels[Long_Name[Journal_Currency]] = 0
 
 
   # These functions are not dependent on currency
@@ -969,7 +970,7 @@ function parse_transaction(now, a, b, amount,
         print_transaction(now, ("# GST Sell <Brokerage> " Leaf[a]), b, GST, g)
       }
 
-      # Zero GST 
+      # Zero GST
       GST_Claimable = 0
     } else
       g = 0

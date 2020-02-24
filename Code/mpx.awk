@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Logic conventions
 
 
@@ -2615,14 +2617,14 @@ function read_date(date_string, hour,
   #             YYYY-Mon-DD
   #             Mon-DD-YYYY
   #             DD-Mon-YYYY
-  #
-  if (date_string !~ /[[:alnum:]]+[- ][[:alnum:]]+[- ][[:digit:]]+/) {
+  # Or other separators, eg '/' etc
+  if (date_string !~ /[[:alnum:]]+[-/ ][[:alnum:]]+[-/ ][[:digit:]]+/) {
     Read_Date_Error = "Illegal date string format"
     return (-1)
   }
 
   # Split the input date
-  if (3 == split(date_string, date_fields, "[- ]")) {
+  if (3 == split(date_string, date_fields, "[-/ ]")) {
     # Which format
     if (month = (((date_fields[1]) in Lookup_Month)?( Lookup_Month[date_fields[1]]):( 0))) {
       # Mon-DD-YYYY
@@ -3639,55 +3641,59 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
                             past,
                             key) {
 
-  #
-  # losses_array[Now] => Total losses (and maybe gains) in year
-  # They have a non-standard double dependence on time
-  #
-  reports_stream = ((reports_stream)?( reports_stream):( "/dev/null"))
+  # Is this already computed?
+  if (Start_Journal) {
 
-  # Don't use losses prior to (now - limit) if limit is set
-  if (limit)
-    # Set the limiting time
-    # The passed limit is in units of years
-    limit = now - one_year(now, - limit)
+    #
+    # losses_array[Now] => Total losses (and maybe gains) in year
+    # They have a non-standard double dependence on time
+    #
+    reports_stream = ((reports_stream)?( reports_stream):( "/dev/null"))
 
-  # There would be need to be one set per currency
-  past = find_key(losses_array, ((now) - 1))
+    # Don't use losses prior to (now - limit) if limit is set
+    if (limit)
+      # Set the limiting time
+      # The passed limit is in units of years
+      limit = now - one_year(now, - limit)
 
-  # If there are already earlier losses copy them
-  if (past in losses_array) {
-    for (key in losses_array[past])
-      # Copy the most recent set of losses
-      losses_array[now][key] = losses_array[past][key]
+    # The previous years losses
+    past = find_key(losses_array, ((now) - 1))
 
-    # If limit is set remove any keys older than limit in latest version
-    if (limit && now in losses_array) {
-      key = remove_keys(losses_array[now], limit)
+    # If there are already earlier losses copy them
+    if (past in losses_array) {
+      for (key in losses_array[past])
+        # Copy the most recent set of losses
+        losses_array[now][key] = losses_array[past][key]
 
-      # Record this
-      if (key && ((((key) - ( Epsilon)) > 0) || (((key) - ( -Epsilon)) < 0))) {
-        printf "\t%27s => %14s\n", "Losses Prior To",  get_date(limit) > reports_stream
-        printf "\t%27s => %14s\n", "Losses Cancelled",  print_cash(key) > reports_stream
+      # If limit is set remove any keys older than limit in latest version
+      if (limit && now in losses_array) {
+        key = remove_keys(losses_array[now], limit)
+
+        # Record this
+        if (key && ((((key) - ( Epsilon)) > 0) || (((key) - ( -Epsilon)) < 0))) {
+          printf "\t%27s => %14s\n", "Losses Prior To",  get_date(limit) > reports_stream
+          printf "\t%27s => %14s\n", "Losses Cancelled",  print_cash(key) > reports_stream
+        }
       }
     }
-  }
 
-  # If there are gains cancel the earliest losses
-  if ((((losses) - ( -Epsilon)) < 0)) {
-    # These are actually gains
-    # The oldest losses are cancelled first
-    # Remember gains are negative
-    # There may be no losses available
-    if (now in losses_array)
-      remove_entries(losses_array[now], -losses)
-  } else if ((((losses) - ( Epsilon)) > 0)) {
-    # OK no old losses will be extinguished
-    # A new loss is added
-    if (now in losses_array)
-      sum_entry(losses_array[now], losses, now)
-    else
-      losses_array[now][now] = losses
-  }
+    # If there are gains cancel the earliest losses
+    if ((((losses) - ( -Epsilon)) < 0)) {
+      # These are actually gains
+      # The oldest losses are cancelled first
+      # Remember gains are negative
+      # There may be no losses available
+      if (now in losses_array)
+        remove_entries(losses_array[now], -losses)
+    } else if ((((losses) - ( Epsilon)) > 0)) {
+      # OK no old losses will be extinguished
+      # A new loss is added
+      if (now in losses_array)
+        sum_entry(losses_array[now], losses, now)
+      else
+        losses_array[now][now] = losses
+    }
+  } 
 
   # Return the carried losses
   return (( now in losses_array)?( ((__MPX_KEY__ = first_key(losses_array[ now]))?( losses_array[ now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( losses_array[ now][0]):( 0))))):( 0))
@@ -4914,9 +4920,6 @@ function income_tax_aud(now, past, benefits,
 
     # The franking deficit offsets
     franking_deficit_offsets = ((__MPX_KEY__ = find_key(Franking_Deficit_Offsets,  now))?( Franking_Deficit_Offsets[__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Franking_Deficit_Offsets[0]):( 0))))
-
-    if (!((((franking_deficit_offsets) - ( Epsilon)) <= 0) && (((franking_deficit_offsets) - ( -Epsilon)) >= 0)))
-      printf "%48s %32s\n\n", "Franking Deficit Offsets", print_cash(franking_deficit_offsets) > write_stream
 
 
     # Need to check for franking deficit tax here
@@ -6352,6 +6355,7 @@ function read_state_record(first_line, last_line) {
   # Set translation rate for journal currency
   initialize_account("ASSET.CURRENCY:" Journal_Currency)
   (Price[Long_Name[Journal_Currency]][ Epoch] = ( 1))
+  Number_Parcels[Long_Name[Journal_Currency]] = 0
 
 
   # These functions are not dependent on currency
@@ -6509,14 +6513,14 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
       if (!index(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
-        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
+        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
         Scalar_Names[x] = Array_Names[x]
@@ -6526,7 +6530,7 @@ function initialize_state(    x) {
     # Use default read and write list
     Write_Variables = (0)
     MPX_Arrays = ("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate ")
-    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
+    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
     split(MPX_Scalars, Scalar_Names, " ")
@@ -6923,7 +6927,7 @@ function parse_transaction(now, a, b, amount,
         print_transaction(now, ("# GST Sell <Brokerage> " Leaf[a]), b, GST, g)
       }
 
-      # Zero GST 
+      # Zero GST
       GST_Claimable = 0
     } else
       g = 0

@@ -28,7 +28,7 @@
 
 
 @define SHARED_SCALARS "MPX_Version MPX_Arrays MPX_Scalars Document_Protocol\
- Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Day FY_Length FY_Time\
+ Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time\
  Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window\
  Start_Record ALLOCATED\
  Dividend_Qualification_Function Get_Taxable_Gains_Function\

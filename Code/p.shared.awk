@@ -2336,14 +2336,14 @@ function read_date(date_string, hour,
   #             YYYY-Mon-DD
   #             Mon-DD-YYYY
   #             DD-Mon-YYYY
-  #
-  if (date_string !~ /[[:alnum:]]+[- ][[:alnum:]]+[- ][[:digit:]]+/) {
+  # Or other separators, eg '/' etc
+  if (date_string !~ /[[:alnum:]]+[-/ ][[:alnum:]]+[-/ ][[:digit:]]+/) {
     Read_Date_Error = "Illegal date string format"
     return DATE_ERROR
   }
 
   # Split the input date
-  if (3 == split(date_string, date_fields, "[- ]")) {
+  if (3 == split(date_string, date_fields, "[-/ ]")) {
     # Which format
     if (month = get_month_number(date_fields[1])) {
       # Mon-DD-YYYY

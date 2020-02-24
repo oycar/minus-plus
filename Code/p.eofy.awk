@@ -892,55 +892,59 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
                             past,
                             key) {
 
-  #
-  # losses_array[Now] => Total losses (and maybe gains) in year
-  # They have a non-standard double dependence on time
-  #
-  reports_stream = ternary(reports_stream, reports_stream, DEVNULL)
+  # Is this already computed?
+  if (Start_Journal) {
 
-  # Don't use losses prior to (now - limit) if limit is set
-  if (limit)
-    # Set the limiting time
-    # The passed limit is in units of years
-    limit = now - one_year(now, - limit)
+    #
+    # losses_array[Now] => Total losses (and maybe gains) in year
+    # They have a non-standard double dependence on time
+    #
+    reports_stream = ternary(reports_stream, reports_stream, DEVNULL)
 
-  # There would be need to be one set per currency
-  past = find_key(losses_array, just_before(now))
+    # Don't use losses prior to (now - limit) if limit is set
+    if (limit)
+      # Set the limiting time
+      # The passed limit is in units of years
+      limit = now - one_year(now, - limit)
 
-  # If there are already earlier losses copy them
-  if (past in losses_array) {
-    for (key in losses_array[past])
-      # Copy the most recent set of losses
-      losses_array[now][key] = losses_array[past][key]
+    # The previous years losses
+    past = find_key(losses_array, just_before(now))
 
-    # If limit is set remove any keys older than limit in latest version
-    if (limit && now in losses_array) {
-      key = remove_keys(losses_array[now], limit)
+    # If there are already earlier losses copy them
+    if (past in losses_array) {
+      for (key in losses_array[past])
+        # Copy the most recent set of losses
+        losses_array[now][key] = losses_array[past][key]
 
-      # Record this
-      if (key && not_zero(key)) {
-        printf "\t%27s => %14s\n", "Losses Prior To",  get_date(limit) > reports_stream
-        printf "\t%27s => %14s\n", "Losses Cancelled",  print_cash(key) > reports_stream
+      # If limit is set remove any keys older than limit in latest version
+      if (limit && now in losses_array) {
+        key = remove_keys(losses_array[now], limit)
+
+        # Record this
+        if (key && not_zero(key)) {
+          printf "\t%27s => %14s\n", "Losses Prior To",  get_date(limit) > reports_stream
+          printf "\t%27s => %14s\n", "Losses Cancelled",  print_cash(key) > reports_stream
+        }
       }
     }
-  }
 
-  # If there are gains cancel the earliest losses
-  if (below_zero(losses)) {
-    # These are actually gains
-    # The oldest losses are cancelled first
-    # Remember gains are negative
-    # There may be no losses available
-    if (now in losses_array)
-      remove_entries(losses_array[now], -losses)
-  } else if (above_zero(losses)) {
-    # OK no old losses will be extinguished
-    # A new loss is added
-    if (now in losses_array)
-      sum_entry(losses_array[now], losses, now)
-    else
-      losses_array[now][now] = losses
-  }
+    # If there are gains cancel the earliest losses
+    if (below_zero(losses)) {
+      # These are actually gains
+      # The oldest losses are cancelled first
+      # Remember gains are negative
+      # There may be no losses available
+      if (now in losses_array)
+        remove_entries(losses_array[now], -losses)
+    } else if (above_zero(losses)) {
+      # OK no old losses will be extinguished
+      # A new loss is added
+      if (now in losses_array)
+        sum_entry(losses_array[now], losses, now)
+      else
+        losses_array[now][now] = losses
+    }
+  } 
 
   # Return the carried losses
   return carry_losses(losses_array, now)
