@@ -380,7 +380,8 @@ function income_tax_aud(now, past, benefits,
 
       # And reset franking balance
       # This is effectively a payment of stamped franking credits into the account
-      if (Start_Journal) {
+      # if (Start_Journal) {
+      if (process_records(now)) {
         adjust_cost(FRANKING, - franking_balance, now)
         adjust_cost(FRANKING_STAMPED, franking_balance, now)
       }
@@ -668,7 +669,7 @@ function income_tax_aud(now, past, benefits,
   tax_cont = get_cost(CONTRIBUTION_TAX, just_before(now))
 
   # Now save quantities -
-  if (Start_Journal) {
+  if ( process_records(now)) {
     # Overall impact of following adjustments is (- tax_owed)
     adjust_cost(TAX,   (tax_paid + tax_with) - (tax_owed), now)
     adjust_cost(PAYG, - tax_paid,            now)
@@ -717,7 +718,7 @@ function income_tax_aud(now, past, benefits,
     printf "%48s %32s\n\n", "Franking Deficit Offsets Carried Forward", print_cash(franking_deficit_offsets) > write_stream
   else
     franking_deficit_offsets = 0
-  if (Start_Journal)
+  if ( process_records(now))
     set_entry(Franking_Deficit_Offsets, -franking_deficit_offsets, now)
 
   # Update carry forward offsets
@@ -725,13 +726,13 @@ function income_tax_aud(now, past, benefits,
     printf "\t%40s %32s\n", "Non-Refundable Offsets Carried Forwards", print_cash(carry_offsets) > write_stream
   else
     carry_offsets = 0
-  if (Start_Journal)
+  if (process_records(now))
     set_entry(Carry_Offsets, -carry_offsets, now)
 
   # End report
   printf "\n" > write_stream
 
-  if (Start_Journal) {
+  if (process_records(now)) {
     # Now we need Deferred Tax - the hypothetical liability that would be due if all
     # assets were liquidated today
     deferred_gains = get_cost(UNREALIZED, now)
@@ -881,7 +882,7 @@ function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
   extra_gains = rational_value(CGT_Discount) * fraction * total_gains / (1.0 - rational_value(CGT_Discount))
 
   # Track total share of extra gains remaining
-  if (Start_Journal) {
+  if (process_records(now)) {
     total_share = 1
     for (a in Leaf)
       if (select_class(a, "INCOME.GAINS.NET")) {

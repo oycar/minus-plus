@@ -113,6 +113,8 @@ END {
 
 
 
+
+
 # // The stream to write reports to
 
 
@@ -144,6 +146,9 @@ END {
 
 
 # // Reserved Classes
+
+
+# // Ensure no EOFY re-processing of State File
 
 
 # // Useful inline functions - this may be overdoing it
@@ -760,8 +765,11 @@ function remove_entries(array, x,     key, delta) {
     } else {
 
 
+      # Set negligible & negative entries to zero?
+      array[key] = 0
+
       # Remove negligible and negative entries
-      delete array[key]
+      #delete array[key]
     }
   }
 
@@ -2797,7 +2805,7 @@ function eofy_actions(now,      past, allocated_profits,
   # distributed gains can change the market gains
   # Also unrealized gains are *tax adjusted*
   # becaause otherwise they would effect the deferred tax calculation
-  if (Start_Journal) {
+  if ((((((now)) - ( Last_State)) > 0))) {
     # No this is the first time through
     # Depreciate everything - at EOFY
     depreciate_all(now)
@@ -2821,14 +2829,14 @@ function eofy_actions(now,      past, allocated_profits,
   @Income_Tax_Function(now, past, benefits)
 
   # A Super fund must allocate assets to members - this requires account balancing
-  if (Start_Journal)
+  if ((((((now)) - ( Last_State)) > 0)))
     @Balance_Profits_Function(now, past, allocated_profits)
 
   # Print the balance sheet
   print_balance_sheet(now, past, 1)
 
   # Allocate second element costs associated with fixed assets - at SOFY
-  if (Start_Journal)
+  if ((((((now)) - ( Last_State)) > 0)))
     allocate_second_element_costs(((now) + 1))
 }
 
@@ -3356,7 +3364,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("T" ~ /[cC]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("bcot" ~ /[cC]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3608,7 +3616,7 @@ function apply_losses(now, reports_stream, label,
   # these could be deferred gains or taxable gains
   # Only needed on first pass
   if (save_gains) {
-    if (Start_Journal) {
+    if ((((((now)) - ( Last_State)) > 0))) {
       x = get_cost(save_gains, now)
       adjust_cost(save_gains,          gains - x,  now)
       adjust_cost(balancing_account, -(gains - x), now)
@@ -3618,7 +3626,7 @@ function apply_losses(now, reports_stream, label,
 
   # Remaining options could only be for taxable gains
   if (save_losses) {
-    if (Start_Journal) {
+    if ((((((now)) - ( Last_State)) > 0))) {
       x = get_cost(save_losses, now)
       adjust_cost(save_losses,         losses - x,  now)
       adjust_cost(balancing_account, -(losses - x), now)
@@ -3642,7 +3650,7 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
                             key) {
 
   # Is this already computed?
-  if (Start_Journal) {
+  if ((((((now)) - ( Last_State)) > 0))) {
 
     #
     # losses_array[Now] => Total losses (and maybe gains) in year
@@ -3693,7 +3701,7 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
       else
         losses_array[now][now] = losses
     }
-  } 
+  }
 
   # Return the carried losses
   return (( now in losses_array)?( ((__MPX_KEY__ = first_key(losses_array[ now]))?( losses_array[ now][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( losses_array[ now][0]):( 0))))):( 0))
@@ -3711,7 +3719,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[oO]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[oO]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3851,7 +3859,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[bB]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[bB]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -3989,7 +3997,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("T" ~ /[mM]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("bcot" ~ /[mM]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4058,7 +4066,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[dD]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[dD]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4193,7 +4201,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("T" ~ /[qQ]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[qQ]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4281,7 +4289,7 @@ function print_dividend_qualification(now, past, is_detailed,
         qualified_payment += qualified_fraction * payment
 
         # Make the appropriate changes for the current tax jurisdiction
-        if (Start_Journal)
+        if ((((((now)) - ( Last_State)) > 0)))
           @Dividend_Qualification_Function(a, key, 1.0 - qualified_fraction)
 
         # Get the next key
@@ -4721,7 +4729,7 @@ function income_tax_aud(now, past, benefits,
                                         tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("T" ~ /[tT]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("bcot" ~ /[tT]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -4960,7 +4968,8 @@ function income_tax_aud(now, past, benefits,
 
       # And reset franking balance
       # This is effectively a payment of stamped franking credits into the account
-      if (Start_Journal) {
+      # if (Start_Journal) {
+      if ((((((now)) - ( Last_State)) > 0))) {
         adjust_cost(FRANKING, - franking_balance, now)
         adjust_cost(FRANKING_STAMPED, franking_balance, now)
       }
@@ -5248,7 +5257,7 @@ function income_tax_aud(now, past, benefits,
   tax_cont = get_cost(CONTRIBUTION_TAX, ((now) - 1))
 
   # Now save quantities -
-  if (Start_Journal) {
+  if ( (((((now)) - ( Last_State)) > 0))) {
     # Overall impact of following adjustments is (- tax_owed)
     adjust_cost(TAX,   (tax_paid + tax_with) - (tax_owed), now)
     adjust_cost(PAYG, - tax_paid,            now)
@@ -5297,7 +5306,7 @@ function income_tax_aud(now, past, benefits,
     printf "%48s %32s\n\n", "Franking Deficit Offsets Carried Forward", print_cash(franking_deficit_offsets) > write_stream
   else
     franking_deficit_offsets = 0
-  if (Start_Journal)
+  if ( (((((now)) - ( Last_State)) > 0)))
     (Franking_Deficit_Offsets[ now] = ( -franking_deficit_offsets))
 
   # Update carry forward offsets
@@ -5305,13 +5314,13 @@ function income_tax_aud(now, past, benefits,
     printf "\t%40s %32s\n", "Non-Refundable Offsets Carried Forwards", print_cash(carry_offsets) > write_stream
   else
     carry_offsets = 0
-  if (Start_Journal)
+  if ((((((now)) - ( Last_State)) > 0)))
     (Carry_Offsets[ now] = ( -carry_offsets))
 
   # End report
   printf "\n" > write_stream
 
-  if (Start_Journal) {
+  if ((((((now)) - ( Last_State)) > 0))) {
     # Now we need Deferred Tax - the hypothetical liability that would be due if all
     # assets were liquidated today
     deferred_gains = get_cost(UNREALIZED, now)
@@ -5442,7 +5451,7 @@ function gross_up_gains_aud(now, past, total_gains, long_gains, short_gains,
   extra_gains = ((CGT_Discount[2])?( (CGT_Discount[1]/CGT_Discount[2])):( assert((0), "Division by zero in rational fraction" CGT_Discount[1] "/" CGT_Discount[2]))) * fraction * total_gains / (1.0 - ((CGT_Discount[2])?( (CGT_Discount[1]/CGT_Discount[2])):( assert((0), "Division by zero in rational fraction" CGT_Discount[1] "/" CGT_Discount[2]))))
 
   # Track total share of extra gains remaining
-  if (Start_Journal) {
+  if ((((((now)) - ( Last_State)) > 0))) {
     total_share = 1
     for (a in Leaf)
       if (select_class(a, "INCOME.GAINS.NET")) {
@@ -5542,7 +5551,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("T" ~ /[iI]|[aA]/ && "T" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("bcot" ~ /[iI]|[aA]/ && "bcot" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream

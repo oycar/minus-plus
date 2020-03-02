@@ -45,7 +45,7 @@ function eofy_actions(now,      past, allocated_profits,
   # distributed gains can change the market gains
   # Also unrealized gains are *tax adjusted*
   # becaause otherwise they would effect the deferred tax calculation
-  if (Start_Journal) {
+  if (process_records(now)) {
     # No this is the first time through
     # Depreciate everything - at EOFY
     depreciate_all(now)
@@ -69,14 +69,14 @@ function eofy_actions(now,      past, allocated_profits,
   @Income_Tax_Function(now, past, benefits)
 
   # A Super fund must allocate assets to members - this requires account balancing
-  if (Start_Journal)
+  if (process_records(now))
     @Balance_Profits_Function(now, past, allocated_profits)
 
   # Print the balance sheet
   print_balance_sheet(now, past, 1)
 
   # Allocate second element costs associated with fixed assets - at SOFY
-  if (Start_Journal)
+  if (process_records(now))
     allocate_second_element_costs(just_after(now))
 }
 
@@ -859,7 +859,7 @@ function apply_losses(now, reports_stream, label,
   # these could be deferred gains or taxable gains
   # Only needed on first pass
   if (save_gains) {
-    if (Start_Journal) {
+    if (process_records(now)) {
       x = get_cost(save_gains, now)
       adjust_cost(save_gains,          gains - x,  now)
       adjust_cost(balancing_account, -(gains - x), now)
@@ -869,7 +869,7 @@ function apply_losses(now, reports_stream, label,
 
   # Remaining options could only be for taxable gains
   if (save_losses) {
-    if (Start_Journal) {
+    if (process_records(now)) {
       x = get_cost(save_losses, now)
       adjust_cost(save_losses,         losses - x,  now)
       adjust_cost(balancing_account, -(losses - x), now)
@@ -893,7 +893,7 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
                             key) {
 
   # Is this already computed?
-  if (Start_Journal) {
+  if (process_records(now)) {
 
     #
     # losses_array[Now] => Total losses (and maybe gains) in year
@@ -944,7 +944,7 @@ function get_carried_losses(now, losses_array, losses, limit, reports_stream,
       else
         losses_array[now][now] = losses
     }
-  } 
+  }
 
   # Return the carried losses
   return carry_losses(losses_array, now)
@@ -1545,7 +1545,7 @@ function print_dividend_qualification(now, past, is_detailed,
         qualified_payment += qualified_fraction * payment
 
         # Make the appropriate changes for the current tax jurisdiction
-        if (Start_Journal)
+        if (process_records(now))
           @Dividend_Qualification_Function(a, key, 1.0 - qualified_fraction)
 
         # Get the next key

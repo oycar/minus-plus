@@ -120,6 +120,9 @@
 # // Reserved Classes
 @define RESERVED_CLASSES  /ASSET|EQUITY|EXPENSE|INCOME|LIABILITY|SPECIAL|BALANCING/
 
+# // Ensure no EOFY re-processing of State File
+@define process_records(t)   (greater_than((t), Last_State))
+
 # // Useful inline functions - this may be overdoing it
 @define make_array(array)  ternary(SUBSEP in array,TRUE,FALSE)
 

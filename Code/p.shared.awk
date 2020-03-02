@@ -402,8 +402,11 @@ function remove_entries(array, x,     key, delta) {
       printf "\t%s Delete %f\n", get_date(key), array[key] > STDERR
 @endif
 
+      # Set negligible & negative entries to zero?
+      array[key] = 0
+
       # Remove negligible and negative entries
-      delete array[key]
+      #delete array[key]
     }
   }
 
