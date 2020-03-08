@@ -476,6 +476,7 @@ function new_line(  key) {
 
   Extra_Timestamp = DATE_ERROR
   Parcel_Name = ""
+  Parcel_Order = "FIFO"
   Tax_Adjustment = FALSE
   Cost_Element = COST_ELEMENT # The default value
   Automatic_Depreciation = FALSE
@@ -949,8 +950,17 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
   if (string == field) {
     # Parcel names are enclosed by single quotes
     if (field ~ /^"([[:print:]])+"$/) {
+
+      # Catch special instructions FIFO, LIFO, MSTX, LSTX
+      if (field ~ /^"(FIFO|LIFO|MSTX|LSTX)"$/) {
+        Parcel_Order = substr(field, 2, 4) # Fixed length order tag
+        field = ""
+      } else
+        Parcel_Order = "FIFO"
+
       # A Parcel name
       Parcel_Name = field # With quotes
+
       return ""
     }
 

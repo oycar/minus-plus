@@ -1582,6 +1582,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     printf "\tSpecified parcel   => %s\n", parcel_tag > STDERR
   if (parcel_timestamp >= Epoch)
     printf "\tParcel bought at   => %s\n", get_date(parcel_timestamp) > STDERR
+  printf "\tSale Order         => %s\n", Parcel_Order
   printf "\tInitial Units      => %.3f\n", get_units(ac, now) > STDERR
   printf "\tInitial Total Cost => %s\n", print_cash(get_cost(ac, now)) > STDERR
 @endif # LOG
