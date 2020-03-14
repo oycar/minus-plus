@@ -77,6 +77,9 @@ BEGIN {
   Variable_Name = ""
   Variable_Keys[0] = ""
 
+  # A parcel ordering array
+  make_array(Ordering)
+
   # Output Fields
   if ("" != Use_Separator)
     OFS = Use_Separator
@@ -386,8 +389,9 @@ function read_state_record(first_line, last_line) {
   Initialize_Tax_Function = "initialize_tax_" tolower(Journal_Currency)
   Dividend_Qualification_Function = "dividend_qualification_" tolower(Journal_Currency)
   Imputation_Report_Function      = "imputation_report_" tolower(Journal_Currency)
-  Gross_Up_Gains_Function   = "gross_up_gains_" tolower(Journal_Currency)
-  Get_Taxable_Gains_Function   = "get_taxable_gains_" tolower(Journal_Currency)
+  Gross_Up_Gains_Function    = "gross_up_gains_" tolower(Journal_Currency)
+  Get_Taxable_Gains_Function = "get_taxable_gains_" tolower(Journal_Currency)
+  Get_Parcel_Gains_Function  = "get_parcel_gains_" tolower(Journal_Currency)
 
   # Set translation rate for journal currency
   initialize_account("ASSET.CURRENCY:" Journal_Currency)
@@ -1572,7 +1576,7 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
 # Sell units
 #  Sale receipts go to cash_out and happen at Held_Until
 #  At this point only the adjusted cost is made use of
-function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost, catch_up_depreciation, t) {
+function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost, catch_up_depreciation, t, key) {
   # Set a default parcel_timestamp
   parcel_timestamp = ternary("" == parcel_timestamp, DATE_ERROR, parcel_timestamp)
 
@@ -1582,7 +1586,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     printf "\tSpecified parcel   => %s\n", parcel_tag > STDERR
   if (parcel_timestamp >= Epoch)
     printf "\tParcel bought at   => %s\n", get_date(parcel_timestamp) > STDERR
-  printf "\tSale Order         => %s\n", Parcel_Order
+  printf "\tSale Order         => %s\n", Parcel_Order > STDERR
   printf "\tInitial Units      => %.3f\n", get_units(ac, now) > STDERR
   printf "\tInitial Total Cost => %s\n", print_cash(get_cost(ac, now)) > STDERR
 @endif # LOG
@@ -1654,15 +1658,18 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
       set_entry(Price[ac], new_price, now)
   }
 
-  # Default assumption is first-in-first-out (FIFO)
+
+  # Parcel ordering
+  get_parcel_ordering(ac, now, Ordering, Parcel_Order)
+
   # But can be overriden if specific parcel given
   p = 0
-  while (u > 0 && p < Number_Parcels[ac]) {
-    # Skip sold parcels - including those sold today
-    if (is_sold(ac, p, now)) {
-      p ++
-      continue
-    }
+  for (key in Ordering) {
+    if (0 == u)
+      break
+
+    # Get each parcel in order
+    p = Ordering[key]
 
     # Match the parcel id
     if (match_parcel(ac, p, parcel_tag, parcel_timestamp)) {
@@ -1686,9 +1693,13 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
 
 @ifeq LOG sell_units # // LOG
       # Identify which parcel matches
-      printf "\tprice => %11.2f\n", new_price > STDERR
+      printf "\tPrice => %11.2f\n", new_price > STDERR
 
       printf "\tSell from parcel => %05d\n", p > STDERR
+      printf "\tCost => %11.2f\n", find_entry(Price[ac], Held_From[ac][p]) > STDERR
+
+      #printf "\tcost => %11.2f\n", find_entry(Price[ac], Held_From[ac][p]) > STDERR
+
       if (parcel_tag)
         printf "\t\tParcel Tag       => %s\n", Parcel_Tag[ac][p] > STDERR
       if (parcel_timestamp > Epoch)
@@ -1719,6 +1730,8 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     p ++
   } # End of while statement
 
+  delete Ordering
+
 @ifeq LOG sell_units
   printf "\tFinal Units => %.3f\n", get_units(ac, now) > STDERR
   printf "\tFinal Total Cost     => %s\n", print_cash(get_cost(ac, now)) > STDERR
@@ -1730,6 +1743,54 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
   # Update parent sums
   update_cost(ac, -x, now)
 }
+
+function get_parcel_ordering(a, now, order, sale_order,        p, sense, k, key, gains_type) {
+
+
+  # Default assumption is first-in-first-out (FIFO)
+  #
+  # Determine the order in which parcels should be sold
+  gains_type = FALSE
+  switch (sale_order) {
+    # Least Tax or Last-In-First-Out
+    case "LSTX"  :
+      gains_type = TRUE
+    case "LIFO"  :
+      sense =  1
+      break
+
+    # Most Tax or First In First Out
+    case "MSTX"  :
+      gains_type = TRUE
+
+    case "FIFO"  :
+    default  :
+      sense = -1
+      break
+  }
+
+  # Need a function to compute parcel taxable gain...
+  p = 0
+  while (p < Number_Parcels[a]) {
+    # Skip sold parcels - including those sold today
+    if (is_unsold(a, p, now)) {
+      if (gains_type) {
+        key = k = sense * @Get_Parcel_Gains_Function(a, p, now)
+        # There may be a key clash
+        while (key in order)
+          # Arbitrary small shift to get a new key
+          key = k + 10.0 * sense * rand() * Epsilon
+
+      } else
+        key = sense * Held_From[a][p]
+
+      # Save the key
+      order[key] = p
+    }
+    p ++
+  }
+}
+
 
 #
 # sell part or all a parcel at time now
@@ -1794,12 +1855,13 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   set_parcel_proceeds(a, p, -amount_paid)
 
 @ifeq LOG sell_units
-  printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n",
+  printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n\t\tparcel gains => %s\n",
     p, du,  get_date(now),
     get_date(Held_From[a][p]), get_date(Held_Until[a][p]),
     print_cash(get_cost_modifications(a, p, now)),
     print_cash(get_parcel_cost(a, p, now)),
-    print_cash(get_parcel_proceeds(a, p)) > STDERR
+    print_cash(get_parcel_proceeds(a, p)),
+    print_cash(gains / du) > STDERR
 @endif # LOG
 
   # Was a parcel split

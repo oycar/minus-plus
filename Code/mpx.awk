@@ -3370,7 +3370,7 @@ function get_capital_gains(now, past, is_detailed,
 
 
     # The reports_stream is the pipe to write the schedule out to
-    reports_stream = (("Z" ~ /[cC]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+    reports_stream = (("CT" ~ /[cC]|[aA]/ && "CT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
     # Print the capital gains schedule
     print Journal_Title > reports_stream
@@ -3725,7 +3725,7 @@ function print_operating_statement(now, past, is_detailed,     reports_stream,
   is_detailed = ("" == is_detailed) ? 1 : 2
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[oO]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CT" ~ /[oO]|[aA]/ && "CT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   printf "\n%s\n", Journal_Title > reports_stream
   if (is_detailed)
@@ -3865,7 +3865,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
                              current_assets, assets, current_liabilities, liabilities, equity, label, class_list) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[bB]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CT" ~ /[bB]|[aA]/ && "CT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Return if nothing to do
   if ("/dev/null" == reports_stream)
@@ -4003,7 +4003,7 @@ function print_balance_sheet(now, past, is_detailed,    reports_stream,
 function get_market_gains(now, past, is_detailed,    reports_stream) {
   # Show current gains/losses
    # The reports_stream is the pipe to write the schedule out to
-   reports_stream = (("Z" ~ /[mM]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+   reports_stream = (("CT" ~ /[mM]|[aA]/ && "CT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
    # First print the gains out in detail
    print_gains(now, past, is_detailed, "Market Gains", reports_stream, now)
@@ -4072,7 +4072,7 @@ function print_depreciating_holdings(now, past, is_detailed,      reports_stream
                                                                   sale_depreciation, sale_appreciation) {
 
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[dD]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CT" ~ /[dD]|[aA]/ && "CT" !~ /[zZ]/)?( ((!Show_FY || ((((now) - 1)) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
   if ("/dev/null" == reports_stream)
     return
 
@@ -4207,7 +4207,7 @@ function print_dividend_qualification(now, past, is_detailed,
                                          print_header) {
 
   ## Output Stream => Dividend_Report
-  reports_stream = (("Z" ~ /[qQ]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CT" ~ /[qQ]|[aA]/ && "CT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # For each dividend in the previous accounting period
   print Journal_Title > reports_stream
@@ -4735,7 +4735,7 @@ function income_tax_aud(now, past, benefits,
                                         tax_levy, x, header) {
 
   # Print this out?
-  write_stream = (("Z" ~ /[tT]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  write_stream = (("CT" ~ /[tT]|[aA]/ && "CT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Get market changes
   market_changes = get_cost(UNREALIZED, now) - get_cost(UNREALIZED, past)
@@ -5557,7 +5557,7 @@ function imputation_report_aud(now, past, is_detailed,
 
   # Show imputation report
   # The reports_stream is the pipe to write the schedule out to
-  reports_stream = (("Z" ~ /[iI]|[aA]/ && "Z" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
+  reports_stream = (("CT" ~ /[iI]|[aA]/ && "CT" !~ /[zZ]/)?( ((!Show_FY || ((now) == Show_FY))?( "/dev/stderr"):( "/dev/null"))):( "/dev/null"))
 
   # Let's go
   printf "%s\n", Journal_Title > reports_stream
@@ -5611,6 +5611,43 @@ function imputation_report_aud(now, past, is_detailed,
     print_cash(get_cost(FRANKING, past)) > reports_stream
 
   printf "\n\n\n" > reports_stream
+}
+
+# A function to compute the gains associated with a parcel
+function get_parcel_gains_aud(a, p, now,            held_time, gains, parcel_gains, units) {
+
+  # Number of units
+  units = Units_Held[a][p]
+
+  # The held time
+  held_time = get_held_time(now, Held_From[a][p])
+
+  # Total gains (accounting gains)
+  gains = (Parcel_Proceeds[a][ p]) + sum_cost_elements(Accounting_Cost[a][p], now) # All elements
+
+  # We want taxable gains
+  # Gains are relative to adjusted cost
+  # Losses are relative to reduced cost (so equal accounting losses)
+  if ((((gains) - ( Epsilon)) > 0))
+    # These are losses
+    parcel_gains = gains
+  else
+    # Assume zero losses or gains
+    parcel_gains = 0
+
+  # after application of tax adjustments
+  # If there were losses then parcel_gains will be above zero
+  gains -= ((__MPX_KEY__ = find_key(Tax_Adjustments[a][p],  now))?( Tax_Adjustments[a][p][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Tax_Adjustments[a][p][0]):( 0))))
+  if ((((gains) - ( -Epsilon)) < 0)) {
+    # Adjustments are negative and reduce taxable gains
+    if (held_time >= 31622400)
+      parcel_gains = (1.0 - ((CGT_Discount[2])?( (CGT_Discount[1]/CGT_Discount[2])):( assert((0), "Division by zero in rational fraction" CGT_Discount[1] "/" CGT_Discount[2])))) * gains
+    else
+      parcel_gains = gains
+  }
+
+  # return the gains
+  return parcel_gains / units
 }
 
 #!/usr/local/bin/gawk -f
@@ -6062,6 +6099,9 @@ BEGIN {
   Array_Sort = sort_arrays_on("@ind_num_desc")
   Variable_Name = ""
   Variable_Keys[0] = ""
+
+  # A parcel ordering array
+  ((SUBSEP in Ordering)?((1)):((0)))
 
   # Output Fields
   if ("" != Use_Separator)
@@ -7496,7 +7536,7 @@ function new_parcel(ac, u, x, now, parcel_tag,        last_parcel, key) {
 # Sell units
 #  Sale receipts go to cash_out and happen at Held_Until
 #  At this point only the adjusted cost is made use of
-function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost, catch_up_depreciation, t) {
+function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, did_split, new_price, proportional_cost, catch_up_depreciation, t, key) {
   # Set a default parcel_timestamp
   parcel_timestamp = (("" == parcel_timestamp)?( (-1)):( parcel_timestamp))
 
@@ -7506,7 +7546,7 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     printf "\tSpecified parcel   => %s\n", parcel_tag > "/dev/stderr"
   if (parcel_timestamp >= Epoch)
     printf "\tParcel bought at   => %s\n", get_date(parcel_timestamp) > "/dev/stderr"
-  printf "\tSale Order         => %s\n", Parcel_Order
+  printf "\tSale Order         => %s\n", Parcel_Order > "/dev/stderr"
   printf "\tInitial Units      => %.3f\n", ((ac in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[ac],   now))?( Total_Units[ac][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[ac][0]):( 0))))):( 0)) > "/dev/stderr"
   printf "\tInitial Total Cost => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 
@@ -7578,15 +7618,18 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
       (Price[ac][ now] = ( new_price))
   }
 
-  # Default assumption is first-in-first-out (FIFO)
+
+  # Parcel ordering
+  get_parcel_ordering(ac, now, Ordering, Parcel_Order)
+
   # But can be overriden if specific parcel given
   p = 0
-  while (u > 0 && p < Number_Parcels[ac]) {
-    # Skip sold parcels - including those sold today
-    if ((Held_Until[ac][ p] <= ( now))) {
-      p ++
-      continue
-    }
+  for (key in Ordering) {
+    if (0 == u)
+      break
+
+    # Get each parcel in order
+    p = Ordering[key]
 
     # Match the parcel id
     if (match_parcel(ac, p, parcel_tag, parcel_timestamp)) {
@@ -7610,9 +7653,13 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
 
 
       # Identify which parcel matches
-      printf "\tprice => %11.2f\n", new_price > "/dev/stderr"
+      printf "\tPrice => %11.2f\n", new_price > "/dev/stderr"
 
       printf "\tSell from parcel => %05d\n", p > "/dev/stderr"
+      printf "\tCost => %11.2f\n", ((__MPX_KEY__ = find_key(Price[ac],  Held_From[ac][p]))?( Price[ac][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[ac][0]):( 0)))) > "/dev/stderr"
+
+      #printf "\tcost => %11.2f\n", find_entry(Price[ac], Held_From[ac][p]) > STDERR
+
       if (parcel_tag)
         printf "\t\tParcel Tag       => %s\n", Parcel_Tag[ac][p] > "/dev/stderr"
       if (parcel_timestamp > Epoch)
@@ -7643,6 +7690,8 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     p ++
   } # End of while statement
 
+  delete Ordering
+
 
   printf "\tFinal Units => %.3f\n", ((ac in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[ac],   now))?( Total_Units[ac][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[ac][0]):( 0))))):( 0)) > "/dev/stderr"
   printf "\tFinal Total Cost     => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
@@ -7654,6 +7703,55 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
   # Update parent sums
   update_cost(ac, -x, now)
 }
+
+function get_parcel_ordering(a, now, order, sale_order,        p, sense, k, key, gains_type) {
+
+
+  # Default assumption is first-in-first-out (FIFO)
+  #
+  # Determine the order in which parcels should be sold
+  gains_type = (0)
+  switch (sale_order) {
+    # Least Tax or Last-In-First-Out
+    case "LSTX"  :
+      gains_type = (1)
+    case "LIFO"  :
+      sense =  1
+      break
+
+    # Most Tax or First In First Out
+    case "MSTX"  :
+      gains_type = (1)
+
+    case "FIFO"  :
+    default  :
+      sense = -1
+      break
+  }
+
+  # Need a function to compute parcel taxable gain...
+
+  p = 0
+  while (p < Number_Parcels[a]) {
+    # Skip sold parcels - including those sold today
+    if ((Held_Until[a][ p] > ( now))) {
+      if (gains_type) {
+        key = k = sense * get_parcel_gains_aud(a, p, now)
+        # There may be a key clash
+        while (key in order)
+          # Arbitrary small shift
+          key = k + 10.0 * sense * rand() * Epsilon
+
+      } else
+        key = sense * Held_From[a][p]
+
+      # Save the key
+      order[key] = p
+    }
+    p ++
+  }
+}
+
 
 #
 # sell part or all a parcel at time now
@@ -7718,12 +7816,13 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   (Parcel_Proceeds[a][ p] = ( -amount_paid))
 
 
-  printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n",
+  printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n\t\tparcel gains => %s\n",
     p, du,  get_date(now),
     get_date(Held_From[a][p]), get_date(Held_Until[a][p]),
     print_cash(get_cost_modifications(a, p, now)),
     print_cash(get_parcel_cost(a, p, now)),
-    print_cash((Parcel_Proceeds[a][ p])) > "/dev/stderr"
+    print_cash((Parcel_Proceeds[a][ p])),
+    print_cash(gains / du) > "/dev/stderr"
 
 
   # Was a parcel split

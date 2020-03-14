@@ -31,7 +31,7 @@
  Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time\
  Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window\
  Start_Record ALLOCATED\
- Dividend_Qualification_Function Get_Taxable_Gains_Function\
+ Dividend_Qualification_Function Get_Taxable_Gains_Function Get_Parcel_Gains_Function\
  Gross_Up_Gains_Function Imputation_Report_Function\
  Income_Tax_Function Initialize_Tax_Function "
 

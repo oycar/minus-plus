@@ -1056,3 +1056,40 @@ function imputation_report_aud(now, past, is_detailed,
 
   printf "\n\n\n" > reports_stream
 }
+
+# A function to compute the gains associated with a parcel
+function get_parcel_gains_aud(a, p, now,            held_time, gains, parcel_gains, units) {
+
+  # Number of units
+  units = Units_Held[a][p]
+
+  # The held time
+  held_time = get_held_time(now, Held_From[a][p])
+
+  # Total gains (accounting gains)
+  gains = get_parcel_proceeds(a, p) + sum_cost_elements(Accounting_Cost[a][p], now) # All elements
+
+  # We want taxable gains
+  # Gains are relative to adjusted cost
+  # Losses are relative to reduced cost (so equal accounting losses)
+  if (above_zero(gains))
+    # These are losses
+    parcel_gains = gains
+  else
+    # Assume zero losses or gains
+    parcel_gains = 0
+
+  # after application of tax adjustments
+  # If there were losses then parcel_gains will be above zero
+  gains -= find_entry(Tax_Adjustments[a][p], now)
+  if (below_zero(gains)) {
+    # Adjustments are negative and reduce taxable gains
+    if (held_time >= CGT_PERIOD)
+      parcel_gains = (1.0 - rational_value(CGT_Discount)) * gains
+    else
+      parcel_gains = gains
+  }
+
+  # return the gains
+  return parcel_gains / units
+}
