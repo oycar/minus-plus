@@ -1775,15 +1775,20 @@ function get_parcel_ordering(a, now, order, sale_order,        p, sense, k, key,
     # Skip sold parcels - including those sold today
     if (is_unsold(a, p, now)) {
       if (gains_type) {
-        key = k = sense * @Get_Parcel_Gains_Function(a, p, now)
-        # There may be a key clash
-        while (key in order)
-          # Arbitrary small shift to get a new key
-          key = k + 10.0 * sense * rand() * Epsilon
+        key = @Get_Parcel_Gains_Function(a, p, now)
 
       } else
         key = sense * Held_From[a][p]
 
+      # There may be a key clash
+      if (key in order)
+        # Add a unique id tag (the parcel number)
+        key = sprintf("%.4f_%d", key, p)
+
+@ifeq LOG sell_units # // LOG
+      printf "\tParcel tag %s => %04d\n", key, p > STDERR
+
+@endif
       # Save the key
       order[key] = p
     }

@@ -46,6 +46,8 @@ END {
 # // Control Logging
 
 
+
+
 # // Logic conventions
 
 
@@ -1313,13 +1315,12 @@ function parse_optional_string(field, save_document,    string, adjustment_flag)
       # Catch special instructions FIFO, LIFO, MSTX, LSTX
       if (field ~ /^"(FIFO|LIFO|MSTX|LSTX)"$/) {
         Parcel_Order = substr(field, 2, 4) # Fixed length order tag
-        field = ""
-      } else
+        Parcel_Name  = ""
+      } else {
         Parcel_Order = "FIFO"
-
-      # A Parcel name
-      Parcel_Name = field # With quotes
-
+        Parcel_Name  = field # With quotes
+      }
+      
       return ""
     }
 
@@ -6404,8 +6405,9 @@ function read_state_record(first_line, last_line) {
   Initialize_Tax_Function = "initialize_tax_" tolower(Journal_Currency)
   Dividend_Qualification_Function = "dividend_qualification_" tolower(Journal_Currency)
   Imputation_Report_Function      = "imputation_report_" tolower(Journal_Currency)
-  Gross_Up_Gains_Function   = "gross_up_gains_" tolower(Journal_Currency)
-  Get_Taxable_Gains_Function   = "get_taxable_gains_" tolower(Journal_Currency)
+  Gross_Up_Gains_Function    = "gross_up_gains_" tolower(Journal_Currency)
+  Get_Taxable_Gains_Function = "get_taxable_gains_" tolower(Journal_Currency)
+  Get_Parcel_Gains_Function  = "get_parcel_gains_" tolower(Journal_Currency)
 
   # Set translation rate for journal currency
   initialize_account("ASSET.CURRENCY:" Journal_Currency)
@@ -6568,14 +6570,14 @@ function initialize_state(    x) {
   ((SUBSEP in Scalar_Names)?((1)):((0)))
 
   # Current Version
-  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
+  MPX_Version = Current_Version = "Version " string_hash(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate ") ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Get_Parcel_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "))
   if ("" != Write_Variables) {
     # This time we just use the requested variables
     split(Write_Variables, Array_Names, ",")
     for (x in Array_Names)
       # Ensure the requested variable name is allowable - it could be an array or a scalar
       if (!index(("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate "), Array_Names[x])) {
-        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
+        assert(index(("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Get_Parcel_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function "), Array_Names[x]), "Unknown Variable <" Array_Names[x] ">")
 
         # This is a scalar
         Scalar_Names[x] = Array_Names[x]
@@ -6585,7 +6587,7 @@ function initialize_state(    x) {
     # Use default read and write list
     Write_Variables = (0)
     MPX_Arrays = ("Account_Closed Account_Term Accounting_Cost Capital_Losses Carry_Offsets Cost_Basis Dividend_Date Foreign_Offset_Limit Held_From Held_Until Income_Tax Leaf Lifetime Long_Gains Long_Losses Long_Name Maturity_Date Method_Name No_Carry_Offsets Number_Parcels Parcel_Proceeds Parcel_Tag Parent_Name Price Qualified_Units Refundable_Offsets Short_Gains Short_Losses Tax_Adjustments Tax_Bands Tax_Credits Tax_Losses Taxable_Income Total_Units Underlying_Asset Units_Held " " ATO_Levy CGT_Discount Franking_Deficit_Offsets GST_Rate LIC_Allowance LIC_Deduction Member_Liability Pension_Liability Reserve_Rate ")
-    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
+    MPX_Scalars = ("MPX_Version MPX_Arrays MPX_Scalars Document_Protocol Document_Root Enforce_Names Enforce_Qualification EOFY_Window FY_Date FY_Day FY_Length FY_Time Journal_Currency Journal_Title Journal_Type Last_State Qualification_Window Start_Record ALLOCATED Dividend_Qualification_Function Get_Taxable_Gains_Function Get_Parcel_Gains_Function Gross_Up_Gains_Function Imputation_Report_Function Income_Tax_Function Initialize_Tax_Function " " Balance_Profits_Function Check_Balance_Function ")
 
     split(MPX_Arrays, Array_Names, " ")
     split(MPX_Scalars, Scalar_Names, " ")
@@ -7541,15 +7543,6 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
   parcel_timestamp = (("" == parcel_timestamp)?( (-1)):( parcel_timestamp))
 
 
-  printf "%s: %s units => %.3f amount => %11.2f\n", "sell_units", (Leaf[ac]), u, x > "/dev/stderr"
-  if ("" != parcel_tag)
-    printf "\tSpecified parcel   => %s\n", parcel_tag > "/dev/stderr"
-  if (parcel_timestamp >= Epoch)
-    printf "\tParcel bought at   => %s\n", get_date(parcel_timestamp) > "/dev/stderr"
-  printf "\tSale Order         => %s\n", Parcel_Order > "/dev/stderr"
-  printf "\tInitial Units      => %.3f\n", ((ac in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[ac],   now))?( Total_Units[ac][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[ac][0]):( 0))))):( 0)) > "/dev/stderr"
-  printf "\tInitial Total Cost => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
-
 
   # Try adjusting units now...
   ((ac in Total_Units)?( sum_entry(Total_Units[ac],  -u,  now)):( 0))
@@ -7562,9 +7555,6 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
     # Is this asset's depreciation upto date?
     # Depreciate
 
-    printf "\tDate => %s\n",  get_date(now, LONG_FORMAT)> "/dev/stderr"
-    printf "\tEOFY => %s\n",  get_date(FY_Time, LONG_FORMAT)> "/dev/stderr"
-
     if (now > FY_Time) {
       t = ((FY_Time) - 1)
       catch_up_depreciation = depreciate_now(ac, t)
@@ -7576,10 +7566,6 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
 
         # Print the transaction
         print_transaction(t, "# Closing Depreciation", ac, DEPRECIATION, catch_up_depreciation, "(D)")
-
-        printf "\tCatch-Up Depreciation => %s\n", print_cash(catch_up_depreciation) > "/dev/stderr"
-        printf "\tApplied At Time => %s\n", get_date(t, LONG_FORMAT) > "/dev/stderr"
-        printf "\tModified Total Cost => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 
       }
     }
@@ -7652,37 +7638,10 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
         new_price = get_parcel_cost(ac, p, now) * proportional_cost
 
 
-      # Identify which parcel matches
-      printf "\tPrice => %11.2f\n", new_price > "/dev/stderr"
-
-      printf "\tSell from parcel => %05d\n", p > "/dev/stderr"
-      printf "\tCost => %11.2f\n", ((__MPX_KEY__ = find_key(Price[ac],  Held_From[ac][p]))?( Price[ac][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Price[ac][0]):( 0)))) > "/dev/stderr"
-
-      #printf "\tcost => %11.2f\n", find_entry(Price[ac], Held_From[ac][p]) > STDERR
-
-      if (parcel_tag)
-        printf "\t\tParcel Tag       => %s\n", Parcel_Tag[ac][p] > "/dev/stderr"
-      if (parcel_timestamp > Epoch)
-        printf "\t\tParcel TimeStamp => %s\n", get_date(Held_From[ac][p]) > "/dev/stderr"
-
 
       # Sell the parcel
       did_split = sell_parcel(ac, p, du, du * new_price, now)
 
-
-      if (did_split) {
-        # Parcel was split
-        if (0 == u) {
-          # Was this the last sold parcel
-          if (p + 1 < Number_Parcels[ac])
-            # Was a parcel kept
-            printf "\tkept parcel => %05d on  => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n",
-              p + 1, Units_Held[ac][p + 1], get_date(now),
-              get_date(Held_From[ac][p + 1]), get_date(Held_Until[ac][p + 1]),
-              print_cash(get_cost_modifications(ac, p + 1, now)),
-              print_cash(get_parcel_cost(ac, p + 1, now)) > "/dev/stderr"
-        } # Was this the last parcel sold
-      } # Was a parcel split
 
     } # End of match parcel
 
@@ -7692,9 +7651,6 @@ function sell_units(now, ac, u, x, parcel_tag, parcel_timestamp,        du, p, d
 
   delete Ordering
 
-
-  printf "\tFinal Units => %.3f\n", ((ac in Total_Units)?( ((__MPX_KEY__ = find_key(Total_Units[ac],   now))?( Total_Units[ac][__MPX_KEY__]):( ((0 == __MPX_KEY__)?( Total_Units[ac][0]):( 0))))):( 0)) > "/dev/stderr"
-  printf "\tFinal Total Cost     => %s\n", print_cash(get_cost(ac, now)) > "/dev/stderr"
 
 
   # Were all the requested units actually sold?
@@ -7730,20 +7686,21 @@ function get_parcel_ordering(a, now, order, sale_order,        p, sense, k, key,
   }
 
   # Need a function to compute parcel taxable gain...
-
   p = 0
   while (p < Number_Parcels[a]) {
     # Skip sold parcels - including those sold today
     if ((Held_Until[a][ p] > ( now))) {
       if (gains_type) {
-        key = k = sense * get_parcel_gains_aud(a, p, now)
-        # There may be a key clash
-        while (key in order)
-          # Arbitrary small shift
-          key = k + 10.0 * sense * rand() * Epsilon
+        key = @Get_Parcel_Gains_Function(a, p, now)
 
       } else
         key = sense * Held_From[a][p]
+
+      # There may be a key clash
+      if (key in order)
+        # Add a unique id tag (the parcel number)
+        key = sprintf("%.4f_%d", key, p)
+
 
       # Save the key
       order[key] = p
@@ -7770,17 +7727,12 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
 
   # Amount paid
 
-  printf "\tAmount Paid => %s\n", print_cash(amount_paid) > "/dev/stderr"
-
 
   # Check for an empty parcel - allow for rounding error
   if (((((Units_Held[a][p] - du) - ( Epsilon)) <= 0) && (((Units_Held[a][p] - du) - ( -Epsilon)) >= 0)))
     # Parcel is sold off
     Units_Held[a][p] = du
   else { # Units remain - parcel not completely sold off
-
-    printf "\tsplit parcel %3d on => %10.3f off => %10.3f\n\t\tadjustment => %s\n\t\tparcel cost => %s\n",
-          p, Units_Held[a][p], du, print_cash(get_cost_modifications(a, p, now)), print_cash(get_parcel_cost(a, p, now)) > "/dev/stderr"
 
 
     # Shuffle parcels up by one
@@ -7816,14 +7768,6 @@ function sell_parcel(a, p, du, amount_paid, now,      gains, i, is_split) {
   (Parcel_Proceeds[a][ p] = ( -amount_paid))
 
 
-  printf "\tsold parcel => %05d off => %10.3f date => %s\n\t\tHeld => [%s, %s]\n\t\tadjustment => %s\n\t\tparcel cost => %s\n\t\tparcel paid => %s\n\t\tparcel gains => %s\n",
-    p, du,  get_date(now),
-    get_date(Held_From[a][p]), get_date(Held_Until[a][p]),
-    print_cash(get_cost_modifications(a, p, now)),
-    print_cash(get_parcel_cost(a, p, now)),
-    print_cash((Parcel_Proceeds[a][ p])),
-    print_cash(gains / du) > "/dev/stderr"
-
 
   # Was a parcel split
   return is_split
@@ -7840,13 +7784,6 @@ function save_parcel_income(a, p, now, income, income_account, expense_account, 
   # Income                => c + p <  0
 
   income += sum_cost_elements(Accounting_Cost[a][p], now)
-
-  if ((((income) - ( Epsilon)) > 0)) # This was an expense
-    printf "\tExpense => %s\n", print_cash(income) > "/dev/stderr"
-  else if ((((income) - ( -Epsilon)) < 0)) # This was income
-    printf "\tIncome => %s\n", print_cash(-income) > "/dev/stderr"
-  else
-    printf "\tZero Income\n" > "/dev/stderr"
 
 
   # Any excess income or expenses are recorded
